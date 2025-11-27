@@ -1,99 +1,143 @@
 "use client";
+
 import * as React from "react";
+import { use } from "react";
 
-const API = process.env.NEXT_PUBLIC_API_URL!; // ej: http://localhost:3001/api
+const API = process.env.NEXT_PUBLIC_API_URL!;
 
-type QuestionKind = "MCQ" | "TRUE_FALSE" | "SHORT_TEXT" | "FILL_IN";
-type GradingMode = "auto" | "manual";
+type ExamResponse = {
+  exam: {
+    id: string;
+    title: string;
+    status: string;
+    durationMinutes: number | null;
+    lives?: number | null;
+    code: string;
+  };
+};
 
-export default function TeacherBoard({
+type Meta = {
+  examId: string;
+  teacherName: string | null;
+  subject: string | null;
+  gradingMode: "auto" | "manual";
+  maxScore: number;
+  openAt: string | null;
+};
+
+type MetaResponse = {
+  meta: Meta | null;
+};
+
+export default function ConfigurePage({
   params,
 }: {
   params: Promise<{ code: string }>;
 }) {
-  const { code } = React.use(params);
+  const { code } = use(params);
 
-  // ---- examen base ----
-  const [exam, setExam] = React.useState<any>(null);
-  const [isOpen, setIsOpen] = React.useState<boolean>(false);
-  const [duration, setDuration] = React.useState<number>(60);
+  // loading / error
+  const [loading, setLoading] = React.useState(true);
+  const [err, setErr] = React.useState<string | null>(null);
+  const [savingMeta, setSavingMeta] = React.useState(false);
   const [savingExam, setSavingExam] = React.useState(false);
+  const [info, setInfo] = React.useState<string | null>(null);
 
-  // ---- meta (docente, materia, grading, maxScore, openAt) ----
+  // exam básico
+  const [examId, setExamId] = React.useState<string | null>(null);
+  const [title, setTitle] = React.useState("");
+  const [durationMinutes, setDurationMinutes] = React.useState<number | "">("");
+  const [lives, setLives] = React.useState<number | "">("");
+  const [isOpen, setIsOpen] = React.useState(false);
+
+  // meta docente/materia
   const [teacherName, setTeacherName] = React.useState("");
   const [subject, setSubject] = React.useState("");
-  const [gradingMode, setGradingMode] = React.useState<GradingMode>("auto");
-  const [maxScore, setMaxScore] = React.useState<number>(10);
-  const [openAt, setOpenAt] = React.useState<string>(""); // ISO local datetime (input type="datetime-local")
-  const [savingMeta, setSavingMeta] = React.useState(false);
+  const [gradingMode, setGradingMode] = React.useState<"auto" | "manual">(
+    "auto"
+  );
+  const [maxScore, setMaxScore] = React.useState<number | "">("");
+  const [openAt, setOpenAt] = React.useState<string>("");
 
-  // ---- preguntas ----
-  const [items, setItems] = React.useState<any[]>([]);
-  const [loadingQ, setLoadingQ] = React.useState(false);
-  const [savingQ, setSavingQ] = React.useState(false);
-  const [errMsg, setErrMsg] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    async function load() {
+      setLoading(true);
+      setErr(null);
+      setInfo(null);
+      try {
+        const [examRes, metaRes] = await Promise.all([
+          fetch(`${API}/exams/${code}`, { cache: "no-store" }),
+          fetch(`${API}/exams/${code}/meta`, { cache: "no-store" }),
+        ]);
 
-  // formulario crear pregunta
-  const [kind, setKind] = React.useState<QuestionKind>("MCQ");
-  const [stem, setStem] = React.useState("");
-  const [points, setPoints] = React.useState(1);
+        if (!examRes.ok) {
+          throw new Error(await examRes.text());
+        }
+        const examData: ExamResponse = await examRes.json();
+        const e = examData.exam;
+        setExamId(e.id);
+        setTitle(e.title || "");
+        setIsOpen(String(e.status).toLowerCase() === "open");
+        setDurationMinutes(
+          typeof e.durationMinutes === "number" ? e.durationMinutes : ""
+        );
+        setLives(typeof e.lives === "number" ? e.lives : "");
 
-  // MCQ
-  const [mcqChoices, setMcqChoices] = React.useState<string[]>([
-    "Opción 1",
-    "Opción 2",
-  ]);
-  const [mcqCorrect, setMcqCorrect] = React.useState(0);
-
-  // VOF
-  const [tfCorrect, setTfCorrect] = React.useState(true);
-
-  // Texto
-  const [shortAnswer, setShortAnswer] = React.useState("");
-
-  // Completar
-  const [fillAnswers, setFillAnswers] = React.useState("");
-
-  // ---- Step (pestañas) ----
-  const [step, setStep] = React.useState<1 | 2 | 3 | 4>(1);
-
-  // ----------------- helpers -----------------
-  async function loadExam() {
-    const r = await fetch(`${API}/exams/${code}`, { cache: "no-store" });
-    if (!r.ok) throw new Error("No se pudo cargar el examen");
-    const data = await r.json();
-    const ex = data.exam;
-    setExam(ex);
-    setIsOpen(!!ex.isOpen);
-    setDuration(Number(ex.durationMinutes ?? 60));
-  }
-
-  async function loadMeta() {
-    const r = await fetch(`${API}/exams/${code}/meta`, { cache: "no-store" });
-    if (!r.ok) return; // no meta aún
-    const data = await r.json();
-    if (data?.meta) {
-      setTeacherName(data.meta.teacherName ?? "");
-      setSubject(data.meta.subject ?? "");
-      setGradingMode((data.meta.gradingMode as GradingMode) ?? "auto");
-      setMaxScore(
-        Number.isFinite(data.meta.maxScore) ? Number(data.meta.maxScore) : 10
-      );
-      // openAt del server es UTC; acá podrías convertir a local si quisieras
-      setOpenAt(data.meta.openAt ?? "");
+        if (!metaRes.ok) {
+          // si falla meta, seguimos igual
+        } else {
+          const metaData: MetaResponse = await metaRes.json();
+          if (metaData.meta) {
+            const m = metaData.meta;
+            setTeacherName(m.teacherName || "");
+            setSubject(m.subject || "");
+            setGradingMode(
+              (m.gradingMode || "auto").toLowerCase() === "manual"
+                ? "manual"
+                : "auto"
+            );
+            setMaxScore(
+              typeof m.maxScore === "number" && !isNaN(m.maxScore)
+                ? m.maxScore
+                : ""
+            );
+            if (m.openAt) {
+              const d = new Date(m.openAt);
+              if (!isNaN(d.getTime())) {
+                // datetime-local necesita yyyy-MM-ddTHH:mm
+                const iso = d.toISOString().slice(0, 16);
+                setOpenAt(iso);
+              }
+            }
+          }
+        }
+      } catch (e: any) {
+        setErr(e?.message || "No se pudo cargar el examen");
+      } finally {
+        setLoading(false);
+      }
     }
-  }
+    load();
+  }, [code]);
 
   async function saveMeta() {
+    if (!examId) return;
     setSavingMeta(true);
+    setErr(null);
+    setInfo(null);
     try {
       const body: any = {
         teacherName: teacherName.trim() || null,
         subject: subject.trim() || null,
         gradingMode,
-        maxScore: Number(maxScore) || 10,
-        openAt: openAt ? new Date(openAt).toISOString() : null, // ✅ a ISO
       };
+      if (maxScore !== "") {
+        body.maxScore = Number(maxScore);
+      }
+      if (openAt) {
+        // enviamos ISO; el backend ya hace el parse
+        body.openAt = new Date(openAt).toISOString();
+      }
 
       const r = await fetch(`${API}/exams/${code}/meta`, {
         method: "PUT",
@@ -101,24 +145,33 @@ export default function TeacherBoard({
         body: JSON.stringify(body),
       });
       if (!r.ok) throw new Error(await r.text());
-      await loadMeta();
-      alert("Datos guardados");
-      setStep(2); // ir al siguiente paso
-    } catch (e) {
-      console.error(e);
-      alert("No se pudo guardar los datos del docente/materia");
+      setInfo("Datos del docente guardados.");
+    } catch (e: any) {
+      setErr(e?.message || "Error al guardar los datos del docente");
     } finally {
       setSavingMeta(false);
     }
   }
 
-  async function saveExamConfig(open?: boolean) {
+  async function saveAndOpenExam() {
+    if (!examId) return;
     setSavingExam(true);
+    setErr(null);
+    setInfo(null);
     try {
       const body: any = {
-        durationMins: Number(duration) || 0,
+        isOpen: true,
       };
-      if (typeof open === "boolean") body.isOpen = open;
+
+      if (title.trim()) body.title = title.trim();
+      if (durationMinutes !== "") {
+        // 🔴 antes: body.durationMin
+        body.durationMinutes = Number(durationMinutes) || 0;
+      }
+      if (lives !== "") {
+        const v = Math.max(0, Math.floor(Number(lives) || 0));
+        body.lives = v;
+      }
 
       const r = await fetch(`${API}/exams/${code}`, {
         method: "PUT",
@@ -126,521 +179,372 @@ export default function TeacherBoard({
         body: JSON.stringify(body),
       });
       if (!r.ok) throw new Error(await r.text());
-      const upd = await r.json();
-      setExam(upd);
-      setIsOpen(!!upd.isOpen);
-      alert("Configuración guardada");
-      setStep(3);
-    } catch (e) {
-      console.error(e);
-      alert("No se pudo guardar la configuración");
+
+      setIsOpen(true);
+      setInfo("Configuración guardada y examen abierto.");
+    } catch (e: any) {
+      setErr(e?.message || "Error al guardar la configuración");
     } finally {
       setSavingExam(false);
     }
   }
 
-  async function loadQuestions() {
-    setLoadingQ(true);
-    setErrMsg(null);
-    try {
-      const r = await fetch(`${API}/exams/${code}/questions`, {
-        cache: "no-store",
-      });
-      if (!r.ok) throw new Error(await r.text());
-      const data = await r.json();
-      setItems(data.items ?? []);
-    } catch (e: any) {
-      console.error(e);
-      setErrMsg("No se pudieron cargar las preguntas.");
-    } finally {
-      setLoadingQ(false);
-    }
-  }
-
-  React.useEffect(() => {
-    (async () => {
-      try {
-        await loadExam();
-        await loadMeta();
-        await loadQuestions();
-      } catch (e) {
-        console.error(e);
-        alert("Error cargando el examen");
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code]);
-
-  // ---- builder helpers ----
-  function addMcqChoice() {
-    setMcqChoices((prev) => [...prev, `Opción ${prev.length + 1}`]);
-  }
-  function removeMcqChoice(idx: number) {
-    setMcqChoices((prev) => prev.filter((_, i) => i !== idx));
-    if (mcqCorrect >= mcqChoices.length - 1) {
-      setMcqCorrect(Math.max(0, mcqChoices.length - 2));
-    }
-  }
-  function updateMcqChoice(idx: number, val: string) {
-    setMcqChoices((prev) => prev.map((c, i) => (i === idx ? val : c)));
-  }
-
-  async function saveQuestion() {
-    setSavingQ(true);
-    setErrMsg(null);
-    try {
-      if (!stem.trim()) throw new Error("Falta el enunciado/consigna.");
-      const body: any = {
-        kind,
-        stem: stem.trim(),
-        points: Number(points) || 1,
-      };
-
-      if (kind === "MCQ") {
-        const choices = mcqChoices.map((s) => s.trim()).filter(Boolean);
-        if (choices.length < 2)
-          throw new Error("MCQ requiere al menos 2 opciones.");
-        if (mcqCorrect < 0 || mcqCorrect >= choices.length)
-          throw new Error("Índice correcto fuera de rango.");
-        body.choices = choices;
-        body.answer = mcqCorrect;
-      } else if (kind === "TRUE_FALSE") {
-        body.answer = Boolean(tfCorrect);
-      } else if (kind === "SHORT_TEXT") {
-        body.answer = shortAnswer.trim() || null;
-      } else if (kind === "FILL_IN") {
-        const answers = fillAnswers
-          .split(";")
-          .map((s) => s.trim())
-          .filter(Boolean);
-        body.answer = { answers };
-      }
-
-      const r = await fetch(`${API}/exams/${code}/questions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!r.ok) throw new Error(await r.text());
-
-      // limpiar y recargar
-      setStem("");
-      setPoints(1);
-      setMcqChoices(["Opción 1", "Opción 2"]);
-      setMcqCorrect(0);
-      setTfCorrect(true);
-      setShortAnswer("");
-      setFillAnswers("");
-      await loadQuestions();
-    } catch (e: any) {
-      console.error(e);
-      setErrMsg(e.message || String(e));
-    } finally {
-      setSavingQ(false);
-    }
-  }
-
-  function copyLink() {
-    const link = `${window.location.origin}/s/${code}`;
-    navigator.clipboard.writeText(link);
-    alert("Link copiado: " + link);
-  }
+  const cardStyle: React.CSSProperties = {
+    border: "1px solid #e5e7eb",
+    borderRadius: 12,
+    padding: 16,
+    background: "#fff",
+  };
 
   return (
     <div
       style={{
+        maxWidth: 960,
+        margin: "0 auto",
         padding: 16,
         display: "grid",
         gap: 16,
-        maxWidth: 1100,
-        margin: "0 auto",
       }}
     >
-      <h2>Docente – {code}</h2>
-
-      {/* Navegación simple de pasos */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button
-          onClick={() => setStep(1)}
-          style={{ fontWeight: step === 1 ? 700 : 400 }}
-        >
-          1) Datos
-        </button>
-        <button
-          onClick={() => setStep(2)}
-          style={{ fontWeight: step === 2 ? 700 : 400 }}
-        >
-          2) Configuración
-        </button>
-        <button
-          onClick={() => setStep(3)}
-          style={{ fontWeight: step === 3 ? 700 : 400 }}
-        >
-          3) Cuestionario
-        </button>
-        <button
-          onClick={() => setStep(4)}
-          style={{ fontWeight: step === 4 ? 700 : 400 }}
-        >
-          4) Publicar
-        </button>
-        <div style={{ marginLeft: "auto" }}>
-          <button onClick={copyLink}>Copiar link alumno</button>
+      {/* ENCABEZADO */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ fontSize: 14, opacity: 0.7 }}>
+          Docente —{" "}
+          <b>
+            {code.toUpperCase()}
+            {isOpen ? " (abierto)" : " (cerrado)"}
+          </b>
+        </div>
+        <h1 style={{ margin: 0, fontSize: 22 }}>Armado de exámenes</h1>
+        <div style={{ fontSize: 13, opacity: 0.75 }}>
+          Configurá los datos del examen, tus datos como docente y cómo se va a
+          corregir.
         </div>
       </div>
 
-      {/* Paso 1: Datos del docente y materia */}
-      {step === 1 && (
-        <section
-          style={{
-            border: "1px solid #ddd",
-            borderRadius: 8,
-            padding: 12,
-            display: "grid",
-            gap: 10,
-          }}
-        >
-          <h3>Datos del docente y materia</h3>
-          <label>Nombre del docente</label>
-          <input
-            value={teacherName}
-            onChange={(e) => setTeacherName(e.target.value)}
-            placeholder="Ej: Malena Pérez"
-          />
-          <label>Materia</label>
-          <input
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            placeholder="Ej: Psicología Clínica"
-          />
-          <div style={{ display: "flex", gap: 12 }}>
-            <div>
-              <label>Modo de corrección</label>
-              <select
-                value={gradingMode}
-                onChange={(e) => setGradingMode(e.target.value as GradingMode)}
-              >
-                <option value="auto">Instantánea (automática)</option>
-                <option value="manual">Manual</option>
-              </select>
-            </div>
-            <div>
-              <label>Nota máxima del examen</label>
-              <input
-                type="number"
-                value={maxScore}
-                onChange={(e) =>
-                  setMaxScore(parseInt(e.target.value, 10) || 10)
-                }
-                style={{ width: 120 }}
-              />
-            </div>
-          </div>
-          <div>
-            <label>Hora de apertura (opcional)</label>
-            <input
-              type="datetime-local"
-              value={openAt}
-              onChange={(e) => setOpenAt(e.target.value)}
-            />
-            <small style={{ display: "block", opacity: 0.7 }}>
-              Si se completa, el examen queda con “hora sugerida de apertura”.
-              El cierre se produce cuando vence el tiempo del alumno.
-            </small>
-          </div>
-          <div>
-            <button disabled={savingMeta} onClick={saveMeta}>
-              {savingMeta ? "Guardando…" : "Guardar y continuar"}
-            </button>
-          </div>
-        </section>
-      )}
+      {loading && <div>Cargando configuración…</div>}
 
-      {/* Paso 2: Configuración básica del examen */}
-      {step === 2 && (
-        <section
-          style={{
-            border: "1px solid #ddd",
-            borderRadius: 8,
-            padding: 12,
-            display: "grid",
-            gap: 10,
-          }}
-        >
-          <h3>Configuración básica</h3>
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <div>
-              <b>Título:</b> {exam?.title ?? "—"}
-            </div>
-            <div>
-              <b>Abierto:</b> {isOpen ? "Sí" : "No"}
-            </div>
-          </div>
-          <label>Duración del examen (minutos)</label>
-          <input
-            type="number"
-            value={duration}
-            onChange={(e) => setDuration(parseInt(e.target.value, 10) || 0)}
-            style={{ width: 140 }}
-          />
-          <div style={{ display: "flex", gap: 12 }}>
-            <button disabled={savingExam} onClick={() => saveExamConfig()}>
-              {savingExam ? "Guardando…" : "Guardar configuración"}
-            </button>
-            <button disabled={savingExam} onClick={() => saveExamConfig(true)}>
-              {savingExam ? "…" : "Guardar y abrir examen"}
-            </button>
-          </div>
-        </section>
-      )}
-
-      {/* Paso 3: Cuestionario (crear preguntas) */}
-      {step === 3 && (
-        <section
-          style={{
-            border: "1px solid #ddd",
-            borderRadius: 8,
-            padding: 12,
-            display: "grid",
-            gap: 12,
-          }}
-        >
-          <h3>Cuestionario</h3>
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <label style={{ fontWeight: 600 }}>Tipo:</label>
-            <select
-              value={kind}
-              onChange={(e) => setKind(e.target.value as QuestionKind)}
-            >
-              <option value="MCQ">Multiple Choice (MCQ)</option>
-              <option value="TRUE_FALSE">Verdadero / Falso</option>
-              <option value="SHORT_TEXT">Texto breve</option>
-              <option value="FILL_IN">Completar</option>
-            </select>
-            <div style={{ marginLeft: "auto", opacity: 0.7 }}>
-              {loadingQ ? "Cargando…" : `Preguntas: ${items.length}`}
-            </div>
-          </div>
-
-          {errMsg && (
+      {!loading && (
+        <>
+          {/* BLOQUE: Datos del docente y materia */}
+          <div style={cardStyle}>
+            <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 18 }}>
+              Datos del docente y materia
+            </h2>
             <div
               style={{
-                background: "#fee",
-                border: "1px solid #f99",
-                padding: 10,
-                borderRadius: 8,
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+                alignItems: "flex-start",
               }}
             >
-              <b>Error: </b>
-              {errMsg}
-            </div>
-          )}
-
-          <label style={{ fontWeight: 600 }}>Enunciado / consigna</label>
-          <textarea
-            value={stem}
-            onChange={(e) => setStem(e.target.value)}
-            rows={3}
-            placeholder="Escribí la consigna…"
-            style={{ width: "100%" }}
-          />
-
-          {kind === "MCQ" && (
-            <div style={{ display: "grid", gap: 8 }}>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <b>Opciones</b>
-                <button type="button" onClick={addMcqChoice}>
-                  + Agregar opción
-                </button>
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>Nombre del docente</label>
+                <input
+                  value={teacherName}
+                  onChange={(e) => setTeacherName(e.target.value)}
+                  placeholder="Ej: Prof. Gómez"
+                  style={{
+                    padding: 8,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                  }}
+                />
               </div>
-              {mcqChoices.map((c, idx) => (
-                <div
-                  key={idx}
-                  style={{ display: "flex", gap: 8, alignItems: "center" }}
-                >
-                  <input
-                    type="radio"
-                    name="mcqCorrect"
-                    checked={mcqCorrect === idx}
-                    onChange={() => setMcqCorrect(idx)}
-                    title="Correcta"
-                  />
-                  <input
-                    value={c}
-                    onChange={(e) => updateMcqChoice(idx, e.target.value)}
-                    style={{ flex: 1 }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeMcqChoice(idx)}
-                    disabled={mcqChoices.length <= 2}
-                    title="Eliminar opción"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {kind === "TRUE_FALSE" && (
-            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <label>Respuesta correcta:</label>
-              <label>
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>Materia</label>
                 <input
-                  type="radio"
-                  name="tf"
-                  checked={tfCorrect === true}
-                  onChange={() => setTfCorrect(true)}
-                />{" "}
-                Verdadero
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name="tf"
-                  checked={tfCorrect === false}
-                  onChange={() => setTfCorrect(false)}
-                />{" "}
-                Falso
-              </label>
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Ej: Matemática I"
+                  style={{
+                    padding: 8,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                  }}
+                />
+              </div>
             </div>
-          )}
 
-          {kind === "SHORT_TEXT" && (
-            <div style={{ display: "grid", gap: 6 }}>
-              <label>Respuesta de referencia (opcional)</label>
-              <input
-                value={shortAnswer}
-                onChange={(e) => setShortAnswer(e.target.value)}
-                placeholder="Respuesta esperada (opcional)"
-              />
-            </div>
-          )}
-
-          {kind === "FILL_IN" && (
-            <div style={{ display: "grid", gap: 6 }}>
-              <label>Respuestas correctas (separadas por “;”)</label>
-              <input
-                value={fillAnswers}
-                onChange={(e) => setFillAnswers(e.target.value)}
-                placeholder="ej: palabra1; palabra2; palabra3"
-              />
-              <small style={{ opacity: 0.7 }}>
-                Se guardan como <code>{`{ answers: string[] }`}</code> (mínimo
-                viable).
-              </small>
-            </div>
-          )}
-
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <label>Puntos</label>
-            <input
-              type="number"
-              value={points}
-              onChange={(e) => setPoints(parseInt(e.target.value, 10) || 1)}
-              style={{ width: 120 }}
-            />
-            <button
-              disabled={savingQ || !stem.trim()}
-              onClick={saveQuestion}
-              style={{ marginLeft: "auto" }}
+            <div
+              style={{
+                marginTop: 12,
+                display: "grid",
+                gridTemplateColumns: "1.2fr 0.8fr",
+                gap: 12,
+              }}
             >
-              {savingQ ? "Guardando…" : "Guardar pregunta"}
-            </button>
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>Modo de corrección</label>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <label
+                    style={{ display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <input
+                      type="radio"
+                      checked={gradingMode === "auto"}
+                      onChange={() => setGradingMode("auto")}
+                    />
+                    Instantánea (automática)
+                  </label>
+                  <label
+                    style={{ display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <input
+                      type="radio"
+                      checked={gradingMode === "manual"}
+                      onChange={() => setGradingMode("manual")}
+                    />
+                    Manual
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>Nota máxima del examen</label>
+                <input
+                  type="number"
+                  min={1}
+                  step="1"
+                  value={maxScore === "" ? "" : maxScore}
+                  onChange={(e) =>
+                    setMaxScore(
+                      e.target.value === "" ? "" : Number(e.target.value)
+                    )
+                  }
+                  placeholder="Ej: 10"
+                  style={{
+                    padding: 8,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 12,
+                display: "grid",
+                gridTemplateColumns: "1fr auto",
+                gap: 12,
+                alignItems: "flex-end",
+              }}
+            >
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>
+                  Hora de apertura (opcional)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={openAt}
+                  onChange={(e) => setOpenAt(e.target.value)}
+                  style={{
+                    padding: 8,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                  }}
+                />
+                <div style={{ fontSize: 11, opacity: 0.7 }}>
+                  Si se completa, el examen queda con hora sugerida de apertura.
+                  El cierre se produce cuando vence el tiempo del alumno.
+                </div>
+              </div>
+              <button
+                onClick={saveMeta}
+                disabled={savingMeta}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 999,
+                  border: "none",
+                  background: savingMeta ? "#9ca3af" : "#111827",
+                  color: "#fff",
+                  fontSize: 14,
+                  cursor: "pointer",
+                  height: 38,
+                }}
+              >
+                {savingMeta ? "Guardando…" : "Guardar datos del docente"}
+              </button>
+            </div>
           </div>
 
-          {/* listado */}
-          <h4>📋 Preguntas ({items.length})</h4>
-          {!items.length && <p>No hay preguntas todavía.</p>}
-          <ol>
-            {items.map((q: any, idx: number) => (
-              <li key={q.id} style={{ marginBottom: 12 }}>
+          {/* BLOQUE: Configuración básica */}
+          <div style={cardStyle}>
+            <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 18 }}>
+              Configuración básica
+            </h2>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "2fr 1fr",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>Título del examen</label>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Ej: Parcial 1 - Unidad 1"
+                  style={{
+                    padding: 8,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>Estado</label>
                 <div
-                  style={{ display: "flex", gap: 8, alignItems: "baseline" }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 14,
+                  }}
                 >
-                  <b
+                  <span
                     style={{
-                      fontSize: 12,
-                      background: "#eef",
-                      padding: "2px 6px",
-                      borderRadius: 6,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: "4px 10px",
+                      borderRadius: 999,
+                      background: isOpen ? "#dcfce7" : "#fee2e2",
+                      color: isOpen ? "#166534" : "#991b1b",
                     }}
                   >
-                    {q.kind}
-                  </b>
-                  <span style={{ fontWeight: 600 }}>{idx + 1}.</span>
-                  <span>{q.stem}</span>
-                  {typeof q.points === "number" && (
-                    <span
-                      style={{ marginLeft: "auto", fontSize: 12, opacity: 0.7 }}
-                    >
-                      Puntos: {q.points}
-                    </span>
-                  )}
+                    {isOpen ? "Abierto" : "Cerrado"}
+                  </span>
+                  <span style={{ opacity: 0.7, fontSize: 12 }}>
+                    Se abrirá al guardar la configuración.
+                  </span>
                 </div>
-                {Array.isArray(q.choices) && q.choices.length > 0 && (
-                  <ul style={{ marginTop: 6 }}>
-                    {q.choices.map((c: string, i: number) => (
-                      <li key={i}>
-                        {i}. {c}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ))}
-          </ol>
+              </div>
+            </div>
 
-          <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-            <button onClick={() => setStep(4)}>Continuar a publicación</button>
+            <div
+              style={{
+                marginTop: 12,
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>
+                  Duración del examen (minutos)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={durationMinutes === "" ? "" : durationMinutes}
+                  onChange={(e) =>
+                    setDurationMinutes(
+                      e.target.value === "" ? "" : Number(e.target.value)
+                    )
+                  }
+                  placeholder="Ej: 60"
+                  style={{
+                    padding: 8,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>
+                  Vidas del examen (puede ser 0, 1, 3, 6…)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={lives === "" ? "" : lives}
+                  onChange={(e) =>
+                    setLives(
+                      e.target.value === "" ? "" : Number(e.target.value)
+                    )
+                  }
+                  placeholder="Ej: 3"
+                  style={{
+                    padding: 8,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                  }}
+                />
+                <div style={{ fontSize: 11, opacity: 0.7 }}>
+                  Cada vez que se detecta fraude, se pierde 1 vida. Al llegar a
+                  0, el examen se cierra.
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 16,
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                onClick={saveAndOpenExam}
+                disabled={savingExam}
+                style={{
+                  padding: "10px 18px",
+                  borderRadius: 999,
+                  border: "none",
+                  background: savingExam ? "#9ca3af" : "#111827",
+                  color: "#fff",
+                  fontSize: 14,
+                  cursor: "pointer",
+                }}
+              >
+                {savingExam ? "Guardando…" : "Guardar y abrir examen"}
+              </button>
+            </div>
           </div>
-        </section>
+        </>
       )}
 
-      {/* Paso 4: Publicación (guardar todo + link) */}
-      {step === 4 && (
-        <section
+      {err && (
+        <div
           style={{
-            border: "1px solid #ddd",
             borderRadius: 8,
-            padding: 12,
-            display: "grid",
-            gap: 10,
+            padding: 8,
+            border: "1px solid #fecaca",
+            background: "#fef2f2",
+            fontSize: 13,
           }}
         >
-          <h3>Publicación y link</h3>
-          <p>
-            <b>Modo de corrección:</b>{" "}
-            {gradingMode === "auto" ? "Instantánea (automática)" : "Manual"}
-            {" — "}
-            <b>Nota máxima:</b> {maxScore}
-          </p>
-          <div style={{ display: "flex", gap: 12 }}>
-            <button onClick={copyLink}>Guardar y copiar link</button>
-            <a href={`/t`} style={{ alignSelf: "center" }}>
-              Ir a “Exámenes”
-              <a href={`/t/${code}/board`}>
-                <button>Ir al tablero de control</button>
-              </a>
-            </a>
-          </div>
-          <small style={{ opacity: 0.7 }}>
-            Link del alumno:{" "}
-            <code>
-              {typeof window !== "undefined"
-                ? `${window.location.origin}/s/${code}`
-                : `/s/${code}`}
-            </code>
-          </small>
-        </section>
+          {err}
+        </div>
+      )}
+
+      {info && (
+        <div
+          style={{
+            borderRadius: 8,
+            padding: 8,
+            border: "1px solid #bbf7d0",
+            background: "#f0fdf4",
+            fontSize: 13,
+          }}
+        >
+          {info}
+        </div>
       )}
     </div>
   );

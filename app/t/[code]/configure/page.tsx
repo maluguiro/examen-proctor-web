@@ -1,200 +1,545 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import * as React from "react";
+import { use } from "react";
+import { useRouter } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_API_URL!;
 
-type Mode = "auto" | "manual";
-type Review = "immediate" | "after_manual";
+type ExamResponse = {
+  exam: {
+    id: string;
+    title: string;
+    status: string;
+    durationMinutes: number | null;
+    lives?: number | null;
+    code: string;
+  };
+};
 
-export default function ConfigureExamPage() {
-  const p = useParams();
-  const code = (p?.code as string) || "";
+type Meta = {
+  examId: string;
+  teacherName: string | null;
+  subject: string | null;
+  gradingMode: "auto" | "manual";
+  maxScore: number;
+  openAt: string | null;
+};
+
+type MetaResponse = {
+  meta: Meta | null;
+};
+
+export default function ConfigurePage({
+  params,
+}: {
+  params: Promise<{ code: string }>;
+}) {
+  const { code } = use(params);
   const router = useRouter();
 
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
+  // loading / error
+  const [loading, setLoading] = React.useState(true);
+  const [err, setErr] = React.useState<string | null>(null);
+  const [savingMeta, setSavingMeta] = React.useState(false);
+  const [savingExam, setSavingExam] = React.useState(false);
+  const [info, setInfo] = React.useState<string | null>(null);
 
-  const [examId, setExamId] = useState<string>("");
-  const [title, setTitle] = useState<string>("");
+  // exam básico
+  const [examId, setExamId] = React.useState<string | null>(null);
+  const [title, setTitle] = React.useState("");
+  const [durationMinutes, setDurationMinutes] = React.useState<number | "">("");
+  const [lives, setLives] = React.useState<number | "">("");
+  const [isOpen, setIsOpen] = React.useState(false);
 
-  // configuraciones
-  const [lives, setLives] = useState<number>(3);
-  const [durationMins, setDurationMins] = useState<number>(60);
-  const [gradingMode, setGradingMode] = useState<Mode>("auto"); // auto = nota instantánea
-  const [reviewMode, setReviewMode] = useState<Review>("immediate"); // immediate = revisión inmediata
+  // meta docente/materia
+  const [teacherName, setTeacherName] = React.useState("");
+  const [subject, setSubject] = React.useState("");
+  const [gradingMode, setGradingMode] = React.useState<"auto" | "manual">(
+    "auto"
+  );
+  const [maxScore, setMaxScore] = React.useState<number | "">("");
+  const [openAt, setOpenAt] = React.useState<string>("");
 
-  async function load() {
-    try {
+  React.useEffect(() => {
+    async function load() {
       setLoading(true);
       setErr(null);
+      setInfo(null);
+      try {
+        const [examRes, metaRes] = await Promise.all([
+          fetch(`${API}/exams/${code}`, { cache: "no-store" }),
+          fetch(`${API}/exams/${code}/meta`, { cache: "no-store" }),
+        ]);
 
-      const res = await fetch(`${API}/exams/by-code/${code}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const e = await res.json();
+        if (!examRes.ok) {
+          throw new Error(await examRes.text());
+        }
+        const examData: ExamResponse = await examRes.json();
+        const e = examData.exam;
+        setExamId(e.id);
+        setTitle(e.title || "");
+        setIsOpen(String(e.status).toLowerCase() === "open");
+        setDurationMinutes(
+          typeof e.durationMinutes === "number" ? e.durationMinutes : ""
+        );
+        setLives(typeof e.lives === "number" ? e.lives : "");
 
-      setExamId(e.id);
-      setTitle(e.title);
-      setLives(Number(e.lives ?? 3));
-      setDurationMins(Number(e.durationMins ?? 60));
-      setGradingMode((e.gradingMode as Mode) ?? "auto");
-      setReviewMode((e.reviewMode as Review) ?? "immediate");
-    } catch (e: any) {
-      setErr(e?.message || "No se pudo cargar la configuración");
-    } finally {
-      setLoading(false);
+        if (metaRes.ok) {
+          const metaData: MetaResponse = await metaRes.json();
+          if (metaData.meta) {
+            const m = metaData.meta;
+            setTeacherName(m.teacherName || "");
+            setSubject(m.subject || "");
+            setGradingMode(
+              (m.gradingMode || "auto").toLowerCase() === "manual"
+                ? "manual"
+                : "auto"
+            );
+            setMaxScore(
+              typeof m.maxScore === "number" && !isNaN(m.maxScore)
+                ? m.maxScore
+                : ""
+            );
+            if (m.openAt) {
+              const d = new Date(m.openAt);
+              if (!isNaN(d.getTime())) {
+                const iso = d.toISOString().slice(0, 16); // yyyy-MM-ddTHH:mm
+                setOpenAt(iso);
+              }
+            }
+          }
+        }
+      } catch (e: any) {
+        setErr(e?.message || "No se pudo cargar el examen");
+      } finally {
+        setLoading(false);
+      }
     }
-  }
+    load();
+  }, [code]);
 
-  useEffect(() => {
-    if (code) load();
-  }, [code]); // eslint-disable-line
-
-  async function save() {
+  async function saveMeta() {
+    if (!examId) return;
+    setSavingMeta(true);
     setErr(null);
-    const res = await fetch(`${API}/exams/${examId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lives, durationMins, gradingMode, reviewMode }),
-    });
-    if (!res.ok) throw new Error(await res.text());
-  }
-
-  async function onSave() {
+    setInfo(null);
     try {
-      await save();
-      alert("Configuración guardada.");
-    } catch (e: any) {
-      setErr(e?.message || "No se pudo guardar");
-    }
-  }
+      const body: any = {
+        teacherName: teacherName.trim() || null,
+        subject: subject.trim() || null,
+        gradingMode,
+      };
+      if (maxScore !== "") {
+        body.maxScore = Number(maxScore);
+      }
+      if (openAt) {
+        body.openAt = new Date(openAt).toISOString();
+      }
 
-  async function onSaveAndOpen() {
-    try {
-      await save();
-      const r = await fetch(`${API}/exams/${examId}/status`, {
-        method: "PATCH",
+      const r = await fetch(`${API}/exams/${code}/meta`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "OPEN" }), // mandamos OPEN y la API lo normaliza
+        body: JSON.stringify(body),
       });
-      const txt = await r.text();
-      if (!r.ok) throw new Error(txt || "No se pudo abrir el examen");
-      // si llega acá, abrió bien -> al tablero
-      router.push(`/t/${code}`);
+      if (!r.ok) throw new Error(await r.text());
+      setInfo("Datos del docente guardados.");
     } catch (e: any) {
-      setErr(
-        e?.message || "La configuración se guardó, pero no pude abrir el examen"
-      );
+      setErr(e?.message || "Error al guardar los datos del docente");
+    } finally {
+      setSavingMeta(false);
     }
   }
 
-  if (loading) return <div style={{ padding: 24 }}>Cargando…</div>;
-  if (err)
-    return <div style={{ padding: 24, color: "crimson" }}>Error: {err}</div>;
+  async function saveAndOpenExam() {
+    if (!examId) return;
+    setSavingExam(true);
+    setErr(null);
+    setInfo(null);
+    try {
+      const body: any = {
+        isOpen: true,
+      };
+
+      if (title.trim()) body.title = title.trim();
+      if (durationMinutes !== "") {
+        body.durationMin = Number(durationMinutes) || 0;
+      }
+      if (lives !== "") {
+        const v = Math.max(0, Math.floor(Number(lives) || 0));
+        body.lives = v;
+      }
+
+      const r = await fetch(`${API}/exams/${code}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error(await r.text());
+
+      setIsOpen(true);
+
+      // 👉 Redirección directa al armado de consignas
+      if (typeof window !== "undefined") {
+        window.location.href = `/t/${code}/builder`;
+      }
+    } catch (e: any) {
+      setErr(e?.message || "Error al guardar la configuración");
+    } finally {
+      setSavingExam(false);
+    }
+  }
+
+  const cardStyle: React.CSSProperties = {
+    border: "1px solid #e5e7eb",
+    borderRadius: 12,
+    padding: 16,
+    background: "#fff",
+  };
 
   return (
-    <main style={{ padding: 24, maxWidth: 900, margin: "0 auto" }}>
-      <a href={`/t/${code}`} style={{ textDecoration: "none" }}>
-        ← Volver
-      </a>
-      <h1>Configurar examen</h1>
-      <div style={{ color: "#666", marginBottom: 12 }}>{title}</div>
-
-      <div
-        style={{
-          display: "grid",
-          gap: 12,
-          border: "1px solid #eee",
-          padding: 16,
-          borderRadius: 10,
-        }}
-      >
-        <div>
-          <label>Vidas por alumno</label>
-          <input
-            type="number"
-            min={1}
-            value={lives}
-            onChange={(e) => setLives(Number(e.target.value))}
-            style={{ width: 120, padding: 8, marginLeft: 8 }}
-          />
-        </div>
-
-        <div>
-          <label>Duración (minutos)</label>
-          <input
-            type="number"
-            min={0}
-            value={durationMins}
-            onChange={(e) => setDurationMins(Number(e.target.value))}
-            style={{ width: 160, padding: 8, marginLeft: 8 }}
-          />
-        </div>
-
-        <div style={{ borderTop: "1px solid #eee", paddingTop: 10 }}>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Calificación</div>
-          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input
-              type="radio"
-              name="grading"
-              value="auto"
-              checked={gradingMode === "auto"}
-              onChange={() => setGradingMode("auto")}
-            />
-            Nota instantánea (MCQ/VF autocorregible)
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input
-              type="radio"
-              name="grading"
-              value="manual"
-              checked={gradingMode === "manual"}
-              onChange={() => setGradingMode("manual")}
-            />
-            La nota la pone el docente (tras leer respuestas)
-          </label>
-        </div>
-
-        <div>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>
-            Revisión del alumno
-          </div>
-          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input
-              type="radio"
-              name="review"
-              value="immediate"
-              checked={reviewMode === "immediate"}
-              onChange={() => setReviewMode("immediate")}
-            />
-            Habilitar revisión inmediata
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input
-              type="radio"
-              name="review"
-              value="after_manual"
-              checked={reviewMode === "after_manual"}
-              onChange={() => setReviewMode("after_manual")}
-            />
-            Habilitar revisión luego de que el docente califique
-          </label>
-        </div>
-
-        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          <button onClick={onSave}>💾 Guardar</button>
-          <button onClick={onSaveAndOpen}>✅ Guardar y abrir examen</button>
-          <a
-            href={`/t/${code}/edit`}
-            style={{ textDecoration: "none", marginLeft: "auto" }}
-          >
-            <button>Volver al editor</button>
-          </a>
+    <div
+      style={{
+        maxWidth: 960,
+        margin: "0 auto",
+        padding: 16,
+        display: "grid",
+        gap: 16,
+      }}
+    >
+      {/* ENCABEZADO SIN "Docente — ABC123" */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <h1 style={{ margin: 0, fontSize: 22 }}>Armado de exámenes</h1>
+        <div style={{ fontSize: 13, opacity: 0.75 }}>
+          Configurá los datos del examen, tus datos como docente y cómo se va a
+          corregir.
         </div>
       </div>
-    </main>
+
+      {loading && <div>Cargando configuración…</div>}
+
+      {!loading && (
+        <>
+          {/* BLOQUE: Datos del docente y materia */}
+          <div style={cardStyle}>
+            <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 18 }}>
+              Datos del docente y materia
+            </h2>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+                alignItems: "flex-start",
+              }}
+            >
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>Nombre del docente</label>
+                <input
+                  value={teacherName}
+                  onChange={(e) => setTeacherName(e.target.value)}
+                  placeholder="Ej: Prof. Gómez"
+                  style={{
+                    padding: 8,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                  }}
+                />
+              </div>
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>Materia</label>
+                <input
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Ej: Psicología Clínica de Niños"
+                  style={{
+                    padding: 8,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 12,
+                display: "grid",
+                gridTemplateColumns: "1.2fr 0.8fr",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>Modo de corrección</label>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <label
+                    style={{ display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <input
+                      type="radio"
+                      checked={gradingMode === "auto"}
+                      onChange={() => setGradingMode("auto")}
+                    />
+                    Instantánea (automática)
+                  </label>
+                  <label
+                    style={{ display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <input
+                      type="radio"
+                      checked={gradingMode === "manual"}
+                      onChange={() => setGradingMode("manual")}
+                    />
+                    Manual
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>Nota máxima del examen</label>
+                <input
+                  type="number"
+                  min={1}
+                  step="1"
+                  value={maxScore === "" ? "" : maxScore}
+                  onChange={(e) =>
+                    setMaxScore(
+                      e.target.value === "" ? "" : Number(e.target.value)
+                    )
+                  }
+                  placeholder="Ej: 10"
+                  style={{
+                    padding: 8,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 12,
+                display: "grid",
+                gridTemplateColumns: "1fr auto",
+                gap: 12,
+                alignItems: "flex-end",
+              }}
+            >
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>
+                  Hora de apertura (opcional)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={openAt}
+                  onChange={(e) => setOpenAt(e.target.value)}
+                  style={{
+                    padding: 8,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                  }}
+                />
+                <div style={{ fontSize: 11, opacity: 0.7 }}>
+                  Si se completa, el examen queda con hora sugerida de apertura.
+                  El cierre se produce cuando vence el tiempo del alumno.
+                </div>
+              </div>
+              <button
+                onClick={saveMeta}
+                disabled={savingMeta}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 999,
+                  border: "none",
+                  background: savingMeta ? "#9ca3af" : "#111827",
+                  color: "#fff",
+                  fontSize: 14,
+                  cursor: "pointer",
+                  height: 38,
+                }}
+              >
+                {savingMeta ? "Guardando…" : "Guardar datos del docente"}
+              </button>
+            </div>
+          </div>
+
+          {/* BLOQUE: Configuración básica */}
+          <div style={cardStyle}>
+            <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 18 }}>
+              Configuración básica
+            </h2>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "2fr 1fr",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>Título del examen</label>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Ej: 1° Parcial Psicología Clínica de Niños"
+                  style={{
+                    padding: 8,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>Estado</label>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 14,
+                  }}
+                >
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: "4px 10px",
+                      borderRadius: 999,
+                      background: isOpen ? "#dcfce7" : "#fee2e2",
+                      color: isOpen ? "#166534" : "#991b1b",
+                    }}
+                  >
+                    {isOpen ? "Abierto" : "Cerrado"}
+                  </span>
+                  <span style={{ opacity: 0.7, fontSize: 12 }}>
+                    Se abrirá al guardar la configuración.
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 12,
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>
+                  Duración del examen (minutos)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={durationMinutes === "" ? "" : durationMinutes}
+                  onChange={(e) =>
+                    setDurationMinutes(
+                      e.target.value === "" ? "" : Number(e.target.value)
+                    )
+                  }
+                  placeholder="Ej: 60"
+                  style={{
+                    padding: 8,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ fontSize: 13 }}>
+                  Vidas del examen (puede ser 0, 1, 3, 6…)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={lives === "" ? "" : lives}
+                  onChange={(e) =>
+                    setLives(
+                      e.target.value === "" ? "" : Number(e.target.value)
+                    )
+                  }
+                  placeholder="Ej: 3"
+                  style={{
+                    padding: 8,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                  }}
+                />
+                <div style={{ fontSize: 11, opacity: 0.7 }}>
+                  Cada vez que se detecta fraude, se pierde 1 vida. Al llegar a
+                  0, el examen se cierra.
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 16,
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                onClick={saveAndOpenExam}
+                disabled={savingExam}
+                style={{
+                  padding: "10px 18px",
+                  borderRadius: 999,
+                  border: "none",
+                  background: savingExam ? "#9ca3af" : "#111827",
+                  color: "#fff",
+                  fontSize: 14,
+                  cursor: "pointer",
+                }}
+              >
+                {savingExam ? "Guardando…" : "Guardar y abrir examen"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {err && (
+        <div
+          style={{
+            borderRadius: 8,
+            padding: 8,
+            border: "1px solid #fecaca",
+            background: "#fef2f2",
+            fontSize: 13,
+          }}
+        >
+          {err}
+        </div>
+      )}
+
+      {info && (
+        <div
+          style={{
+            borderRadius: 8,
+            padding: 8,
+            border: "1px solid #bbf7d0",
+            background: "#f0fdf4",
+            fontSize: 13,
+          }}
+        >
+          {info}
+        </div>
+      )}
+    </div>
   );
 }

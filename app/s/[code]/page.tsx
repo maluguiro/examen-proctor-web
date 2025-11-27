@@ -1,16 +1,15 @@
 "use client";
-
 import * as React from "react";
 import { use } from "react";
 import ExamChat from "@/components/ExamChat";
 
-// ============= CONFIG =============
 const API = process.env.NEXT_PUBLIC_API_URL!;
 
-// ============= TIPOS =============
+type QKind = "TRUE_FALSE" | "MCQ" | "SHORT" | "FIB";
+
 type PaperQuestion = {
   id: string;
-  kind: "TRUE_FALSE" | "MCQ" | "SHORT" | "FIB";
+  kind: QKind | string; // por compat
   stem: string;
   choices?: string[] | null; // MCQ
   points?: number | null;
@@ -28,42 +27,6 @@ type SubmitResponse = {
   maxScore?: number | null;
 };
 
-// ============= HELPERS UI =============
-function mapKind(k: string): "TRUE_FALSE" | "MCQ" | "SHORT" | "FIB" {
-  const x = String(k || "").toUpperCase();
-  if (x === "TRUE_FALSE" || x === "V_F" || x === "VOF") return "TRUE_FALSE";
-  if (x === "MCQ" || x === "MULTIPLE_CHOICE") return "MCQ";
-  if (x === "SHORT" || x === "TEXT" || x === "TEXTO") return "SHORT";
-  if (x === "FIB" || x === "FILL_IN_BLANKS" || x === "CASILLEROS") return "FIB";
-  return "MCQ";
-}
-
-function fibParseToParts(
-  stem: string
-): Array<{ type: "text" | "box"; idx?: number; text?: string }> {
-  const parts: Array<{ type: "text" | "box"; idx?: number; text?: string }> =
-    [];
-  const re = /\[\[(.*?)\]\]/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  let boxIdx = 0;
-  while ((match = re.exec(stem)) !== null) {
-    const i = match.index;
-    if (i > lastIndex) {
-      parts.push({ type: "text", text: stem.slice(lastIndex, i) });
-    }
-    parts.push({ type: "box", idx: boxIdx++ });
-    lastIndex = i + match[0].length;
-  }
-  if (lastIndex < stem.length) {
-    parts.push({ type: "text", text: stem.slice(lastIndex) });
-  }
-  if (parts.length === 0) {
-    parts.push({ type: "text", text: stem });
-  }
-  return parts;
-}
-
 export default function Student({
   params,
 }: {
@@ -71,18 +34,18 @@ export default function Student({
 }) {
   const { code } = use(params);
 
-  // ---- pasos UI
+  // pasos UI
   const [step, setStep] = React.useState<
     "name" | "exam" | "submitting" | "submitted"
   >("name");
 
-  // ---- alumno
+  // alumno
   const [studentName, setStudentName] = React.useState("");
 
-  // ---- intento
+  // intento actual
   const [attemptId, setAttemptId] = React.useState<string | null>(null);
 
-  // ---- paper
+  // examen/paper
   const [exam, setExam] = React.useState<{
     title: string;
     code: string;
@@ -91,163 +54,206 @@ export default function Student({
   const [loadingPaper, setLoadingPaper] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
 
-  // ---- respuestas
+  // runtime: vidas + tiempo
+  const [lives, setLives] = React.useState<number | null>(null);
+  const [secondsLeft, setSecondsLeft] = React.useState<number | null>(null);
+  const [flash, setFlash] = React.useState(false); // para avisar visualmente pérdida de vida
+
+  // respuestas
   const [answers, setAnswers] = React.useState<Record<string, any>>({});
 
-  // ---- resultado
+  // resultado post-submit
   const [gradingMode, setGradingMode] = React.useState<"auto" | "manual">(
     "auto"
   );
   const [score, setScore] = React.useState<number | null>(null);
   const [maxScore, setMaxScore] = React.useState<number | null>(null);
 
-  // ---- estado runtime (vidas + timer)
-  const [lives, setLives] = React.useState<number | null>(null);
-  const [status, setStatus] = React.useState<string>("running");
-  const [secondsLeft, setSecondsLeft] = React.useState<number | null>(null);
+  // util: mapear kind sueltos a nuestros 4 soportados
+  const mapKind = (k: string): QKind => {
+    const s = String(k || "").toUpperCase();
+    if (s === "TRUE_FALSE" || s === "TF" || s === "VOF") return "TRUE_FALSE";
+    if (s === "MCQ" || s === "MULTIPLE" || s === "MULTIPLE_CHOICE")
+      return "MCQ";
+    if (s === "SHORT" || s === "TEXT" || s === "TEXT_SHORT" || s === "BREVE")
+      return "SHORT";
+    if (s === "FIB" || s.includes("FILL") || s.includes("BLANK")) return "FIB";
+    // fallback amigable
+    return "SHORT";
+  };
 
-  // ============= ANTIFRAUDE: reportar eventos al backend alias que YA FUNCIONA =============
+  // parsea [[ ... ]] -> piezas de texto y cajas (para FIB)
+  function fibParseToParts(stem: string) {
+    const parts: Array<{ type: "text" | "box"; idx?: number; text?: string }> =
+      [];
+    const re = /\[\[(.*?)\]\]/g;
+    let last = 0,
+      m: RegExpExecArray | null,
+      box = 0;
+    while ((m = re.exec(stem)) !== null) {
+      if (m.index > last)
+        parts.push({ type: "text", text: stem.slice(last, m.index) });
+      parts.push({ type: "box", idx: box++ });
+      last = m.index + m[0].length;
+    }
+    if (last < stem.length)
+      parts.push({ type: "text", text: stem.slice(last) });
+    if (!parts.length) parts.push({ type: "text", text: stem });
+    return parts;
+  }
+
+  // ======= antifraude: reportador genérico + aviso visual
+  const refreshSummary = React.useCallback(async () => {
+    if (!attemptId) return;
+    try {
+      const r = await fetch(`${API}/attempts/${attemptId}/summary`, {
+        cache: "no-store",
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+
+      setLives(Number.isFinite(data.remaining) ? data.remaining : null);
+      setSecondsLeft(data.secondsLeft ?? null);
+
+      if (data.remaining != null && data.remaining <= 0) {
+        await finishAttempt("lives");
+      }
+    } catch {}
+  }, [attemptId]);
+
   const reportViolation = React.useCallback(
     async (type: string, meta?: any) => {
       if (!attemptId) return;
       try {
-        await fetch(`${API}/attempts/${attemptId}/antifraud`, {
+        // POST real: descuenta vida y devuelve remaining
+        const r = await fetch(`${API}/attempts/${attemptId}/antifraud`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type, meta }),
         });
+        if (r.ok) {
+          // feedback inmediato (flash)
+          setFlash(true);
+          setTimeout(() => setFlash(false), 500);
+
+          // refrescar resumen para mostrar vidas/timer actualizados
+          await refreshSummary();
+        }
       } catch {}
     },
-    [attemptId]
+    [attemptId, refreshSummary]
   );
 
-  // Instalar listeners de antifraude cuando estamos en el examen
-  React.useEffect(() => {
-    if (step !== "exam") return;
-
-    const onBlur = () => reportViolation("blur");
-    const onVis = () => {
-      if (document.visibilityState === "hidden") reportViolation("tab-hidden");
-    };
-    const onFsChange = () => {
-      if (!document.fullscreenElement) reportViolation("fullscreen-exit");
-    };
-    const onCopy = (e: ClipboardEvent) => {
-      reportViolation("copy");
-      // e.preventDefault(); // opcional
-    };
-    const onPaste = (e: ClipboardEvent) => {
-      reportViolation("paste");
-      // e.preventDefault(); // opcional
-    };
-
-    window.addEventListener("blur", onBlur);
-    document.addEventListener("visibilitychange", onVis);
-    document.addEventListener("fullscreenchange", onFsChange);
-    document.addEventListener("copy", onCopy as any);
-    document.addEventListener("paste", onPaste as any);
-
-    return () => {
-      window.removeEventListener("blur", onBlur);
-      document.removeEventListener("visibilitychange", onVis);
-      document.removeEventListener("fullscreenchange", onFsChange);
-      document.removeEventListener("copy", onCopy as any);
-      document.removeEventListener("paste", onPaste as any);
-    };
-  }, [step, reportViolation]);
-
-  // ============= POLL SUMMARY: vidas + timer, y auto-submit =============
+  // listeners antifraude
   React.useEffect(() => {
     if (step !== "exam" || !attemptId) return;
-    let stop = false;
 
-    async function tick() {
-      try {
-        const r = await fetch(`${API}/attempts/${attemptId}/summary`, {
-          cache: "no-store",
-        });
-        if (!r.ok) throw new Error(await r.text());
-        const s = await r.json();
-
-        if (stop) return;
-        setLives(s.remaining ?? null);
-        setStatus(String(s.status || "running"));
-
-        if (typeof s.secondsLeft === "number") {
-          setSecondsLeft(s.secondsLeft);
-          if (s.secondsLeft <= 0) {
-            submitAttempt(); // fin de tiempo => auto envío
-            return;
-          }
-        }
-
-        if (typeof s.remaining === "number" && s.remaining <= 0) {
-          submitAttempt(); // vidas agotadas => auto envío
-          return;
-        }
-      } catch (e) {
-        // opcional: setErr("No se puede sincronizar estado");
-      }
-    }
-
-    tick();
-    const id = setInterval(tick, 2000);
-    return () => {
-      stop = true;
-      clearInterval(id);
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") reportViolation("blur");
     };
-  }, [step, attemptId]);
+    const onCopy = (e: ClipboardEvent) => {
+      e.preventDefault();
+      reportViolation("copy");
+    };
+    const onCut = (e: ClipboardEvent) => {
+      e.preventDefault();
+      reportViolation("cut");
+    };
+    const onPaste = (e: ClipboardEvent) => {
+      e.preventDefault();
+      reportViolation("paste");
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        reportViolation("print");
+      }
+      if (e.key === "PrintScreen") {
+        e.preventDefault();
+        reportViolation("printscreen");
+      }
+    };
+    const onFull = () => {
+      // si se sale del fullscreen, cuenta como violación
+      // @ts-ignore
+      const fs =
+        document.fullscreenElement || (document as any).webkitFullscreenElement;
+      if (!fs) reportViolation("fullscreen-exit");
+    };
 
-  // ============= ACCIONES PRINCIPALES =============
+    document.addEventListener("visibilitychange", onVisibility);
+    document.addEventListener("copy", onCopy as any);
+    document.addEventListener("cut", onCut as any);
+    document.addEventListener("paste", onPaste as any);
+    document.addEventListener("keydown", onKey as any);
+    document.addEventListener("fullscreenchange", onFull as any);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener("copy", onCopy as any);
+      document.removeEventListener("cut", onCut as any);
+      document.removeEventListener("paste", onPaste as any);
+      document.removeEventListener("keydown", onKey as any);
+      document.removeEventListener("fullscreenchange", onFull as any);
+    };
+  }, [step, attemptId, reportViolation]);
+
+  // polling del summary (cada 2s mientras rinde)
+  React.useEffect(() => {
+    if (step !== "exam" || !attemptId) return;
+    let t = setInterval(refreshSummary, 2000);
+    refreshSummary();
+    return () => clearInterval(t);
+  }, [step, attemptId, refreshSummary]);
+
+  // ======= inicio intento
   async function startAttempt() {
     setErr(null);
     const name = studentName.trim();
-    if (!name) {
-      setErr("Ingresá tu nombre para comenzar.");
-      return;
-    }
+    if (!name) return setErr("Ingresá tu nombre para comenzar.");
 
     try {
-      // pedir fullscreen
-      const el = document.documentElement;
+      // fullscreen (mejor esfuerzo)
+      const el: any = document.documentElement;
       if (el.requestFullscreen) {
         try {
           await el.requestFullscreen();
         } catch {}
       }
 
-      // crear intento
-      const r0 = await fetch(`${API}/exams/${code}/attempts/start`, {
+      // crear intento en backend REAL
+      const r = await fetch(`${API}/exams/${code}/attempts/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ studentName: name }),
       });
-      if (!r0.ok) throw new Error(await r0.text());
-      const data0 = await r0.json();
-      setAttemptId(data0.attempt.id);
+      if (!r.ok) throw new Error(await r.text());
+      const data = await r.json();
+      setAttemptId(data.attempt.id);
 
-      // cargar paper
+      // paper
       setLoadingPaper(true);
       const pr = await fetch(`${API}/exams/${code}/paper`, {
         cache: "no-store",
       });
       if (!pr.ok) throw new Error(await pr.text());
       const pdata: PaperResponse = await pr.json();
-
       setExam(pdata.exam);
+
+      // normalizar kinds
       const qs = (pdata.questions || []).map((q) => ({
         ...q,
-        kind: mapKind(q.kind as any),
+        kind: mapKind(q.kind),
       }));
       setQuestions(qs);
 
-      // seed de respuestas
+      // semillas de respuestas
       const seed: Record<string, any> = {};
       for (const q of qs) {
-        if (q.kind === "TRUE_FALSE") seed[q.id] = ""; // "true"/"false"
-        else if (q.kind === "MCQ") seed[q.id] = null; // índice
+        if (q.kind === "TRUE_FALSE") seed[q.id] = "";
+        else if (q.kind === "MCQ") seed[q.id] = null;
         else if (q.kind === "SHORT") seed[q.id] = "";
-        else if (q.kind === "FIB") seed[q.id] = []; // array
+        else if (q.kind === "FIB") seed[q.id] = [];
       }
       setAnswers(seed);
 
@@ -258,6 +264,21 @@ export default function Student({
     }
   }
 
+  // ======= terminar (por vidas o por envío)
+  async function finishAttempt(reason?: "lives" | "time" | "manual") {
+    if (!attemptId) return;
+    try {
+      await fetch(`${API}/s/attempt/${attemptId}/finish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reason || "manual" }),
+      }).catch(() => {});
+    } finally {
+      setStep("submitting");
+    }
+  }
+
+  // ======= enviar
   async function submitAttempt() {
     if (!attemptId) return;
     setErr(null);
@@ -266,14 +287,12 @@ export default function Student({
     try {
       const payload = {
         answers: questions.map((q) => {
-          const val = answers[q.id];
+          const v = answers[q.id];
           if (q.kind === "FIB") {
-            const arr = Array.isArray(val)
-              ? val.map((v) => String(v ?? ""))
-              : [];
+            const arr = Array.isArray(v) ? v.map((x) => String(x ?? "")) : [];
             return { questionId: q.id, value: arr };
           }
-          return { questionId: q.id, value: val };
+          return { questionId: q.id, value: v };
         }),
       };
 
@@ -295,16 +314,34 @@ export default function Student({
     }
   }
 
-  // ============= RENDER PREGUNTAS =============
+  // ======= UI helpers
+  const Header = (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        marginBottom: 12,
+      }}
+    >
+      <h2 style={{ margin: 0 }}>{exam?.title || "Examen"}</h2>
+      <div style={{ marginLeft: "auto", fontSize: 12, opacity: 0.7 }}>
+        Requiere pantalla completa
+      </div>
+    </div>
+  );
+
   function renderQuestion(q: PaperQuestion, idx: number) {
-    const commonBox = {
+    const commonBox: React.CSSProperties = {
       border: "1px solid #e5e7eb",
       borderRadius: 10,
       padding: 12,
       marginBottom: 10,
-    } as React.CSSProperties;
+    };
 
-    if (q.kind === "TRUE_FALSE") {
+    const kind = mapKind(q.kind as string);
+
+    if (kind === "TRUE_FALSE") {
       const v = String(answers[q.id] ?? "");
       return (
         <div key={q.id} style={commonBox}>
@@ -350,7 +387,7 @@ export default function Student({
       );
     }
 
-    if (q.kind === "MCQ") {
+    if (kind === "MCQ") {
       const v = Number(answers[q.id]);
       return (
         <div key={q.id} style={commonBox}>
@@ -383,7 +420,7 @@ export default function Student({
       );
     }
 
-    if (q.kind === "SHORT") {
+    if (kind === "SHORT") {
       const v = String(answers[q.id] ?? "");
       return (
         <div key={q.id} style={commonBox}>
@@ -394,14 +431,14 @@ export default function Student({
             value={v}
             onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
             placeholder="Escribe tu respuesta…"
-            rows={5}
+            rows={4}
+            maxLength={2000}
             style={{
               width: "100%",
               padding: 10,
               border: "1px solid #e5e7eb",
               borderRadius: 8,
               resize: "vertical",
-              minHeight: 120,
             }}
           />
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
@@ -411,19 +448,18 @@ export default function Student({
       );
     }
 
-    if (q.kind === "FIB") {
+    if (kind === "FIB") {
       const parts = fibParseToParts(q.stem || "");
       const vArr: string[] = Array.isArray(answers[q.id]) ? answers[q.id] : [];
-      function setAt(ix: number, val: string) {
+      const setAt = (ix: number, val: string) => {
         const next = [...(vArr || [])];
         next[ix] = val;
         setAnswers({ ...answers, [q.id]: next });
-      }
+      };
+
       return (
         <div key={q.id} style={commonBox}>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>
-            {idx + 1}. Completa los casilleros
-          </div>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>{idx + 1}.</div>
           <div
             style={{
               display: "flex",
@@ -443,7 +479,7 @@ export default function Student({
                   onChange={(e) => setAt(p.idx!, e.target.value)}
                   style={{
                     width: 160,
-                    padding: 6,
+                    padding: 8,
                     border: "1px solid #e5e7eb",
                     borderRadius: 8,
                   }}
@@ -458,7 +494,7 @@ export default function Student({
       );
     }
 
-    // fallback (no debería verse si mapKind funciona)
+    // fallback
     return (
       <div key={q.id} style={commonBox}>
         <div>
@@ -469,50 +505,7 @@ export default function Student({
     );
   }
 
-  // ============= HEADER (título + vidas + timer) =============
-  const Header = (
-    <div
-      style={{
-        padding: 8,
-        borderRadius: 10,
-        border: "1px solid #ddd",
-        background: "#f7f7f7",
-        display: "flex",
-        gap: 16,
-        alignItems: "center",
-        flexWrap: "wrap",
-      }}
-    >
-      <div>
-        <b>{exam?.title || "Examen"}</b>
-      </div>
-      <div>
-        Alumno: <b>{studentName}</b>
-      </div>
-      <div style={{ marginLeft: "auto", display: "flex", gap: 16 }}>
-        <div>
-          <b>Vidas:</b> {lives ?? "—"}
-        </div>
-        <div>
-          <b>Tiempo:</b>{" "}
-          {secondsLeft != null
-            ? (() => {
-                const m = Math.floor(secondsLeft / 60);
-                const s = secondsLeft % 60;
-                const danger = secondsLeft <= 600;
-                return (
-                  <span style={{ color: danger ? "red" : undefined }}>
-                    {m}:{String(s).padStart(2, "0")}
-                  </span>
-                );
-              })()
-            : "—"}
-        </div>
-      </div>
-    </div>
-  );
-
-  // ============= JSX =============
+  // ======= render
   return (
     <div
       style={{
@@ -565,6 +558,48 @@ export default function Student({
       {step === "exam" && (
         <div style={{ display: "grid", gap: 12 }}>
           {Header}
+
+          {/* Cabecera info (vidas/timer/título) */}
+          <div
+            style={{
+              padding: 8,
+              borderRadius: 10,
+              border: "1px solid #ddd",
+              background: flash ? "#ffe6e6" : "#f7f7f7",
+              transition: "background 200ms",
+              display: "flex",
+              gap: 16,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <b>{exam?.title || "Examen"}</b>
+            </div>
+            <div>
+              Alumno: <b>{studentName}</b>
+            </div>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 16 }}>
+              <div>
+                <b>Vidas:</b> {lives ?? "—"}
+              </div>
+              <div>
+                <b>Tiempo:</b>{" "}
+                {secondsLeft != null
+                  ? (() => {
+                      const m = Math.floor(secondsLeft / 60);
+                      const s = secondsLeft % 60;
+                      const danger = secondsLeft <= 600;
+                      return (
+                        <span style={{ color: danger ? "red" : undefined }}>
+                          {m}:{String(s).padStart(2, "0")}
+                        </span>
+                      );
+                    })()
+                  : "—"}
+              </div>
+            </div>
+          </div>
 
           {loadingPaper && <div>Cargando examen…</div>}
 
@@ -664,8 +699,7 @@ export default function Student({
               </div>
               {attemptId && (
                 <div style={{ fontSize: 12, opacity: 0.7 }}>
-                  Guardá este identificador de intento por si necesitás
-                  consultarlo: <code>{attemptId}</code>
+                  Guardá este identificador: <code>{attemptId}</code>
                 </div>
               )}
             </>
