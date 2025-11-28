@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { use } from "react";
 
 const API = process.env.NEXT_PUBLIC_API_URL!;
 
@@ -32,9 +31,9 @@ type MetaResponse = {
 export default function ConfigurePage({
   params,
 }: {
-  params: Promise<{ code: string }>;
+  params: { code: string };
 }) {
-  const { code } = use(params);
+  const { code } = params;
 
   // loading / error
   const [loading, setLoading] = React.useState(true);
