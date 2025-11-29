@@ -1,17 +1,13 @@
 "use client";
+
 import * as React from "react";
-import ExamChat from "@/components/ExamChat";
+import type {
+  ExamAttemptsResponse,
+  AttemptSummary,
+  ExamStatus,
+} from "@/lib/types";
 
 const API = process.env.NEXT_PUBLIC_API_URL!;
-
-type Attempt = {
-  id: string;
-  studentName: string;
-  livesRemaining: number;
-  paused: boolean;
-  violations?: string; // JSON de strings
-  startedAt?: string;
-};
 
 export default function BoardPage({
   params,
@@ -20,23 +16,23 @@ export default function BoardPage({
 }) {
   const { code } = React.use(params);
 
-  const [items, setItems] = React.useState<Attempt[]>([]);
+  const [data, setData] = React.useState<ExamAttemptsResponse | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
-  const [newName, setNewName] = React.useState("");
 
+  // ====== Cargar tablero ======
   async function load() {
     setLoading(true);
     setErr(null);
     try {
-      const r = await fetch(`${API}/exams/${code}/attempts`, {
+      const r = await fetch(`${API}/exams/${code}/attempts?t=${Date.now()}`, {
         cache: "no-store",
       });
       if (!r.ok) throw new Error(await r.text());
-      const data = await r.json();
-      setItems(data.attempts ?? []);
+      const json: ExamAttemptsResponse = await r.json();
+      setData(json);
     } catch (e: any) {
-      setErr(e.message || String(e));
+      setErr(e?.message || "No se pudo cargar el tablero");
     } finally {
       setLoading(false);
     }
@@ -49,185 +45,298 @@ export default function BoardPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  // Simular alumno (para pruebas locales)
-  async function mockAdd() {
-    if (!newName.trim()) return;
-    await fetch(`${API}/exams/${code}/attempts/mock`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ studentName: newName.trim() }),
-    }).catch(() => {});
-    setNewName("");
-    await load();
+  // ====== Acciones del docente (pausa, perdonar vida, +tiempo) ======
+  async function modAttempt(
+    id: string,
+    action: "pause" | "resume" | "forgive_life" | "add_time",
+    seconds?: number
+  ) {
+    try {
+      await fetch(`${API}/attempts/${id}/mod`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          action === "add_time"
+            ? { action, seconds: seconds ?? 300 }
+            : { action }
+        ),
+      });
+      await load();
+    } catch {
+      // si falla, igual el próximo poll va a refrescar
+    }
   }
 
-  // Operaciones: pause/resume/vidas
-  async function op(id: string, fn: "pause" | "resume" | "lives", body?: any) {
-    const url =
-      fn === "lives"
-        ? `${API}/attempts/${id}/lives`
-        : `${API}/attempts/${id}/${fn}`;
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: body ? JSON.stringify(body) : undefined,
-    }).catch(() => {});
-    await load();
+  const attempts: AttemptSummary[] = data?.attempts ?? [];
+  const total = attempts.length;
+  const exam = data?.exam;
+
+  function renderAttemptStatus(status: string, paused: boolean) {
+    if (status === "submitted") return "Enviado";
+    if (paused) return "Pausado";
+    return "En curso";
   }
 
-  const total = items.length;
+  function mapStatusLabel(status?: ExamStatus | string) {
+    switch (status) {
+      case "DRAFT":
+        return "Borrador";
+      case "OPEN":
+      case "open":
+        return "Abierto";
+      case "CLOSED":
+      case "closed":
+        return "Cerrado";
+      default:
+        return status || "";
+    }
+  }
 
   return (
-    <div
-      style={{
-        padding: 16,
-        display: "grid",
-        gap: 12,
-        maxWidth: 1000,
-        margin: "0 auto",
-      }}
-    >
-      <h2>Tablero — {code}</h2>
-
-      <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-        <b>Participantes:</b> {total}
-        <div style={{ marginLeft: "auto" }}>
-          <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Nombre alumno (mock)"
-          />
-          <button onClick={mockAdd} style={{ marginLeft: 8 }}>
-            ➕ Simular alumno
-          </button>
-        </div>
+    <main style={{ padding: 24, maxWidth: 1000, margin: "0 auto" }}>
+      <div style={{ marginBottom: 12 }}>
+        <a href={`/t/${code}`} style={{ textDecoration: "none" }}>
+          ← Volver
+        </a>
       </div>
-      {/* Botones de export del chat */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
-        <a
-          href={`${API}/exams/${code}/chat.csv`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <button>⬇️ Exportar chat (CSV)</button>
-        </a>
-        <a
-          href={`${API}/exams/${code}/chat.json`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <button>⬇️ Exportar chat (JSON)</button>
-        </a>
-        <a
-          href={`${API}/exams/${code}/chat.docx`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <button>⬇️ Exportar chat (Word)</button>
-        </a>
-        <a
-          href={`${API}/exams/${code}/chat.print`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <button>🖨️ Imprimir / PDF</button>
-        </a>
+
+      <h1 style={{ marginTop: 0 }}>Tablero — {code}</h1>
+
+      {exam && (
+        <p style={{ color: "#555" }}>
+          Examen: <b>{exam.title}</b>{" "}
+          {typeof exam.lives === "number" && (
+            <>
+              · Vidas por alumno: <b>{exam.lives}</b>
+            </>
+          )}{" "}
+          · Estado: <b>{mapStatusLabel(exam.status)}</b>
+        </p>
+      )}
+
+      <div
+        style={{
+          margin: "12px 0 16px",
+          padding: 12,
+          borderRadius: 8,
+          border: "1px solid #eee",
+          background: "#fafafa",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        <div>
+          Participantes: <b>{total}</b>
+        </div>
+        {/* Futuro: exportar tablero / chat como PDF */}
+        {/* <button>⬇ Exportar tablero (PDF)</button> */}
       </div>
 
       {err && (
-        <div
-          style={{
-            background: "#fee",
-            border: "1px solid #f99",
-            padding: 8,
-            borderRadius: 8,
-          }}
-        >
-          Error: {err}
-        </div>
+        <div style={{ color: "crimson", marginBottom: 12 }}>Error: {err}</div>
       )}
 
-      <div style={{ border: "1px solid #ddd", borderRadius: 8 }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "2fr 1fr 2fr 2fr",
-            gap: 8,
-            padding: "8px 12px",
-            background: "#f7f7f7",
-            fontWeight: 600,
-          }}
-        >
-          <div>Alumno</div>
-          <div>Vidas</div>
-          <div>Acciones</div>
-          <div>Estado</div>
-        </div>
-
-        {loading && items.length === 0 && (
-          <div style={{ padding: 12, opacity: 0.7 }}>Cargando…</div>
-        )}
-
-        {items.map((a) => {
-          let vio: string[] = [];
-          try {
-            vio = a.violations ? JSON.parse(String(a.violations)) : [];
-          } catch {}
-
-          return (
-            <div
-              key={a.id}
+      <table
+        style={{
+          width: "100%",
+          borderCollapse: "collapse",
+          fontSize: 14,
+        }}
+      >
+        <thead>
+          <tr>
+            <th
               style={{
-                display: "grid",
-                gridTemplateColumns: "2fr 1fr 2fr 2fr",
-                gap: 8,
-                padding: "8px 12px",
-                borderTop: "1px solid #eee",
+                textAlign: "left",
+                padding: 8,
+                borderBottom: "1px solid #ddd",
               }}
             >
-              <div>{a.studentName}</div>
-              <div>{a.livesRemaining}</div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                <button onClick={() => op(a.id, "lives", { op: "inc" })}>
-                  + Vida
-                </button>
-                <button onClick={() => op(a.id, "lives", { op: "forgive" })}>
-                  💟 Perdonar vida
-                </button>
-                <button onClick={() => op(a.id, "lives", { op: "dec" })}>
-                  - Vida
-                </button>
-                {a.paused ? (
-                  <button onClick={() => op(a.id, "resume")}>▶ Reanudar</button>
-                ) : (
-                  <button onClick={() => op(a.id, "pause")}>⏸ Pausar</button>
-                )}
-                <button disabled>+5 min</button>
-              </div>
-              <div>
-                {vio.length ? (
-                  <span style={{ color: "red" }}>
-                    Violaciones: {vio.join(", ")}
-                  </span>
-                ) : (
-                  <span style={{ opacity: 0.7 }}>
-                    {a.paused ? "Pausado" : "En curso"}
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
+              Alumno
+            </th>
+            <th
+              style={{
+                textAlign: "center",
+                padding: 8,
+                borderBottom: "1px solid #ddd",
+              }}
+            >
+              Vidas
+            </th>
+            <th
+              style={{
+                textAlign: "center",
+                padding: 8,
+                borderBottom: "1px solid #ddd",
+              }}
+            >
+              Puntaje
+            </th>
+            <th
+              style={{
+                textAlign: "center",
+                padding: 8,
+                borderBottom: "1px solid #ddd",
+              }}
+            >
+              Acciones
+            </th>
+            <th
+              style={{
+                textAlign: "left",
+                padding: 8,
+                borderBottom: "1px solid #ddd",
+              }}
+            >
+              Estado
+            </th>
+            <th
+              style={{
+                textAlign: "left",
+                padding: 8,
+                borderBottom: "1px solid #ddd",
+              }}
+            >
+              Último evento
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading && attempts.length === 0 && (
+            <tr>
+              <td colSpan={6} style={{ padding: 12 }}>
+                Cargando…
+              </td>
+            </tr>
+          )}
 
-        {!loading && items.length === 0 && (
-          <div style={{ padding: 12, opacity: 0.7 }}>
-            Aún no hay alumnos conectados.
-          </div>
-        )}
-      </div>
+          {!loading && attempts.length === 0 && (
+            <tr>
+              <td colSpan={6} style={{ padding: 12 }}>
+                Aún no hay alumnos conectados.
+              </td>
+            </tr>
+          )}
 
-      {/* Chat flotante (Docente) */}
-      <ExamChat code={code} role="teacher" defaultName="Docente" />
-    </div>
+          {attempts.map((a) => {
+            const examLives = exam?.lives ?? 0;
+            const livesRemaining =
+              examLives > 0 ? Math.max(0, examLives - (a.livesUsed ?? 0)) : 0;
+            const lastEvent = a.events?.[0];
+
+            return (
+              <tr key={a.id}>
+                <td
+                  style={{
+                    padding: 8,
+                    borderBottom: "1px solid #f0f0f0",
+                  }}
+                >
+                  {a.studentName || (
+                    <span style={{ color: "#999" }}>(sin nombre)</span>
+                  )}
+                </td>
+                <td
+                  style={{
+                    padding: 8,
+                    borderBottom: "1px solid #f0f0f0",
+                    textAlign: "center",
+                  }}
+                >
+                  {examLives ? `${livesRemaining}/${examLives}` : "—"}
+                </td>
+                <td
+                  style={{
+                    padding: 8,
+                    borderBottom: "1px solid #f0f0f0",
+                    textAlign: "center",
+                  }}
+                >
+                  {typeof a.score === "number" ? a.score : "—"}
+                </td>
+                <td
+                  style={{
+                    padding: 8,
+                    borderBottom: "1px solid #f0f0f0",
+                    textAlign: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 6,
+                      justifyContent: "center",
+                    }}
+                  >
+                    <button
+                      onClick={() => modAttempt(a.id, "forgive_life")}
+                      style={{ padding: "4px 8px", fontSize: 12 }}
+                    >
+                      Perdonar vida
+                    </button>
+                    <button
+                      onClick={() => modAttempt(a.id, "add_time", 300)}
+                      style={{ padding: "4px 8px", fontSize: 12 }}
+                    >
+                      +5 min
+                    </button>
+                    {a.paused ? (
+                      <button
+                        onClick={() => modAttempt(a.id, "resume")}
+                        style={{ padding: "4px 8px", fontSize: 12 }}
+                      >
+                        ▶ Reanudar
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => modAttempt(a.id, "pause")}
+                        style={{ padding: "4px 8px", fontSize: 12 }}
+                      >
+                        ⏸ Pausar
+                      </button>
+                    )}
+                  </div>
+                </td>
+                <td
+                  style={{
+                    padding: 8,
+                    borderBottom: "1px solid #f0f0f0",
+                  }}
+                >
+                  {renderAttemptStatus(a.status, a.paused)}
+                </td>
+                <td
+                  style={{
+                    padding: 8,
+                    borderBottom: "1px solid #f0f0f0",
+                    fontSize: 12,
+                    color: "#666",
+                  }}
+                >
+                  {lastEvent ? (
+                    <>
+                      {lastEvent.type}
+                      {lastEvent.reason ? ` · ${lastEvent.reason}` : ""} ·{" "}
+                      {new Date(lastEvent.ts).toLocaleTimeString()}
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* TODO (futuro):
+          - Chat docente centralizado
+          - Exportar tablero y chat como PDF
+          - Buscador / orden alfabético por alumno
+      */}
+    </main>
   );
 }
