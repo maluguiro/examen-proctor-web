@@ -1,562 +1,405 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import type { Question, QuestionType, ExamSettings } from "@/lib/types";
-
-type ExamSettingsPayload = {
-  title: string;
-  durationMins: number;
-  lives: number;
-  settings: ExamSettings;
-};
+import * as React from "react";
+import { useParams, useRouter } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_API_URL!;
 
-function nextLetter(n: number) {
-  // 0->A, 1->B...
-  return String.fromCharCode("A".charCodeAt(0) + n);
-}
+// Tipos que entiende el backend
+type QuestionKind = "MCQ" | "TRUE_FALSE" | "SHORT_TEXT" | "FILL_IN";
 
-export default function EditQuestionsPage() {
-  const { code } = useParams<{ code: string }>();
-  const [examInfo, setExamInfo] = useState<{
-    title: string;
-    durationMins: number;
-    lives: number;
-  } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [list, setList] = useState<Question[]>([]);
-  const [err, setErr] = useState<string | null>(null);
+type QuestionLite = {
+  id: string;
+  examId: string;
+  kind: QuestionKind;
+  stem: string;
+  choices: string[] | null;
+  answer: any;
+  points: number;
+};
 
-  // formulario nuevo
-  const [newType, setNewType] = useState<QuestionType>("mcq");
-  const [newText, setNewText] = useState("");
-  const [newPoints, setNewPoints] = useState<number>(1);
-  const [newOptions, setNewOptions] = useState<{ id: string; text: string }[]>([
-    { id: "A", text: "" },
-    { id: "B", text: "" },
+export default function EditExamPage() {
+  const params = useParams<{ code: string }>();
+  const router = useRouter();
+  const code = (params?.code || "").toString();
+
+  const [items, setItems] = React.useState<QuestionLite[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+
+  const [kind, setKind] = React.useState<QuestionKind>("MCQ");
+  const [stem, setStem] = React.useState("");
+
+  // Campos tipo MCQ
+  const [mcqChoices, setMcqChoices] = React.useState<string[]>([
+    "Opción 1",
+    "Opción 2",
   ]);
-  const [newCorrectMCQ, setNewCorrectMCQ] = useState<string[]>([]);
-  const [newCorrectTF, setNewCorrectTF] = useState<boolean>(true);
+  const [mcqCorrect, setMcqCorrect] = React.useState(0);
 
-  // cargar info básica del examen (título, duración, vidas)
-  useEffect(() => {
-    let cancel = false;
-    async function loadExam() {
-      try {
-        const res = await fetch(`${API}/exams/${code}/settings`, {
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const j: ExamSettingsPayload = await res.json();
-        if (!cancel)
-          setExamInfo({
-            title: j.title,
-            durationMins: j.durationMins,
-            lives: j.lives,
-          });
-      } catch {
-        // ignoramos por ahora
-      }
-    }
-    loadExam();
-    return () => {
-      cancel = true;
-    };
-  }, [code]);
+  // Campos TRUE/FALSE
+  const [tfCorrect, setTfCorrect] = React.useState(true);
 
-  // listar preguntas
+  // Campos SHORT_TEXT
+  const [shortAnswer, setShortAnswer] = React.useState("");
+
+  // Campos FILL_IN
+  const [fillAnswers, setFillAnswers] = React.useState("");
+
+  // Puntos
+  const [points, setPoints] = React.useState(1);
+
   async function load() {
+    if (!code) return;
     setLoading(true);
-    setErr(null);
+    setErrorMsg(null);
     try {
-      const res = await fetch(
-        `${API}/exams/${code}/questions?t=${Date.now()}`,
-        { cache: "no-store" }
-      );
-      if (!res.ok) throw new Error(await res.text());
-      const j: Question[] = await res.json();
-      setList(j);
-    } catch {
-      setErr("No se pudieron cargar las preguntas");
+      const r = await fetch(`${API}/exams/${code}/questions`, {
+        cache: "no-store",
+      });
+      if (!r.ok) throw new Error(await r.text());
+      const data = await r.json();
+      setItems(data.items ?? []);
+    } catch (e: any) {
+      console.error(e);
+      setErrorMsg("No se pudieron cargar las preguntas.");
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
+  React.useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  // crear pregunta
-  async function createQuestion(e: React.FormEvent) {
-    e.preventDefault();
+  function addMcqChoice() {
+    setMcqChoices((prev) => [...prev, `Opción ${prev.length + 1}`]);
+  }
 
-    const base: Partial<Question> = {
-      type: newType,
-      text: newText.trim(),
-      points: Number(newPoints),
-      order: list.length, // al final
-    };
+  function removeMcqChoice(idx: number) {
+    setMcqChoices((prev) => prev.filter((_, i) => i !== idx));
+    setMcqCorrect((prev) => {
+      const newLen = mcqChoices.length - 1;
+      if (prev >= newLen) return Math.max(0, newLen - 1);
+      return prev;
+    });
+  }
 
-    let payload: any = { ...base };
+  function updateMcqChoice(idx: number, val: string) {
+    setMcqChoices((prev) => prev.map((c, i) => (i === idx ? val : c)));
+  }
 
-    if (newType === "mcq") {
-      const opts = newOptions.map((o, i) => ({
-        id: o.id || nextLetter(i),
-        text: o.text || "",
-      }));
-      payload.options = opts;
-      payload.correct = newCorrectMCQ;
-    } else if (newType === "tf") {
-      payload.options = null;
-      payload.correct = !!newCorrectTF;
-    } else {
-      // text u otros tipos abiertos
-      payload.options = null;
-      payload.correct = null;
-    }
+  async function saveQuestion() {
+    setSaving(true);
+    setErrorMsg(null);
 
     try {
-      const res = await fetch(`${API}/exams/${code}/questions`, {
+      if (!stem.trim()) {
+        throw new Error("Falta el enunciado / consigna.");
+      }
+
+      let body: any = {
+        kind,
+        stem: stem.trim(),
+        points: Number(points) || 1,
+      };
+
+      if (kind === "MCQ") {
+        const choices = mcqChoices.map((s) => s.trim()).filter(Boolean);
+        if (choices.length < 2) {
+          throw new Error("Opción múltiple requiere al menos 2 opciones.");
+        }
+        if (mcqCorrect < 0 || mcqCorrect >= choices.length) {
+          throw new Error("La opción correcta está fuera de rango.");
+        }
+        body.choices = choices;
+        body.answer = mcqCorrect; // índice correcto (0-based)
+      } else if (kind === "TRUE_FALSE") {
+        body.answer = Boolean(tfCorrect);
+      } else if (kind === "SHORT_TEXT") {
+        body.answer = shortAnswer.trim() || null; // opcional
+      } else if (kind === "FILL_IN") {
+        const answers = fillAnswers
+          .split(";")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        body.answer = { answers }; // backend lo guarda como JSON
+      }
+
+      const r = await fetch(`${API}/exams/${code}/questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(body),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error ?? res.statusText);
+
+      if (!r.ok) {
+        const t = await r.text();
+        throw new Error(t || "No se pudo crear la pregunta.");
       }
+
+      // Reset de formulario para la próxima pregunta
+      setStem("");
+      setPoints(1);
+      setMcqChoices(["Opción 1", "Opción 2"]);
+      setMcqCorrect(0);
+      setTfCorrect(true);
+      setShortAnswer("");
+      setFillAnswers("");
+
       await load();
-      // reset form rápido
-      setNewText("");
-      setNewPoints(1);
-      setNewOptions([
-        { id: "A", text: "" },
-        { id: "B", text: "" },
-      ]);
-      setNewCorrectMCQ([]);
-      setNewCorrectTF(true);
-      alert("Pregunta creada");
     } catch (e: any) {
-      alert(`Error: ${e.message || "no se pudo crear"}`);
+      console.error(e);
+      // Si el backend devolvió JSON tipo {"error":"FALTAN_CAMPOS"}, mostramos eso
+      const msg = e.message || String(e);
+      try {
+        const parsed = JSON.parse(msg);
+        if (parsed?.error) setErrorMsg(parsed.error);
+        else setErrorMsg(msg);
+      } catch {
+        setErrorMsg(msg);
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
-  // actualizar
-  async function updateQuestion(id: string, data: Partial<Question>) {
-    try {
-      const res = await fetch(`${API}/questions/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      await load();
-    } catch {
-      alert("No se pudo actualizar");
-    }
-  }
+  const containerStyle: React.CSSProperties = {
+    maxWidth: 900,
+    margin: "0 auto",
+    padding: 24,
+    display: "grid",
+    gap: 16,
+  };
 
-  // borrar
-  async function removeQuestion(id: string) {
-    if (!confirm("¿Eliminar la pregunta? Esta acción no se puede deshacer."))
-      return;
-    try {
-      const res = await fetch(`${API}/questions/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(await res.text());
-      await load();
-    } catch {
-      alert("No se pudo borrar");
-    }
-  }
-
-  // mover (cambia "order" y reenumera todo para evitar huecos)
-  async function move(idx: number, dir: -1 | 1) {
-    const arr = [...list];
-    const j = idx + dir;
-    if (j < 0 || j >= arr.length) return;
-    // swap
-    const tmp = arr[idx];
-    arr[idx] = arr[j];
-    arr[j] = tmp;
-    // reordenar 0..n-1
-    const ops = arr.map((q, i) =>
-      fetch(`${API}/questions/${q.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order: i }),
-      })
-    );
-    await Promise.all(ops);
-    await load();
-  }
-
-  // helpers UI para nuevo MCQ
-  function addOption() {
-    const next = nextLetter(newOptions.length);
-    setNewOptions([...newOptions, { id: next, text: "" }]);
-  }
-  function removeOption(i: number) {
-    const copy = [...newOptions];
-    const removed = copy.splice(i, 1)[0];
-    setNewOptions(copy);
-    // si estaba marcada como correcta, quitarla
-    setNewCorrectMCQ((prev) => prev.filter((x) => x !== removed.id));
-  }
+  const cardStyle: React.CSSProperties = {
+    border: "1px solid #e5e7eb",
+    borderRadius: 12,
+    padding: 16,
+    background: "#fff",
+  };
 
   return (
-    <main style={{ padding: 24, maxWidth: 1000, margin: "0 auto" }}>
-      <div style={{ marginBottom: 10 }}>
-        <a href={`/t/${code}`} style={{ textDecoration: "none" }}>
-          ← Volver al tablero
-        </a>
-      </div>
-
-      <h1 style={{ margin: 0 }}>Editar preguntas</h1>
-      {examInfo && (
-        <p style={{ color: "#555", marginTop: 6 }}>
-          Examen: <b>{examInfo.title}</b> · Duración: {examInfo.durationMins}{" "}
-          min · Vidas: {examInfo.lives}
+    <main style={containerStyle}>
+      <header>
+        <div style={{ marginBottom: 8 }}>
+          <a href={`/t/${code}/board`} style={{ textDecoration: "none" }}>
+            ← Volver al tablero
+          </a>
+        </div>
+        <h1 style={{ margin: 0 }}>Editar preguntas — {code}</h1>
+        <p style={{ color: "#555", marginTop: 4 }}>
+          Armá las consignas y sus opciones de respuesta.
         </p>
-      )}
+      </header>
 
-      {/* Crear nueva */}
-      <section
-        style={{
-          padding: 16,
-          border: "1px solid #ddd",
-          borderRadius: 8,
-          marginTop: 12,
-          marginBottom: 16,
-        }}
-      >
-        <h3 style={{ marginTop: 0 }}>Nueva pregunta</h3>
-        <form onSubmit={createQuestion} style={{ display: "grid", gap: 10 }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <label>Tipo:</label>
-            <select
-              value={newType}
-              onChange={(e) => setNewType(e.target.value as QuestionType)}
-            >
-              <option value="mcq">Opción múltiple</option>
-              <option value="tf">Verdadero / Falso</option>
-              <option value="text">Texto</option>
-            </select>
-            <label style={{ marginLeft: 12 }}>Puntos:</label>
-            <input
-              type="number"
-              min={0}
-              value={newPoints}
-              onChange={(e) => setNewPoints(Number(e.target.value) || 0)}
-              style={{ width: 80 }}
-            />
-          </div>
+      <section style={cardStyle}>
+        <h2 style={{ marginTop: 0 }}>Nueva pregunta</h2>
 
+        <div style={{ display: "grid", gap: 12 }}>
+          {/* Tipo */}
           <div>
-            <label>Enunciado</label>
+            <label>Tipo de pregunta:</label>
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value as QuestionKind)}
+              style={{ marginLeft: 8, padding: 4 }}
+            >
+              <option value="MCQ">Opción múltiple</option>
+              <option value="TRUE_FALSE">Verdadero / Falso</option>
+              <option value="SHORT_TEXT">Texto breve</option>
+              <option value="FILL_IN">Relleno de casilleros</option>
+            </select>
+          </div>
+
+          {/* Enunciado */}
+          <div>
+            <label>Enunciado / consigna</label>
             <textarea
+              value={stem}
+              onChange={(e) => setStem(e.target.value)}
               rows={3}
-              value={newText}
-              onChange={(e) => setNewText(e.target.value)}
-              style={{ width: "100%" }}
-              placeholder="Escribí el enunciado…"
+              placeholder="Escribí la consigna de la pregunta…"
+              style={{ width: "100%", marginTop: 4 }}
             />
           </div>
 
-          {newType === "mcq" && (
-            <div>
-              <label>Opciones</label>
-              <div style={{ display: "grid", gap: 8 }}>
-                {newOptions.map((opt, i) => (
-                  <div
-                    key={i}
-                    style={{ display: "flex", gap: 8, alignItems: "center" }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={newCorrectMCQ.includes(opt.id)}
-                      onChange={(e) =>
-                        setNewCorrectMCQ((prev) =>
-                          e.target.checked
-                            ? [...prev, opt.id]
-                            : prev.filter((x) => x !== opt.id)
-                        )
-                      }
-                      title="Marca si esta opción es correcta"
-                    />
-                    <code style={{ width: 24, display: "inline-block" }}>
-                      {opt.id}
-                    </code>
-                    <input
-                      value={opt.text}
-                      onChange={(e) => {
-                        const copy = [...newOptions];
-                        copy[i] = { ...copy[i], text: e.target.value };
-                        setNewOptions(copy);
-                      }}
-                      placeholder={`Texto de opción ${opt.id}`}
-                      style={{ flex: 1 }}
-                    />
-                    <button type="button" onClick={() => removeOption(i)}>
-                      Eliminar
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div style={{ marginTop: 8 }}>
-                <button type="button" onClick={addOption}>
+          {/* Campos por tipo */}
+          {kind === "MCQ" && (
+            <div style={{ display: "grid", gap: 10 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <b>Opciones</b>
+                <button type="button" onClick={addMcqChoice}>
                   + Agregar opción
                 </button>
               </div>
-            </div>
-          )}
-
-          {newType === "tf" && (
-            <div>
-              <label>Respuesta correcta</label>
-              <div style={{ display: "flex", gap: 12 }}>
-                <label>
-                  <input
-                    type="radio"
-                    checked={newCorrectTF === true}
-                    onChange={() => setNewCorrectTF(true)}
-                  />{" "}
-                  Verdadero
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    checked={newCorrectTF === false}
-                    onChange={() => setNewCorrectTF(false)}
-                  />{" "}
-                  Falso
-                </label>
-              </div>
-            </div>
-          )}
-
-          {newType === "text" && (
-            <div style={{ color: "#777" }}>
-              Las respuestas se corrigen de forma manual.
-            </div>
-          )}
-
-          <div>
-            <button type="submit">Crear</button>
-          </div>
-        </form>
-      </section>
-
-      {/* Lista / edición rápida */}
-      <section
-        style={{ padding: 16, border: "1px solid #ddd", borderRadius: 8 }}
-      >
-        <h3 style={{ marginTop: 0 }}>Preguntas</h3>
-        {loading && <div>Cargando…</div>}
-        {err && <div style={{ color: "crimson" }}>{err}</div>}
-        {!loading && list.length === 0 && <div>No hay preguntas aún.</div>}
-
-        {list.length > 0 && (
-          <div style={{ display: "grid", gap: 12 }}>
-            {list.map((q, idx) => {
-              const opts = (q.options as any[]) || [];
-              const correct: string[] = Array.isArray(q.correct)
-                ? (q.correct as string[])
-                : [];
-
-              return (
+              {mcqChoices.map((c, idx) => (
                 <div
-                  key={q.id}
+                  key={idx}
                   style={{
-                    border: "1px solid #eee",
-                    borderRadius: 8,
-                    padding: 12,
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "center",
                   }}
                 >
-                  <div
+                  <input
+                    type="radio"
+                    name="mcqCorrect"
+                    checked={mcqCorrect === idx}
+                    onChange={() => setMcqCorrect(idx)}
+                    title="Correcta"
+                  />
+                  <input
+                    value={c}
+                    onChange={(e) => updateMcqChoice(idx, e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeMcqChoice(idx)}
+                    disabled={mcqChoices.length <= 2}
+                  >
+                    🗑
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {kind === "TRUE_FALSE" && (
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <label>Respuesta correcta:</label>
+              <label>
+                <input
+                  type="radio"
+                  name="tf"
+                  checked={tfCorrect === true}
+                  onChange={() => setTfCorrect(true)}
+                />{" "}
+                Verdadero
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="tf"
+                  checked={tfCorrect === false}
+                  onChange={() => setTfCorrect(false)}
+                />{" "}
+                Falso
+              </label>
+            </div>
+          )}
+
+          {kind === "SHORT_TEXT" && (
+            <div style={{ display: "grid", gap: 6 }}>
+              <label>Respuesta de referencia (opcional)</label>
+              <input
+                value={shortAnswer}
+                onChange={(e) => setShortAnswer(e.target.value)}
+                placeholder="Respuesta esperada (opcional)"
+              />
+            </div>
+          )}
+
+          {kind === "FILL_IN" && (
+            <div style={{ display: "grid", gap: 6 }}>
+              <label>Respuestas correctas (separadas por “;”)</label>
+              <input
+                value={fillAnswers}
+                onChange={(e) => setFillAnswers(e.target.value)}
+                placeholder="ej: palabra1; palabra2; palabra3"
+              />
+              <small style={{ opacity: 0.7 }}>
+                Se guardan como <code>{`{ answers: string[] }`}</code> (mínimo
+                viable).
+              </small>
+            </div>
+          )}
+
+          {/* Puntos + botón guardar */}
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <label>Puntos</label>
+            <input
+              type="number"
+              value={points}
+              onChange={(e) => setPoints(parseInt(e.target.value, 10) || 1)}
+              style={{ width: 120 }}
+            />
+            <div style={{ marginLeft: "auto" }}>
+              <button disabled={saving || !stem.trim()} onClick={saveQuestion}>
+                {saving ? "Guardando..." : "Guardar pregunta"}
+              </button>
+            </div>
+          </div>
+
+          {errorMsg && (
+            <div
+              style={{
+                background: "#fee",
+                border: "1px solid #fcc",
+                borderRadius: 8,
+                padding: 8,
+                whiteSpace: "pre-wrap",
+                marginTop: 8,
+              }}
+            >
+              Error: {errorMsg}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* LISTA DE PREGUNTAS */}
+      <section style={cardStyle}>
+        <h2 style={{ marginTop: 0 }}>Preguntas ({items.length})</h2>
+        {!items.length && <p>No hay preguntas todavía.</p>}
+        <ol>
+          {items.map((q, idx) => (
+            <li key={q.id} style={{ marginBottom: 12 }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "baseline",
+                }}
+              >
+                <b
+                  style={{
+                    fontSize: 12,
+                    background: "#eef",
+                    padding: "2px 6px",
+                    borderRadius: 6,
+                  }}
+                >
+                  {q.kind}
+                </b>
+                <span style={{ fontWeight: 600 }}>{idx + 1}.</span>
+                <span>{q.stem}</span>
+                {typeof q.points === "number" && (
+                  <span
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
+                      marginLeft: "auto",
+                      fontSize: 12,
+                      opacity: 0.7,
                     }}
                   >
-                    <div>
-                      <small style={{ color: "#777" }}>
-                        #{idx + 1} · {q.type.toUpperCase()} · {q.points} pts
-                      </small>
-                    </div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button
-                        onClick={() => move(idx, -1)}
-                        disabled={idx === 0}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        onClick={() => move(idx, +1)}
-                        disabled={idx === list.length - 1}
-                      >
-                        ↓
-                      </button>
-                      <button
-                        onClick={() => removeQuestion(q.id)}
-                        style={{ color: "crimson" }}
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: 8 }}>
-                    <label>Enunciado</label>
-                    <textarea
-                      rows={2}
-                      value={q.text}
-                      onChange={(e) =>
-                        updateQuestion(q.id, { text: e.target.value })
-                      }
-                      style={{ width: "100%" }}
-                    />
-                  </div>
-
-                  <div style={{ marginTop: 8 }}>
-                    <label>Puntos</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={q.points}
-                      onChange={(e) =>
-                        updateQuestion(q.id, {
-                          points: Number(e.target.value) || 0,
-                        })
-                      }
-                      style={{ width: 100 }}
-                    />
-                  </div>
-
-                  {q.type === "mcq" && (
-                    <div style={{ marginTop: 8 }}>
-                      <label>Opciones (tildá las correctas)</label>
-                      <div style={{ display: "grid", gap: 8 }}>
-                        {opts.map((opt: any, i: number) => {
-                          const checked = correct.includes(opt.id);
-                          return (
-                            <div
-                              key={i}
-                              style={{
-                                display: "flex",
-                                gap: 8,
-                                alignItems: "center",
-                              }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={(e) => {
-                                  const nc = new Set(correct);
-                                  if (e.target.checked) nc.add(opt.id);
-                                  else nc.delete(opt.id);
-                                  updateQuestion(q.id, {
-                                    correct: Array.from(nc) as any,
-                                  });
-                                }}
-                              />
-                              <code
-                                style={{ width: 24, display: "inline-block" }}
-                              >
-                                {opt.id}
-                              </code>
-                              <input
-                                value={opt.text}
-                                onChange={(e) => {
-                                  const copy = [...opts];
-                                  copy[i] = {
-                                    ...copy[i],
-                                    text: e.target.value,
-                                  };
-                                  updateQuestion(q.id, {
-                                    options: copy as any,
-                                  });
-                                }}
-                                style={{ flex: 1 }}
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const id = nextLetter(opts.length);
-                            updateQuestion(q.id, {
-                              options: [...opts, { id, text: "" }] as any,
-                            });
-                          }}
-                        >
-                          + Agregar opción
-                        </button>
-                        {opts.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const last = opts[opts.length - 1];
-                              const nc = correct.filter((x) => x !== last.id);
-                              updateQuestion(q.id, {
-                                options: opts.slice(0, -1) as any,
-                                correct: nc as any,
-                              });
-                            }}
-                          >
-                            Quitar última opción
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {q.type === "tf" && (
-                    <div style={{ marginTop: 8 }}>
-                      <label>Respuesta correcta</label>
-                      <div style={{ display: "flex", gap: 12 }}>
-                        <label>
-                          <input
-                            type="radio"
-                            checked={q.correct === true}
-                            onChange={() =>
-                              updateQuestion(q.id, { correct: true as any })
-                            }
-                          />{" "}
-                          Verdadero
-                        </label>
-                        <label>
-                          <input
-                            type="radio"
-                            checked={q.correct === false}
-                            onChange={() =>
-                              updateQuestion(q.id, { correct: false as any })
-                            }
-                          />{" "}
-                          Falso
-                        </label>
-                      </div>
-                    </div>
-                  )}
-
-                  {q.type === "text" && (
-                    <div style={{ marginTop: 8, color: "#777" }}>
-                      Respuesta abierta – se corrige de forma manual luego del
-                      envío.
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                    Puntos: {q.points}
+                  </span>
+                )}
+              </div>
+              {Array.isArray(q.choices) && q.choices.length > 0 && (
+                <ul style={{ marginTop: 6 }}>
+                  {q.choices.map((c, i) => (
+                    <li key={i}>
+                      {String.fromCharCode(65 + i)}. {c}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ol>
       </section>
     </main>
   );

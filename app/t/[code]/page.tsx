@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_API_URL!;
 
@@ -31,6 +31,7 @@ type MetaResponse = {
 
 export default function TeacherExamPage() {
   const params = useParams<{ code: string }>();
+  const router = useRouter();
   const code = (params?.code || "").toString();
 
   // ID real del examen en la base
@@ -82,20 +83,19 @@ export default function TeacherExamPage() {
         // 1) /exams/:code
         // 2) /exams/by-code/:code
         for (const c of codeVariants) {
-          // 1) /exams/:code
+          // 1) /api/exams/:code
           let r = await fetch(`${API}/exams/${c}`, { cache: "no-store" });
           if (r.ok) {
             examData = (await r.json()) as ExamResponse;
             break;
           }
 
-          // 2) /exams/by-code/:code
+          // 2) /api/exams/by-code/:code
           r = await fetch(`${API}/exams/by-code/${c}`, {
             cache: "no-store",
           });
           if (r.ok) {
             const e = (await r.json()) as any;
-            // puede venir como { exam: {...} } o directo como examen
             if (e.exam) {
               examData = e as ExamResponse;
             } else {
@@ -247,6 +247,12 @@ export default function TeacherExamPage() {
 
       setIsOpen(true);
       setInfo("Configuración guardada y examen abierto.");
+
+      // 👇 Después de abrir, vamos directo al armado de preguntas
+      const nextCode = publicCode || code;
+      if (nextCode) {
+        router.push(`/t/${nextCode}/edit`);
+      }
     } catch (e: any) {
       setErr(e?.message || "Error al guardar la configuración");
     } finally {
@@ -273,6 +279,11 @@ export default function TeacherExamPage() {
     >
       {/* ENCABEZADO */}
       <header>
+        <div style={{ marginBottom: 8 }}>
+          <a href="/t" style={{ textDecoration: "none" }}>
+            ← Volver al panel docente
+          </a>
+        </div>
         <h1 style={{ margin: 0 }}>
           Docente — {publicCode || code.toUpperCase()}{" "}
           {isOpen ? " (abierto)" : " (cerrado)"}
