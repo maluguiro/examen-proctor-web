@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { use } from "react";
+import { useParams } from "next/navigation";
 import ExamChat from "@/components/ExamChat";
 
 const API = process.env.NEXT_PUBLIC_API_URL!;
@@ -27,12 +27,10 @@ type SubmitResponse = {
   maxScore?: number | null;
 };
 
-export default function Student({
-  params,
-}: {
-  params: Promise<{ code: string }>;
-}) {
-  const { code } = use(params);
+export default function Student() {
+  const params = useParams<{ code: string }>();
+  const code = (params?.code || "").toString().toUpperCase();
+}
 
   // pasos UI
   const [step, setStep] = React.useState<
