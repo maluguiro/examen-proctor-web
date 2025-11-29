@@ -1,4 +1,5 @@
 "use client";
+
 import * as React from "react";
 import { useParams } from "next/navigation";
 import ExamChat from "@/components/ExamChat";
@@ -27,10 +28,37 @@ type SubmitResponse = {
   maxScore?: number | null;
 };
 
+// parsea [[...]] -> piezas de texto y cajas (para FIB)
+function fibParseToParts(stem: string) {
+  const parts: Array<{ type: "text" | "box"; idx?: number; text?: string }> =
+    [];
+  const re = /\[\[(.*?)\]\]/g;
+  let last = 0,
+    m: RegExpExecArray | null,
+    box = 0;
+
+  while ((m = re.exec(stem)) !== null) {
+    if (m.index > last) {
+      parts.push({ type: "text", text: stem.slice(last, m.index) });
+    }
+    parts.push({ type: "box", idx: box++ });
+    last = m.index + m[0].length;
+  }
+
+  if (last < stem.length) {
+    parts.push({ type: "text", text: stem.slice(last) });
+  }
+
+  if (!parts.length) {
+    parts.push({ type: "text", text: stem });
+  }
+
+  return parts;
+}
+
 export default function Student() {
   const params = useParams<{ code: string }>();
   const code = (params?.code || "").toString().toUpperCase();
-}
 
   // pasos UI
   const [step, setStep] = React.useState<
@@ -55,7 +83,7 @@ export default function Student() {
   // runtime: vidas + tiempo
   const [lives, setLives] = React.useState<number | null>(null);
   const [secondsLeft, setSecondsLeft] = React.useState<number | null>(null);
-  const [flash, setFlash] = React.useState(false); // para avisar visualmente pérdida de vida
+  const [flash, setFlash] = React.useState(false); // aviso visual pérdida vida
 
   // respuestas
   const [answers, setAnswers] = React.useState<Record<string, any>>({});
@@ -80,27 +108,21 @@ export default function Student() {
     return "SHORT";
   };
 
-  // parsea [[ ... ]] -> piezas de texto y cajas (para FIB)
-  function fibParseToParts(stem: string) {
-    const parts: Array<{ type: "text" | "box"; idx?: number; text?: string }> =
-      [];
-    const re = /\[\[(.*?)\]\]/g;
-    let last = 0,
-      m: RegExpExecArray | null,
-      box = 0;
-    while ((m = re.exec(stem)) !== null) {
-      if (m.index > last)
-        parts.push({ type: "text", text: stem.slice(last, m.index) });
-      parts.push({ type: "box", idx: box++ });
-      last = m.index + m[0].length;
+  // ======= terminar intento (por vidas / tiempo / manual)
+  async function finishAttempt(reason?: "lives" | "time" | "manual") {
+    if (!attemptId) return;
+    try {
+      await fetch(`${API}/s/attempt/${attemptId}/finish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reason || "manual" }),
+      }).catch(() => {});
+    } finally {
+      setStep("submitting");
     }
-    if (last < stem.length)
-      parts.push({ type: "text", text: stem.slice(last) });
-    if (!parts.length) parts.push({ type: "text", text: stem });
-    return parts;
   }
 
-  // ======= antifraude: reportador genérico + aviso visual
+  // ======= antifraude: summary + aviso visual
   const refreshSummary = React.useCallback(async () => {
     if (!attemptId) return;
     try {
@@ -109,14 +131,15 @@ export default function Student() {
       });
       if (!r.ok) return;
       const data = await r.json();
-
       setLives(Number.isFinite(data.remaining) ? data.remaining : null);
       setSecondsLeft(data.secondsLeft ?? null);
 
       if (data.remaining != null && data.remaining <= 0) {
         await finishAttempt("lives");
       }
-    } catch {}
+    } catch {
+      // ignore
+    }
   }, [attemptId]);
 
   const reportViolation = React.useCallback(
@@ -129,6 +152,7 @@ export default function Student() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type, meta }),
         });
+
         if (r.ok) {
           // feedback inmediato (flash)
           setFlash(true);
@@ -137,7 +161,9 @@ export default function Student() {
           // refrescar resumen para mostrar vidas/timer actualizados
           await refreshSummary();
         }
-      } catch {}
+      } catch {
+        // ignore
+      }
     },
     [attemptId, refreshSummary]
   );
@@ -147,20 +173,26 @@ export default function Student() {
     if (step !== "exam" || !attemptId) return;
 
     const onVisibility = () => {
-      if (document.visibilityState === "hidden") reportViolation("blur");
+      if (document.visibilityState === "hidden") {
+        reportViolation("blur");
+      }
     };
+
     const onCopy = (e: ClipboardEvent) => {
       e.preventDefault();
       reportViolation("copy");
     };
+
     const onCut = (e: ClipboardEvent) => {
       e.preventDefault();
       reportViolation("cut");
     };
+
     const onPaste = (e: ClipboardEvent) => {
       e.preventDefault();
       reportViolation("paste");
     };
+
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
         e.preventDefault();
@@ -171,11 +203,14 @@ export default function Student() {
         reportViolation("printscreen");
       }
     };
+
     const onFull = () => {
       // si se sale del fullscreen, cuenta como violación
       // @ts-ignore
       const fs =
-        document.fullscreenElement || (document as any).webkitFullscreenElement;
+        document.fullscreenElement ||
+        // @ts-ignore
+        (document as any).webkitFullscreenElement;
       if (!fs) reportViolation("fullscreen-exit");
     };
 
@@ -199,7 +234,7 @@ export default function Student() {
   // polling del summary (cada 2s mientras rinde)
   React.useEffect(() => {
     if (step !== "exam" || !attemptId) return;
-    let t = setInterval(refreshSummary, 2000);
+    const t = setInterval(refreshSummary, 2000);
     refreshSummary();
     return () => clearInterval(t);
   }, [step, attemptId, refreshSummary]);
@@ -208,7 +243,10 @@ export default function Student() {
   async function startAttempt() {
     setErr(null);
     const name = studentName.trim();
-    if (!name) return setErr("Ingresá tu nombre para comenzar.");
+    if (!name) {
+      setErr("Ingresá tu nombre para comenzar.");
+      return;
+    }
 
     try {
       // fullscreen (mejor esfuerzo)
@@ -216,7 +254,9 @@ export default function Student() {
       if (el.requestFullscreen) {
         try {
           await el.requestFullscreen();
-        } catch {}
+        } catch {
+          // ignoramos si falla
+        }
       }
 
       // crear intento en backend REAL
@@ -226,6 +266,7 @@ export default function Student() {
         body: JSON.stringify({ studentName: name }),
       });
       if (!r.ok) throw new Error(await r.text());
+
       const data = await r.json();
       setAttemptId(data.attempt.id);
 
@@ -236,12 +277,13 @@ export default function Student() {
       });
       if (!pr.ok) throw new Error(await pr.text());
       const pdata: PaperResponse = await pr.json();
+
       setExam(pdata.exam);
 
       // normalizar kinds
       const qs = (pdata.questions || []).map((q) => ({
         ...q,
-        kind: mapKind(q.kind),
+        kind: mapKind(q.kind as string),
       }));
       setQuestions(qs);
 
@@ -262,21 +304,7 @@ export default function Student() {
     }
   }
 
-  // ======= terminar (por vidas o por envío)
-  async function finishAttempt(reason?: "lives" | "time" | "manual") {
-    if (!attemptId) return;
-    try {
-      await fetch(`${API}/s/attempt/${attemptId}/finish`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: reason || "manual" }),
-      }).catch(() => {});
-    } finally {
-      setStep("submitting");
-    }
-  }
-
-  // ======= enviar
+  // ======= enviar intento
   async function submitAttempt() {
     if (!attemptId) return;
     setErr(null);
@@ -299,9 +327,10 @@ export default function Student() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!r.ok) throw new Error(await r.text());
 
+      if (!r.ok) throw new Error(await r.text());
       const data: SubmitResponse = await r.json();
+
       setGradingMode(data.gradingMode);
       setScore(data.score ?? null);
       setMaxScore(data.maxScore ?? null);
@@ -313,17 +342,11 @@ export default function Student() {
   }
 
   // ======= UI helpers
+
   const Header = (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        marginBottom: 12,
-      }}
-    >
-      <h2 style={{ margin: 0 }}>{exam?.title || "Examen"}</h2>
-      <div style={{ marginLeft: "auto", fontSize: 12, opacity: 0.7 }}>
+    <div>
+      <h2>{exam?.title || "Examen"}</h2>
+      <div style={{ fontSize: 14, opacity: 0.8 }}>
         Requiere pantalla completa
       </div>
     </div>
@@ -339,91 +362,73 @@ export default function Student() {
 
     const kind = mapKind(q.kind as string);
 
+    // TRUE / FALSE
     if (kind === "TRUE_FALSE") {
       const v = String(answers[q.id] ?? "");
       return (
         <div key={q.id} style={commonBox}>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>
-            {idx + 1}. {q.stem}
+          <div style={{ marginBottom: 8 }}>
+            <b>{idx + 1}.</b> {q.stem}
           </div>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              margin: "6px 0",
-            }}
-          >
-            <input
-              type="radio"
-              name={`q-${q.id}`}
-              checked={v === "true"}
-              onChange={() => setAnswers({ ...answers, [q.id]: "true" })}
-            />
-            Verdadero
-          </label>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              margin: "6px 0",
-            }}
-          >
-            <input
-              type="radio"
-              name={`q-${q.id}`}
-              checked={v === "false"}
-              onChange={() => setAnswers({ ...answers, [q.id]: "false" })}
-            />
-            Falso
-          </label>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>
+          <div style={{ display: "flex", gap: 16 }}>
+            <label>
+              <input
+                type="radio"
+                checked={v === "true"}
+                onChange={() => setAnswers({ ...answers, [q.id]: "true" })}
+              />{" "}
+              Verdadero
+            </label>
+            <label>
+              <input
+                type="radio"
+                checked={v === "false"}
+                onChange={() => setAnswers({ ...answers, [q.id]: "false" })}
+              />{" "}
+              Falso
+            </label>
+          </div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
             Puntaje: {q.points ?? 1}
           </div>
         </div>
       );
     }
 
+    // MCQ
     if (kind === "MCQ") {
       const v = Number(answers[q.id]);
       return (
         <div key={q.id} style={commonBox}>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>
-            {idx + 1}. {q.stem}
+          <div style={{ marginBottom: 8 }}>
+            <b>{idx + 1}.</b> {q.stem}
           </div>
-          {(q.choices || []).map((c, i) => (
-            <label
-              key={i}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                margin: "6px 0",
-              }}
-            >
-              <input
-                type="radio"
-                name={`q-${q.id}`}
-                checked={v === i}
-                onChange={() => setAnswers({ ...answers, [q.id]: i })}
-              />
-              {c}
-            </label>
-          ))}
-          <div style={{ fontSize: 12, opacity: 0.7 }}>
+          <div style={{ display: "grid", gap: 6 }}>
+            {(q.choices || []).map((c, i) => (
+              <label key={i} style={{ display: "flex", gap: 6 }}>
+                <input
+                  type="radio"
+                  checked={v === i}
+                  onChange={() => setAnswers({ ...answers, [q.id]: i })}
+                />
+                <span>{c}</span>
+              </label>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
             Puntaje: {q.points ?? 1}
           </div>
         </div>
       );
     }
 
+    // SHORT
     if (kind === "SHORT") {
       const v = String(answers[q.id] ?? "");
       return (
         <div key={q.id} style={commonBox}>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>
-            {idx + 1}. {q.stem}
+          <div style={{ marginBottom: 8 }}>
+            <b>{idx + 1}.</b> {q.stem}
           </div>
           <textarea
             value={v}
@@ -446,9 +451,11 @@ export default function Student() {
       );
     }
 
+    // FILL IN BLANK
     if (kind === "FIB") {
       const parts = fibParseToParts(q.stem || "");
       const vArr: string[] = Array.isArray(answers[q.id]) ? answers[q.id] : [];
+
       const setAt = (ix: number, val: string) => {
         const next = [...(vArr || [])];
         next[ix] = val;
@@ -577,7 +584,13 @@ export default function Student() {
             <div>
               Alumno: <b>{studentName}</b>
             </div>
-            <div style={{ marginLeft: "auto", display: "flex", gap: 16 }}>
+            <div
+              style={{
+                marginLeft: "auto",
+                display: "flex",
+                gap: 16,
+              }}
+            >
               <div>
                 <b>Vidas:</b> {lives ?? "—"}
               </div>
@@ -644,6 +657,7 @@ export default function Student() {
       {step === "submitted" && (
         <div style={{ display: "grid", gap: 12 }}>
           {Header}
+
           {gradingMode === "auto" ? (
             <>
               <div
@@ -660,6 +674,7 @@ export default function Student() {
                   Calificación automática: <b>{score}</b> / <b>{maxScore}</b>
                 </div>
               </div>
+
               {attemptId && (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <a
