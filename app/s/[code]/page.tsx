@@ -462,15 +462,33 @@ export default function Student() {
         setAnswers({ ...answers, [q.id]: next });
       };
 
+      // Banco de palabras sugeridas (correctas por ahora)
+      const bank = Array.isArray(q.choices) ? q.choices : [];
+
+      const selectFromBank = (word: string) => {
+        // llenamos el primer casillero vacío
+        const next = [...(vArr || [])];
+        const emptyIndex = next.findIndex((x) => !x || x.trim() === "");
+        if (emptyIndex === -1) {
+          // si no hay vacío, no hacemos nada (o podríamos sobrescribir el último)
+          return;
+        }
+        next[emptyIndex] = word;
+        setAnswers({ ...answers, [q.id]: next });
+      };
+
       return (
         <div key={q.id} style={commonBox}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>{idx + 1}.</div>
+
+          {/* Texto con casilleros */}
           <div
             style={{
               display: "flex",
               flexWrap: "wrap",
               gap: 8,
               alignItems: "center",
+              marginBottom: 8,
             }}
           >
             {parts.map((p, i) =>
@@ -492,7 +510,48 @@ export default function Student() {
               )
             )}
           </div>
-          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
+
+          {/* Banco de palabras */}
+          {bank.length > 0 && (
+            <div style={{ marginBottom: 6 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  opacity: 0.8,
+                  marginBottom: 4,
+                }}
+              >
+                Opciones sugeridas:
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 8,
+                }}
+              >
+                {bank.map((w, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => selectFromBank(w)}
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: 999,
+                      border: "1px solid #e5e7eb",
+                      background: "#f9fafb",
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {w}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
             Puntaje: {q.points ?? 1}
           </div>
         </div>

@@ -1,11 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_API_URL!;
 
-// Tipos que entiende el backend
 type QuestionKind = "MCQ" | "TRUE_FALSE" | "SHORT_TEXT" | "FILL_IN";
 
 type QuestionLite = {
@@ -18,9 +17,50 @@ type QuestionLite = {
   points: number;
 };
 
+// Extrae las respuestas entre [corchetes] del texto original del docente
+function extractFillAnswersFromStem(raw: string): string[] {
+  if (!raw) return [];
+  const regex = /\[(.+?)\]/g;
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(raw)) !== null) {
+    out.push(m[1].trim());
+  }
+  return out;
+}
+
+// Convierte el texto del docente (con [respuestas]) en el stem que ve el alumno (con [[1]], [[2]]…)
+function buildStudentStemFromRaw(raw: string): {
+  stem: string;
+  answers: string[];
+} {
+  const answers: string[] = [];
+  const regex = /\[(.+?)\]/g;
+  let last = 0;
+  let result = "";
+  let boxIndex = 0;
+  let m: RegExpExecArray | null;
+
+  while ((m = regex.exec(raw)) !== null) {
+    if (m.index > last) {
+      result += raw.slice(last, m.index);
+    }
+    const ans = m[1].trim();
+    answers.push(ans);
+    boxIndex++;
+    result += `[[${boxIndex}]]`;
+    last = m.index + m[0].length;
+  }
+
+  if (last < raw.length) {
+    result += raw.slice(last);
+  }
+
+  return { stem: result, answers };
+}
+
 export default function EditExamPage() {
   const params = useParams<{ code: string }>();
-  const router = useRouter();
   const code = (params?.code || "").toString();
 
   const [items, setItems] = React.useState<QuestionLite[]>([]);
@@ -29,23 +69,20 @@ export default function EditExamPage() {
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   const [kind, setKind] = React.useState<QuestionKind>("MCQ");
-  const [stem, setStem] = React.useState("");
+  const [stem, setStem] = React.useState(""); // texto que escribe el docente
 
-  // Campos tipo MCQ
+  // MCQ
   const [mcqChoices, setMcqChoices] = React.useState<string[]>([
     "Opción 1",
     "Opción 2",
   ]);
   const [mcqCorrect, setMcqCorrect] = React.useState(0);
 
-  // Campos TRUE/FALSE
+  // TRUE/FALSE
   const [tfCorrect, setTfCorrect] = React.useState(true);
 
-  // Campos SHORT_TEXT
+  // SHORT_TEXT
   const [shortAnswer, setShortAnswer] = React.useState("");
-
-  // Campos FILL_IN
-  const [fillAnswers, setFillAnswers] = React.useState("");
 
   // Puntos
   const [points, setPoints] = React.useState(1);
@@ -121,11 +158,19 @@ export default function EditExamPage() {
       } else if (kind === "SHORT_TEXT") {
         body.answer = shortAnswer.trim() || null; // opcional
       } else if (kind === "FILL_IN") {
-        const answers = fillAnswers
-          .split(";")
-          .map((s) => s.trim())
-          .filter(Boolean);
-        body.answer = { answers }; // backend lo guarda como JSON
+        const raw = stem.trim();
+
+        const { stem: studentStem, answers } = buildStudentStemFromRaw(raw);
+
+        if (!answers.length) {
+          throw new Error(
+            "Para los casilleros, escribí el texto completo y colocá cada respuesta correcta entre corchetes. Ej: El perro es un [animal] doméstico."
+          );
+        }
+
+        body.stem = studentStem; // lo que verá el alumno (con [[1]], [[2]]…)
+        body.answer = { answers }; // para la corrección
+        body.choices = answers; // al menos las correctas como banco base
       }
 
       const r = await fetch(`${API}/exams/${code}/questions`, {
@@ -146,12 +191,10 @@ export default function EditExamPage() {
       setMcqCorrect(0);
       setTfCorrect(true);
       setShortAnswer("");
-      setFillAnswers("");
 
       await load();
     } catch (e: any) {
       console.error(e);
-      // Si el backend devolvió JSON tipo {"error":"FALTAN_CAMPOS"}, mostramos eso
       const msg = e.message || String(e);
       try {
         const parsed = JSON.parse(msg);
@@ -180,12 +223,15 @@ export default function EditExamPage() {
     background: "#fff",
   };
 
+  const fillAnswersPreview =
+    kind === "FILL_IN" ? extractFillAnswersFromStem(stem) : [];
+
   return (
     <main style={containerStyle}>
       <header>
         <div style={{ marginBottom: 8 }}>
-          <a href={`/t/${code}/board`} style={{ textDecoration: "none" }}>
-            ← Volver al tablero
+          <a href={`/t/${code}`} style={{ textDecoration: "none" }}>
+            ← Volver a la configuración del examen
           </a>
         </div>
         <h1 style={{ margin: 0 }}>Editar preguntas — {code}</h1>
@@ -220,9 +266,26 @@ export default function EditExamPage() {
               value={stem}
               onChange={(e) => setStem(e.target.value)}
               rows={3}
-              placeholder="Escribí la consigna de la pregunta…"
+              placeholder={
+                kind === "FILL_IN"
+                  ? "Ej: ¿Por qué juegan los niños? Por [placer], para [expresar la agresión], para controlar la [ansiedad]..."
+                  : "Escribí la consigna de la pregunta…"
+              }
               style={{ width: "100%", marginTop: 4 }}
             />
+            {kind === "FILL_IN" && (
+              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
+                Escribí el texto completo con las respuestas correctas entre
+                corchetes. Ejemplo:{" "}
+                <code>
+                  El perro es un [animal] doméstico que suele ser muy [fiel].
+                </code>
+                <br />
+                Detectamos <b>{fillAnswersPreview.length}</b> casillero(s):{" "}
+                {fillAnswersPreview.length > 0 &&
+                  fillAnswersPreview.join(" · ")}
+              </div>
+            )}
           </div>
 
           {/* Campos por tipo */}
@@ -302,21 +365,6 @@ export default function EditExamPage() {
             </div>
           )}
 
-          {kind === "FILL_IN" && (
-            <div style={{ display: "grid", gap: 6 }}>
-              <label>Respuestas correctas (separadas por “;”)</label>
-              <input
-                value={fillAnswers}
-                onChange={(e) => setFillAnswers(e.target.value)}
-                placeholder="ej: palabra1; palabra2; palabra3"
-              />
-              <small style={{ opacity: 0.7 }}>
-                Se guardan como <code>{`{ answers: string[] }`}</code> (mínimo
-                viable).
-              </small>
-            </div>
-          )}
-
           {/* Puntos + botón guardar */}
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <label>Puntos</label>
@@ -391,9 +439,7 @@ export default function EditExamPage() {
               {Array.isArray(q.choices) && q.choices.length > 0 && (
                 <ul style={{ marginTop: 6 }}>
                   {q.choices.map((c, i) => (
-                    <li key={i}>
-                      {String.fromCharCode(65 + i)}. {c}
-                    </li>
+                    <li key={i}>{c}</li>
                   ))}
                 </ul>
               )}
