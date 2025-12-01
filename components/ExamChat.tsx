@@ -1,352 +1,333 @@
 "use client";
+
 import * as React from "react";
 
 const API = process.env.NEXT_PUBLIC_API_URL!;
 
-type ChatMsg = {
+type ChatMessage = {
   id: string;
   fromRole: "student" | "teacher";
   authorName: string;
   message: string;
   createdAt: string;
-  broadcast?: number | boolean; // 1/0 en DB
+  broadcast?: number;
 };
 
-export default function ExamChat({
-  code,
-  role, // 'student' | 'teacher'
-  defaultName, // ej: "Docente" o nombre del alumno
-}: {
+type Props = {
   code: string;
   role: "student" | "teacher";
   defaultName: string;
-}) {
+};
+
+export default function ExamChat({ code, role, defaultName }: Props) {
   const [open, setOpen] = React.useState(false);
-  const [name, setName] = React.useState(defaultName);
+  const [name, setName] = React.useState(defaultName || "");
+  const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState("");
-  const [isBroadcast, setIsBroadcast] = React.useState(false); // SOLO docente
-  const [msgs, setMsgs] = React.useState<ChatMsg[]>([]);
-  const [unread, setUnread] = React.useState(0);
-  const [muted, setMuted] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+  const [err, setErr] = React.useState<string | null>(null);
+  const [asBroadcast, setAsBroadcast] = React.useState(false); // solo docente
 
-  const lastTsRef = React.useRef<string | null>(null);
-  const scrollRef = React.useRef<HTMLDivElement>(null);
-  const beep = React.useRef<HTMLAudioElement | null>(null);
+  const canBroadcast = role === "teacher";
 
-  // -- Preferencia de silencio por examen --
-  React.useEffect(() => {
-    const v = localStorage.getItem(`chat.muted.${code}`);
-    if (v === "1") setMuted(true);
-  }, [code]);
-  React.useEffect(() => {
-    localStorage.setItem(`chat.muted.${code}`, muted ? "1" : "0");
-  }, [muted, code]);
-
-  // -- Beep base64 (ligero, sin archivos externos) --
-  if (!beep.current && typeof window !== "undefined") {
-    // tono 800Hz ~120ms (wav minúsculo)
-    beep.current = new Audio(
-      "data:audio/wav;base64,UklGRhQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAAABwAACAgICAgP8AAP8AAICAf39/f39/f4CAgICA/4CAgICAf39/f39/gICAf39/f4CAgP8A/wAA"
-    );
-  }
-  function playBeep() {
-    if (muted) return;
+  const fetchMessages = React.useCallback(async () => {
     try {
-      beep.current?.play().catch(() => {});
-    } catch {}
-  }
-
-  // -- Fetch de mensajes (polling) --
-  async function fetchMsgs() {
-    try {
-      const qs = lastTsRef.current
-        ? `?since=${encodeURIComponent(lastTsRef.current)}`
-        : "";
-      const r = await fetch(`${API}/exams/${code}/chat${qs}`, {
+      const r = await fetch(`${API}/exams/${code}/chat`, {
         cache: "no-store",
       });
       if (!r.ok) return;
       const data = await r.json();
-      const items: ChatMsg[] = data.items || [];
-      if (items.length) {
-        setMsgs((old) => [...old, ...items]);
-        const last = items[items.length - 1]!;
-        lastTsRef.current = last.createdAt;
-
-        // sonido al recibir nuevos
-        playBeep();
-
-        // contador no leídos si está cerrado
-        if (!open) setUnread((n) => n + items.length);
-
-        // autoscroll si está abierto
-        setTimeout(() => {
-          if (open && scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-          }
-        }, 0);
+      if (Array.isArray(data.items)) {
+        setMessages(data.items);
       }
-    } catch {}
-  }
-
-  React.useEffect(() => {
-    fetchMsgs(); // inicial
-    const t = setInterval(fetchMsgs, 2000);
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    } catch (e) {
+      console.error("CHAT_FETCH_ERROR", e);
+    }
   }, [code]);
 
+  // Polling cada 3s mientras el chat está abierto
   React.useEffect(() => {
-    if (open) {
-      setUnread(0);
-      setTimeout(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-      }, 0);
+    if (!open) return;
+    fetchMessages();
+    const id = window.setInterval(fetchMessages, 3000);
+    return () => window.clearInterval(id);
+  }, [open, fetchMessages]);
+
+  async function sendMessage() {
+    setErr(null);
+    const trimmed = input.trim();
+    const n = name.trim();
+    if (!trimmed) return;
+    if (!n) {
+      setErr("Ingresá un nombre para chatear.");
+      return;
     }
-  }, [open, msgs.length]);
 
-  // -- Enviar mensaje / broadcast --
-  async function send() {
-    const text = input.trim();
-    const who = name.trim();
-    if (!text || !who) return;
-    setInput("");
-
+    setSending(true);
     try {
-      if (role === "teacher" && isBroadcast) {
-        await fetch(`${API}/exams/${code}/chat/broadcast`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ authorName: who, message: text }),
-        });
+      const body: any = {
+        authorName: n,
+        message: trimmed,
+      };
+
+      let url = `${API}/exams/${code}/chat`;
+      if (canBroadcast && asBroadcast) {
+        url = `${API}/exams/${code}/chat/broadcast`;
       } else {
-        await fetch(`${API}/exams/${code}/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fromRole: role,
-            authorName: who,
-            message: text,
-          }),
-        });
+        body.fromRole = role;
       }
-      await fetchMsgs();
-    } catch {}
-  }
-  function onKey(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      send();
+
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!r.ok) {
+        throw new Error(await r.text());
+      }
+
+      setInput("");
+      // refrescamos la lista
+      await fetchMessages();
+    } catch (e: any) {
+      console.error("CHAT_SEND_ERROR", e);
+      setErr(e?.message || "No se pudo enviar el mensaje");
+    } finally {
+      setSending(false);
     }
   }
+
+  function handleKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (!sending) {
+        sendMessage();
+      }
+    }
+  }
+
+  // Badge para saber quién habla
+  function badgeColor(msg: ChatMessage) {
+    if (msg.broadcast) return "#fde68a"; // amarillo clarito
+    if (msg.fromRole === "teacher") return "#bfdbfe"; // azul clarito
+    return "#e5e7eb"; // gris
+  }
+
+  if (!code) return null;
 
   return (
-    <div style={{ position: "fixed", right: 16, bottom: 16, zIndex: 9999 }}>
-      {/* Botón flotante */}
+    <div
+      style={{
+        position: "fixed",
+        right: 16,
+        bottom: 16,
+        zIndex: 50,
+        fontSize: 14,
+      }}
+    >
       {!open && (
         <button
           onClick={() => setOpen(true)}
           style={{
-            position: "relative",
-            width: 56,
-            height: 56,
-            borderRadius: 28,
-            background: "#2563eb",
-            color: "white",
-            border: "none",
-            boxShadow: "0 6px 20px rgba(0,0,0,.2)",
+            padding: "8px 12px",
+            borderRadius: 999,
+            border: "1px solid #d1d5db",
+            background: "white",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
             cursor: "pointer",
-            fontSize: 24,
           }}
-          title="Abrir chat"
         >
-          💬
-          {unread > 0 && (
-            <span
-              style={{
-                position: "absolute",
-                top: -6,
-                right: -6,
-                minWidth: 20,
-                height: 20,
-                borderRadius: 10,
-                background: "#ef4444",
-                color: "white",
-                fontSize: 12,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "0 6px",
-                border: "2px solid white",
-              }}
-            >
-              {unread > 9 ? "9+" : unread}
-            </span>
-          )}
+          💬 Chat
         </button>
       )}
 
-      {/* Panel */}
       {open && (
         <div
           style={{
             width: 320,
-            height: 460,
+            maxHeight: 420,
             background: "white",
-            border: "1px solid #e5e7eb",
             borderRadius: 12,
+            border: "1px solid #d1d5db",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+            display: "flex",
+            flexDirection: "column",
             overflow: "hidden",
-            boxShadow: "0 12px 30px rgba(0,0,0,.2)",
           }}
         >
+          {/* Header */}
           <div
             style={{
-              background: "#1f2937",
-              color: "white",
-              padding: "10px 12px",
+              padding: "8px 10px",
+              borderBottom: "1px solid #e5e7eb",
               display: "flex",
               alignItems: "center",
               gap: 8,
             }}
           >
-            <strong>Chat del examen</strong>
-            <span style={{ marginLeft: "auto" }} />
-            <button
-              onClick={() => setOpen(false)}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "white",
-                fontSize: 18,
-                cursor: "pointer",
-              }}
-              title="Cerrar"
-            >
-              ✕
-            </button>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>Chat del examen</div>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+              {canBroadcast && (
+                <label style={{ fontSize: 11, display: "flex", gap: 4 }}>
+                  <input
+                    type="checkbox"
+                    checked={asBroadcast}
+                    onChange={(e) => setAsBroadcast(e.target.checked)}
+                  />
+                  Broadcast
+                </label>
+              )}
+              <button
+                onClick={() => setOpen(false)}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  fontSize: 16,
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            </div>
           </div>
 
-          <div style={{ padding: 8, display: "grid", gap: 6 }}>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={role === "student" ? "Tu nombre" : "Nombre docente"}
-              style={{
-                padding: 6,
-                border: "1px solid #e5e7eb",
-                borderRadius: 8,
-              }}
-            />
-
-            {role === "teacher" && (
-              <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={isBroadcast}
-                  onChange={(e) => setIsBroadcast(e.target.checked)}
-                />
-                <b>📢 Enviar como broadcast</b>
-              </label>
-            )}
-
-            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                type="checkbox"
-                checked={muted}
-                onChange={(e) => setMuted(e.target.checked)}
-              />
-              🔕 Silenciar
-            </label>
-          </div>
-
+          {/* Mensajes */}
           <div
-            ref={scrollRef}
             style={{
+              flex: 1,
               padding: 8,
-              height: 290,
               overflowY: "auto",
-              display: "grid",
-              gap: 6,
+              background: "#f9fafb",
             }}
           >
-            {msgs.map((m) => {
-              const mine =
-                (role === "student" &&
-                  m.fromRole === "student" &&
-                  m.authorName === name) ||
-                (role === "teacher" &&
-                  m.fromRole === "teacher" &&
-                  m.authorName === name);
+            {messages.length === 0 && (
+              <div
+                style={{
+                  fontSize: 12,
+                  opacity: 0.7,
+                  textAlign: "center",
+                  marginTop: 10,
+                }}
+              >
+                No hay mensajes aún.
+              </div>
+            )}
 
-              const isBc = !!m.broadcast;
-              return (
+            {messages.map((m) => (
+              <div
+                key={m.id}
+                style={{
+                  marginBottom: 6,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems:
+                    m.fromRole === "teacher" ? "flex-end" : "flex-start",
+                }}
+              >
                 <div
-                  key={m.id}
                   style={{
-                    display: "flex",
-                    justifyContent: mine ? "flex-end" : "flex-start",
+                    maxWidth: "90%",
+                    padding: "6px 8px",
+                    borderRadius: 8,
+                    background: badgeColor(m),
+                    border: "1px solid #d1d5db",
+                    fontSize: 12,
                   }}
                 >
                   <div
                     style={{
-                      maxWidth: "80%",
-                      background: isBc
-                        ? "#fffbeb"
-                        : mine
-                        ? "#dbeafe"
-                        : "#f3f4f6",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 10,
-                      padding: "6px 8px",
+                      fontSize: 10,
+                      opacity: 0.7,
+                      marginBottom: 2,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 6,
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: 11,
-                        opacity: 0.7,
-                        marginBottom: 2,
-                        display: "flex",
-                        gap: 6,
-                        alignItems: "center",
-                      }}
-                    >
-                      {isBc && (
-                        <span style={{ fontWeight: 700 }}>📢 Broadcast</span>
-                      )}
-                      <span>
-                        {m.authorName} •{" "}
-                        {new Date(m.createdAt).toLocaleTimeString()}
-                      </span>
-                    </div>
-                    <div style={{ whiteSpace: "pre-wrap" }}>{m.message}</div>
+                    <span>
+                      {m.authorName ||
+                        (m.fromRole === "teacher" ? "Docente" : "Alumno")}
+                    </span>
+                    {m.broadcast ? <span>📢 broadcast</span> : null}
                   </div>
+                  <div>{m.message}</div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
 
-          <div style={{ padding: 8, display: "flex", gap: 6 }}>
+          {/* Nombre + input */}
+          <div
+            style={{
+              borderTop: "1px solid #e5e7eb",
+              padding: 8,
+              display: "grid",
+              gap: 6,
+            }}
+          >
             <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={onKey}
-              placeholder={
-                role === "teacher" && isBroadcast
-                  ? "Mensaje (broadcast a todos)"
-                  : "Escribe un mensaje…"
-              }
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Tu nombre"
               style={{
-                flex: 1,
-                padding: 8,
-                border: "1px solid #e5e7eb",
-                borderRadius: 8,
+                padding: "6px 8px",
+                borderRadius: 6,
+                border: "1px solid #d1d5db",
+                fontSize: 12,
               }}
             />
-            <button onClick={send} style={{ padding: "8px 12px" }}>
-              Enviar
-            </button>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKey}
+              placeholder="Escribí tu mensaje… (Enter para enviar)"
+              rows={2}
+              style={{
+                resize: "none",
+                padding: "6px 8px",
+                borderRadius: 6,
+                border: "1px solid #d1d5db",
+                fontSize: 12,
+              }}
+            />
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              {err && (
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: "#b91c1c",
+                    maxWidth: 180,
+                  }}
+                >
+                  {err}
+                </div>
+              )}
+              <button
+                onClick={sendMessage}
+                disabled={sending}
+                style={{
+                  marginLeft: "auto",
+                  padding: "6px 10px",
+                  borderRadius: 999,
+                  border: "none",
+                  background: sending ? "#9ca3af" : "#2563eb",
+                  color: "white",
+                  fontSize: 12,
+                  cursor: sending ? "default" : "pointer",
+                }}
+              >
+                {sending ? "Enviando..." : "Enviar"}
+              </button>
+            </div>
           </div>
         </div>
       )}

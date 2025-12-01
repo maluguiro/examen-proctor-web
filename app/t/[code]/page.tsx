@@ -1,16 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
-
-const API = process.env.NEXT_PUBLIC_API_URL!;
+import { useParams } from "next/navigation";
+import { API } from "@/lib/api"; // 👈 nuevo
 
 type ExamResponse = {
   exam: {
     id: string;
     title: string;
     status: string;
-    durationMin: number | null; // ✅ mismo nombre que en la BD
+    durationMinutes: number | null;
     lives?: number | null;
     code: string;
   };
@@ -29,28 +28,43 @@ type MetaResponse = {
   meta: Meta | null;
 };
 
-export default function TeacherExamPage() {
+type AttemptsResponse = {
+  exam: {
+    id: string;
+    code: string;
+    isOpen: boolean;
+  };
+  attempts: {
+    id: string;
+    studentName: string;
+    startedAt: string;
+    finishedAt: string | null;
+    status: string;
+    livesRemaining: number;
+    paused: boolean;
+    violations: string;
+  }[];
+};
+
+export default function ConfigurePage() {
   const params = useParams<{ code: string }>();
-  const router = useRouter();
-  const code = (params?.code || "").toString();
+  const code = (params?.code || "").toUpperCase();
 
-  // ID real del examen en la base
-  const [examId, setExamId] = React.useState<string | null>(null);
-  const [publicCode, setPublicCode] = React.useState<string>("");
-
-  // loading / error
+  // loading / error / info
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState<string | null>(null);
-  const [savingMeta, setSavingMeta] = React.useState(false);
-  const [savingExam, setSavingExam] = React.useState(false);
   const [info, setInfo] = React.useState<string | null>(null);
 
+  const [savingMeta, setSavingMeta] = React.useState(false);
+  const [savingExam, setSavingExam] = React.useState(false);
+
   // exam básico
+  const [examId, setExamId] = React.useState<string | null>(null);
   const [title, setTitle] = React.useState("");
-  const [durationMinutes, setDurationMinutes] = React.useState<
-    number | "" | string
-  >("");
-  const [lives, setLives] = React.useState<number | "" | string>("");
+  const [durationMinutes, setDurationMinutes] = React.useState<string | number>(
+    ""
+  );
+  const [lives, setLives] = React.useState<string | number>("");
   const [isOpen, setIsOpen] = React.useState(false);
 
   // meta docente/materia
@@ -59,123 +73,94 @@ export default function TeacherExamPage() {
   const [gradingMode, setGradingMode] = React.useState<"auto" | "manual">(
     "auto"
   );
-  const [maxScore, setMaxScore] = React.useState<number | "" | string>("");
-  const [openAt, setOpenAt] = React.useState("");
+  const [maxScore, setMaxScore] = React.useState<string | number>("");
+  const [openAt, setOpenAt] = React.useState(""); // datetime-local
 
-  // ========= carga inicial: buscar examen por código (dos endpoints posibles) =========
+  // tablero / intentos
+  const [attempts, setAttempts] = React.useState<AttemptsResponse["attempts"]>(
+    []
+  );
+  const [loadingAttempts, setLoadingAttempts] = React.useState(false);
+
+  // ======================= CARGA INICIAL =======================
+
+  async function loadExamAndMeta() {
+    setLoading(true);
+    setErr(null);
+    setInfo(null);
+
+    try {
+      const [examRes, metaRes, attemptsRes] = await Promise.all([
+        fetch(`${API}/exams/${code}`, { cache: "no-store" }),
+        fetch(`${API}/exams/${code}/meta`, { cache: "no-store" }),
+        fetch(`${API}/exams/${code}/attempts`, { cache: "no-store" }),
+      ]);
+
+      // EXAM
+      if (!examRes.ok) {
+        throw new Error(await examRes.text());
+      }
+      const examData: ExamResponse = await examRes.json();
+      const e = examData.exam;
+
+      setExamId(e.id);
+      setTitle(e.title || "");
+      setIsOpen(String(e.status).toLowerCase() === "open");
+      setDurationMinutes(
+        typeof e.durationMinutes === "number" ? e.durationMinutes : ""
+      );
+      setLives(typeof e.lives === "number" ? e.lives : "");
+
+      // META
+      if (metaRes.ok) {
+        const metaData: MetaResponse = await metaRes.json();
+        if (metaData.meta) {
+          const m = metaData.meta;
+          setTeacherName(m.teacherName || "");
+          setSubject(m.subject || "");
+          setGradingMode(
+            (m.gradingMode || "auto").toLowerCase() === "manual"
+              ? "manual"
+              : "auto"
+          );
+          setMaxScore(
+            typeof m.maxScore === "number" && !isNaN(m.maxScore)
+              ? m.maxScore
+              : ""
+          );
+          if (m.openAt) {
+            const d = new Date(m.openAt);
+            if (!isNaN(d.getTime())) {
+              // datetime-local necesita yyyy-MM-ddTHH:mm
+              const iso = d.toISOString().slice(0, 16);
+              setOpenAt(iso);
+            }
+          }
+        }
+      }
+
+      // ATTEMPTS (tablero)
+      if (attemptsRes.ok) {
+        const attemptsData: AttemptsResponse = await attemptsRes.json();
+        setAttempts(attemptsData.attempts || []);
+      }
+    } catch (e: any) {
+      console.error(e);
+      setErr(e?.message || "No se pudo cargar el examen");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   React.useEffect(() => {
     if (!code) return;
-
-    async function load() {
-      setLoading(true);
-      setErr(null);
-      setInfo(null);
-
-      try {
-        const raw = code.trim();
-        const codeVariants = Array.from(
-          new Set([raw, raw.toUpperCase(), raw.toLowerCase()])
-        ).filter(Boolean) as string[];
-
-        let examData: ExamResponse | null = null;
-
-        // Probamos distintas rutas hasta que alguna devuelva OK:
-        // 1) /exams/:code
-        // 2) /exams/by-code/:code
-        for (const c of codeVariants) {
-          // 1) /api/exams/:code
-          let r = await fetch(`${API}/exams/${c}`, { cache: "no-store" });
-          if (r.ok) {
-            examData = (await r.json()) as ExamResponse;
-            break;
-          }
-
-          // 2) /api/exams/by-code/:code
-          r = await fetch(`${API}/exams/by-code/${c}`, {
-            cache: "no-store",
-          });
-          if (r.ok) {
-            const e = (await r.json()) as any;
-            if (e.exam) {
-              examData = e as ExamResponse;
-            } else {
-              examData = { exam: e } as ExamResponse;
-            }
-            break;
-          }
-        }
-
-        if (!examData) {
-          throw new Error(
-            "No se encontró el examen para este código. Verificá el enlace o el código."
-          );
-        }
-
-        const e = examData.exam;
-
-        setExamId(e.id);
-        setPublicCode(e.code || raw);
-        setTitle(e.title || "");
-        setIsOpen(String(e.status).toLowerCase() === "open");
-        setDurationMinutes(
-          typeof e.durationMin === "number" ? e.durationMin : ""
-        );
-
-        setLives(typeof e.lives === "number" ? e.lives : "");
-
-        // Intentar cargar meta usando el ID del examen
-        try {
-          const metaRes = await fetch(`${API}/exams/${e.id}/meta`, {
-            cache: "no-store",
-          });
-          if (metaRes.ok) {
-            const metaData: MetaResponse = await metaRes.json();
-            if (metaData.meta) {
-              const m = metaData.meta;
-              setTeacherName(m.teacherName || "");
-              setSubject(m.subject || "");
-              setGradingMode(
-                (m.gradingMode || "auto").toLowerCase() === "manual"
-                  ? "manual"
-                  : "auto"
-              );
-              setMaxScore(
-                typeof m.maxScore === "number" && !isNaN(m.maxScore)
-                  ? m.maxScore
-                  : ""
-              );
-              if (m.openAt) {
-                const d = new Date(m.openAt);
-                if (!isNaN(d.getTime())) {
-                  const iso = d.toISOString().slice(0, 16); // yyyy-MM-ddTHH:mm
-                  setOpenAt(iso);
-                }
-              }
-            }
-          }
-        } catch {
-          // si falla meta, seguimos sin bloquear la página
-        }
-      } catch (e: any) {
-        setErr(
-          e?.message ||
-            "No se pudo cargar el examen. Probá refrescar o revisar el código."
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    load();
+    loadExamAndMeta();
   }, [code]);
 
-  // ========= guardar meta docente (por ID) =========
-  async function saveMeta() {
-    if (!examId) {
-      setErr("No se pudo identificar el examen (ID nulo).");
-      return;
-    }
+  // ======================= GUARDAR META DOCENTE =======================
 
+  async function saveMeta() {
+    if (!examId) return;
     setSavingMeta(true);
     setErr(null);
     setInfo(null);
@@ -192,17 +177,17 @@ export default function TeacherExamPage() {
       }
 
       if (openAt) {
+        // enviamos ISO; el backend ya hace el parse
         body.openAt = new Date(openAt).toISOString();
       }
 
-      const r = await fetch(`${API}/exams/${examId}/meta`, {
+      const r = await fetch(`${API}/exams/${code}/meta`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
       if (!r.ok) throw new Error(await r.text());
-
       setInfo("Datos del docente guardados.");
     } catch (e: any) {
       setErr(e?.message || "Error al guardar los datos del docente");
@@ -211,13 +196,10 @@ export default function TeacherExamPage() {
     }
   }
 
-  // ========= guardar configuración básica y abrir examen (por ID) =========
-  async function saveAndOpenExam() {
-    if (!examId) {
-      setErr("No se pudo identificar el examen (ID nulo).");
-      return;
-    }
+  // ======================= GUARDAR CONFIG EXAMEN =======================
 
+  async function saveAndOpenExam() {
+    if (!examId) return;
     setSavingExam(true);
     setErr(null);
     setInfo(null);
@@ -230,7 +212,7 @@ export default function TeacherExamPage() {
       if (title.trim()) body.title = title.trim();
 
       if (durationMinutes !== "") {
-        body.durationMin = Number(durationMinutes) || 0;
+        body.durationMinutes = Number(durationMinutes) || 0;
       }
 
       if (lives !== "") {
@@ -238,7 +220,7 @@ export default function TeacherExamPage() {
         body.lives = v;
       }
 
-      const r = await fetch(`${API}/exams/${examId}`, {
+      const r = await fetch(`${API}/exams/${code}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -248,16 +230,40 @@ export default function TeacherExamPage() {
 
       setIsOpen(true);
       setInfo("Configuración guardada y examen abierto.");
-
-      // 👇 Después de abrir, vamos directo al armado de preguntas
-      const nextCode = publicCode || code;
-      if (nextCode) {
-        router.push(`/t/${nextCode}/edit`);
-      }
     } catch (e: any) {
       setErr(e?.message || "Error al guardar la configuración");
     } finally {
       setSavingExam(false);
+    }
+  }
+
+  // ======================= TABLERO: INTENTOS =======================
+
+  async function reloadAttempts() {
+    if (!code) return;
+    setLoadingAttempts(true);
+    try {
+      const r = await fetch(`${API}/exams/${code}/attempts`, {
+        cache: "no-store",
+      });
+      if (!r.ok) return;
+      const data: AttemptsResponse = await r.json();
+      setAttempts(data.attempts || []);
+    } catch (e) {
+      console.error("LOAD_ATTEMPTS_ERROR", e);
+    } finally {
+      setLoadingAttempts(false);
+    }
+  }
+
+  function formatDateTime(dt: string | null) {
+    if (!dt) return "—";
+    try {
+      const d = new Date(dt);
+      if (isNaN(d.getTime())) return "—";
+      return d.toLocaleString();
+    } catch {
+      return "—";
     }
   }
 
@@ -271,95 +277,99 @@ export default function TeacherExamPage() {
   return (
     <main
       style={{
-        padding: 24,
         maxWidth: 900,
         margin: "0 auto",
+        padding: 16,
         display: "grid",
         gap: 16,
       }}
     >
       {/* ENCABEZADO */}
       <header>
-        <div style={{ marginBottom: 8 }}>
-          <a href="/t" style={{ textDecoration: "none" }}>
-            ← Volver al panel docente
-          </a>
-        </div>
-        <h1 style={{ margin: 0 }}>
-          Docente — {publicCode || code.toUpperCase()}{" "}
-          {isOpen ? " (abierto)" : " (cerrado)"}
+        <h1 style={{ fontSize: 24, marginBottom: 4 }}>
+          Docente — {code.toUpperCase()} {isOpen ? " (abierto)" : " (cerrado)"}
         </h1>
-        <p style={{ color: "#555", marginTop: 4 }}>
-          Armado de exámenes
-          <br />
-          Configurá los datos del examen, tus datos como docente y cómo se va a
-          corregir.
+        <p style={{ fontSize: 14, opacity: 0.8 }}>
+          Armado de exámenes · Configurá los datos del examen, tus datos como
+          docente y revisá los intentos de los alumnos.
         </p>
       </header>
 
-      {loading && <div>Cargando configuración…</div>}
+      {loading && (
+        <div style={cardStyle}>
+          <p>Cargando configuración…</p>
+        </div>
+      )}
 
       {!loading && (
         <>
           {/* BLOQUE: Datos del docente y materia */}
           <section style={cardStyle}>
-            <h2 style={{ marginTop: 0 }}>Datos del docente y materia</h2>
+            <h2 style={{ marginBottom: 8 }}>Datos del docente y materia</h2>
 
-            <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ display: "grid", gap: 10 }}>
               <div>
-                <label>Nombre del docente</label>
+                <label style={{ fontSize: 13, display: "block" }}>
+                  Nombre del docente
+                </label>
                 <input
                   value={teacherName}
                   onChange={(e) => setTeacherName(e.target.value)}
                   placeholder="Ej: Prof. Gómez"
                   style={{
-                    width: "100%",
                     padding: 8,
                     border: "1px solid #e5e7eb",
                     borderRadius: 8,
+                    width: "100%",
                   }}
                 />
               </div>
 
               <div>
-                <label>Materia</label>
+                <label style={{ fontSize: 13, display: "block" }}>
+                  Materia
+                </label>
                 <input
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   placeholder="Ej: Matemática I"
                   style={{
-                    width: "100%",
                     padding: 8,
                     border: "1px solid #e5e7eb",
                     borderRadius: 8,
+                    width: "100%",
                   }}
                 />
               </div>
 
               <div>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                <label style={{ fontSize: 13, display: "block" }}>
                   Modo de corrección
+                </label>
+                <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+                  <label style={{ fontSize: 13 }}>
+                    <input
+                      type="radio"
+                      checked={gradingMode === "auto"}
+                      onChange={() => setGradingMode("auto")}
+                    />{" "}
+                    Instantánea (automática)
+                  </label>
+                  <label style={{ fontSize: 13 }}>
+                    <input
+                      type="radio"
+                      checked={gradingMode === "manual"}
+                      onChange={() => setGradingMode("manual")}
+                    />{" "}
+                    Manual
+                  </label>
                 </div>
-                <label style={{ display: "block", marginBottom: 4 }}>
-                  <input
-                    type="radio"
-                    checked={gradingMode === "auto"}
-                    onChange={() => setGradingMode("auto")}
-                  />{" "}
-                  Instantánea (automática)
-                </label>
-                <label style={{ display: "block" }}>
-                  <input
-                    type="radio"
-                    checked={gradingMode === "manual"}
-                    onChange={() => setGradingMode("manual")}
-                  />{" "}
-                  Manual
-                </label>
               </div>
 
               <div>
-                <label>Nota máxima del examen</label>
+                <label style={{ fontSize: 13, display: "block" }}>
+                  Nota máxima del examen
+                </label>
                 <input
                   type="number"
                   value={maxScore}
@@ -370,16 +380,18 @@ export default function TeacherExamPage() {
                   }
                   placeholder="Ej: 10"
                   style={{
-                    width: 120,
                     padding: 8,
                     border: "1px solid #e5e7eb",
                     borderRadius: 8,
+                    width: "100%",
                   }}
                 />
               </div>
 
               <div>
-                <label>Hora de apertura (opcional)</label>
+                <label style={{ fontSize: 13, display: "block" }}>
+                  Hora de apertura (opcional)
+                </label>
                 <input
                   type="datetime-local"
                   value={openAt}
@@ -388,18 +400,13 @@ export default function TeacherExamPage() {
                     padding: 8,
                     border: "1px solid #e5e7eb",
                     borderRadius: 8,
+                    width: "100%",
                   }}
                 />
-                <p
-                  style={{
-                    fontSize: 12,
-                    color: "#777",
-                    marginTop: 4,
-                    marginBottom: 0,
-                  }}
-                >
+                <p style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>
                   Si se completa, el examen queda con hora sugerida de apertura.
-                  El cierre se produce cuando vence el tiempo del alumno.
+                  El cierre final se produce cuando vence el tiempo de cada
+                  alumno.
                 </p>
               </div>
 
@@ -407,9 +414,19 @@ export default function TeacherExamPage() {
                 <button
                   onClick={saveMeta}
                   disabled={savingMeta}
-                  style={{ padding: "8px 12px" }}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: savingMeta ? "#9ca3af" : "#2563eb",
+                    color: "white",
+                    cursor: savingMeta ? "default" : "pointer",
+                    fontSize: 14,
+                  }}
                 >
-                  {savingMeta ? "Guardando…" : "Guardar datos del docente"}
+                  {savingMeta
+                    ? "Guardando…"
+                    : "Guardar datos del docente y materia"}
                 </button>
               </div>
             </div>
@@ -417,36 +434,38 @@ export default function TeacherExamPage() {
 
           {/* BLOQUE: Configuración básica */}
           <section style={cardStyle}>
-            <h2 style={{ marginTop: 0 }}>Configuración básica</h2>
+            <h2 style={{ marginBottom: 8 }}>Configuración básica</h2>
 
-            <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ display: "grid", gap: 10 }}>
               <div>
-                <label>Título del examen</label>
+                <label style={{ fontSize: 13, display: "block" }}>
+                  Título del examen
+                </label>
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Ej: Parcial 1 - Unidad 1"
                   style={{
-                    width: "100%",
                     padding: 8,
                     border: "1px solid #e5e7eb",
                     borderRadius: 8,
+                    width: "100%",
                   }}
                 />
               </div>
 
               <div>
-                <label>Estado</label>
-                <div>
-                  <b>{isOpen ? "Abierto" : "Cerrado"}</b>{" "}
-                  <span style={{ fontSize: 12, color: "#777" }}>
-                    Se abrirá al guardar la configuración.
-                  </span>
-                </div>
+                <label style={{ fontSize: 13, display: "block" }}>Estado</label>
+                <p style={{ marginTop: 4, fontSize: 14 }}>
+                  <b>{isOpen ? "Abierto" : "Cerrado"}</b> · Se abrirá al guardar
+                  la configuración.
+                </p>
               </div>
 
               <div>
-                <label>Duración del examen (minutos)</label>
+                <label style={{ fontSize: 13, display: "block" }}>
+                  Duración del examen (minutos)
+                </label>
                 <input
                   type="number"
                   value={durationMinutes}
@@ -457,16 +476,18 @@ export default function TeacherExamPage() {
                   }
                   placeholder="Ej: 60"
                   style={{
-                    width: 160,
                     padding: 8,
                     border: "1px solid #e5e7eb",
                     borderRadius: 8,
+                    width: "100%",
                   }}
                 />
               </div>
 
               <div>
-                <label>Vidas del examen (puede ser 0, 1, 3, 6…)</label>
+                <label style={{ fontSize: 13, display: "block" }}>
+                  Vidas del examen (puede ser 0, 1, 3, 6…)
+                </label>
                 <input
                   type="number"
                   value={lives}
@@ -477,22 +498,15 @@ export default function TeacherExamPage() {
                   }
                   placeholder="Ej: 3"
                   style={{
-                    width: 160,
                     padding: 8,
                     border: "1px solid #e5e7eb",
                     borderRadius: 8,
+                    width: "100%",
                   }}
                 />
-                <p
-                  style={{
-                    fontSize: 12,
-                    color: "#777",
-                    marginTop: 4,
-                    marginBottom: 0,
-                  }}
-                >
+                <p style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>
                   Cada vez que se detecta fraude, se pierde 1 vida. Al llegar a
-                  0, el examen se cierra.
+                  0, el examen se cierra para ese alumno.
                 </p>
               </div>
 
@@ -500,12 +514,167 @@ export default function TeacherExamPage() {
                 <button
                   onClick={saveAndOpenExam}
                   disabled={savingExam}
-                  style={{ padding: "8px 12px" }}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: savingExam ? "#9ca3af" : "#16a34a",
+                    color: "white",
+                    cursor: savingExam ? "default" : "pointer",
+                    fontSize: 14,
+                  }}
                 >
-                  {savingExam ? "Guardando…" : "Guardar y abrir examen"}
+                  {savingExam
+                    ? "Guardando…"
+                    : "Guardar configuración y abrir examen"}
                 </button>
               </div>
             </div>
+          </section>
+
+          {/* BLOQUE: Tablero de participantes */}
+          <section style={cardStyle}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 8,
+              }}
+            >
+              <h2 style={{ margin: 0 }}>Tablero de participantes</h2>
+              <button
+                onClick={reloadAttempts}
+                disabled={loadingAttempts}
+                style={{
+                  marginLeft: "auto",
+                  padding: "4px 8px",
+                  borderRadius: 8,
+                  border: "1px solid #e5e7eb",
+                  background: "#f9fafb",
+                  fontSize: 12,
+                  cursor: loadingAttempts ? "default" : "pointer",
+                }}
+              >
+                {loadingAttempts ? "Actualizando…" : "Refrescar"}
+              </button>
+            </div>
+
+            {attempts.length === 0 ? (
+              <p style={{ fontSize: 13, opacity: 0.7 }}>
+                Todavía no hay intentos registrados para este examen.
+              </p>
+            ) : (
+              <div
+                style={{
+                  overflowX: "auto",
+                }}
+              >
+                <table
+                  style={{
+                    width: "100%",
+                    fontSize: 13,
+                    borderCollapse: "collapse",
+                  }}
+                >
+                  <thead>
+                    <tr
+                      style={{
+                        background: "#f3f4f6",
+                        textAlign: "left",
+                      }}
+                    >
+                      <th
+                        style={{
+                          padding: 6,
+                          borderBottom: "1px solid #e5e7eb",
+                        }}
+                      >
+                        Alumno
+                      </th>
+                      <th
+                        style={{
+                          padding: 6,
+                          borderBottom: "1px solid #e5e7eb",
+                        }}
+                      >
+                        Estado
+                      </th>
+                      <th
+                        style={{
+                          padding: 6,
+                          borderBottom: "1px solid #e5e7eb",
+                        }}
+                      >
+                        Vidas restantes
+                      </th>
+                      <th
+                        style={{
+                          padding: 6,
+                          borderBottom: "1px solid #e5e7eb",
+                        }}
+                      >
+                        Inicio
+                      </th>
+                      <th
+                        style={{
+                          padding: 6,
+                          borderBottom: "1px solid #e5e7eb",
+                        }}
+                      >
+                        Fin
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {attempts.map((a) => (
+                      <tr key={a.id}>
+                        <td
+                          style={{
+                            padding: 6,
+                            borderBottom: "1px solid #f3f4f6",
+                          }}
+                        >
+                          {a.studentName}
+                        </td>
+                        <td
+                          style={{
+                            padding: 6,
+                            borderBottom: "1px solid #f3f4f6",
+                          }}
+                        >
+                          {a.status}
+                        </td>
+                        <td
+                          style={{
+                            padding: 6,
+                            borderBottom: "1px solid #f3f4f6",
+                          }}
+                        >
+                          {a.livesRemaining}
+                        </td>
+                        <td
+                          style={{
+                            padding: 6,
+                            borderBottom: "1px solid #f3f4f6",
+                          }}
+                        >
+                          {formatDateTime(a.startedAt)}
+                        </td>
+                        <td
+                          style={{
+                            padding: 6,
+                            borderBottom: "1px solid #f3f4f6",
+                          }}
+                        >
+                          {formatDateTime(a.finishedAt)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
         </>
       )}
@@ -513,11 +682,11 @@ export default function TeacherExamPage() {
       {err && (
         <div
           style={{
-            background: "#fee",
-            border: "1px solid #fcc",
             borderRadius: 8,
+            border: "1px solid #fecaca",
+            background: "#fef2f2",
             padding: 8,
-            whiteSpace: "pre-wrap",
+            fontSize: 13,
           }}
         >
           {err}
@@ -527,10 +696,11 @@ export default function TeacherExamPage() {
       {info && (
         <div
           style={{
-            background: "#f0fdf4",
-            border: "1px solid #bbf7d0",
             borderRadius: 8,
+            border: "1px solid #bbf7d0",
+            background: "#ecfdf5",
             padding: 8,
+            fontSize: 13,
           }}
         >
           {info}
