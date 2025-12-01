@@ -10,7 +10,7 @@ type ExamResponse = {
     id: string;
     title: string;
     status: string;
-    durationMinutes: number | null;
+    durationMin: number | null; // ✅ mismo nombre que en la BD
     lives?: number | null;
     code: string;
   };
@@ -118,8 +118,9 @@ export default function TeacherExamPage() {
         setTitle(e.title || "");
         setIsOpen(String(e.status).toLowerCase() === "open");
         setDurationMinutes(
-          typeof e.durationMinutes === "number" ? e.durationMinutes : ""
+          typeof e.durationMin === "number" ? e.durationMin : ""
         );
+
         setLives(typeof e.lives === "number" ? e.lives : "");
 
         // Intentar cargar meta usando el ID del examen
@@ -229,7 +230,7 @@ export default function TeacherExamPage() {
       if (title.trim()) body.title = title.trim();
 
       if (durationMinutes !== "") {
-        body.durationMinutes = Number(durationMinutes) || 0;
+        body.durationMin = Number(durationMinutes) || 0;
       }
 
       if (lives !== "") {

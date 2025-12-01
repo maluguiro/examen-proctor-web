@@ -146,23 +146,29 @@ export default function Student() {
     async (type: string, meta?: any) => {
       if (!attemptId) return;
       try {
-        // POST real: descuenta vida y devuelve remaining
-        const r = await fetch(`${API}/attempts/${attemptId}/antifraud`, {
+        const r = await fetch(`${API}/s/attempt/${attemptId}/event`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type, meta }),
         });
 
         if (r.ok) {
-          // feedback inmediato (flash)
+          const data = await r.json();
+
+          if (typeof data.livesRemaining === "number") {
+            setLives(data.livesRemaining);
+            if (data.livesRemaining <= 0) {
+              await finishAttempt("lives");
+              return;
+            }
+          }
+
           setFlash(true);
           setTimeout(() => setFlash(false), 500);
-
-          // refrescar resumen para mostrar vidas/timer actualizados
           await refreshSummary();
         }
-      } catch {
-        // ignore
+      } catch (err) {
+        console.error("Antifraude error", err);
       }
     },
     [attemptId, refreshSummary]
