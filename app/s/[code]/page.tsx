@@ -114,9 +114,6 @@ export default function Student() {
   const [score, setScore] = React.useState<number | null>(null);
   const [maxScore, setMaxScore] = React.useState<number | null>(null);
 
-  // flag para evitar múltiples auto-envíos (tiempo/vidas)
-  const autoSubmitRef = React.useRef(false);
-
   // ======= resumen (solo vidas, por ahora) =======
   const refreshSummary = React.useCallback(async () => {
     if (!attemptId) return;
@@ -132,7 +129,6 @@ export default function Student() {
         setLives(Number.isFinite(data.remaining) ? data.remaining : null);
 
         if (data.remaining <= 0) {
-          // Auto-submit por vidas agotadas (una sola vez)
           await submitAttempt("lives");
         }
       }
@@ -141,21 +137,11 @@ export default function Student() {
     }
   }, [attemptId]);
 
+  // ======= enviar =======
   async function submitAttempt(
     reason?: "manual" | "time" | "lives"
   ): Promise<void> {
     if (!attemptId) return;
-
-    const isAuto = reason === "time" || reason === "lives";
-
-    // Evita múltiples auto-submits encadenados (tiempo/vidas/polling/antifraude)
-    if (isAuto) {
-      if (autoSubmitRef.current) {
-        return;
-      }
-      autoSubmitRef.current = true;
-    }
-
     setErr(null);
     setStep("submitting");
 
@@ -163,12 +149,13 @@ export default function Student() {
       const payload = {
         answers: questions.map((q) => {
           const v = answers[q.id];
-          if (q.kind === "FIB") {
+          if (mapKind(q.kind as string) === "FIB") {
             const arr = Array.isArray(v) ? v.map((x) => String(x ?? "")) : [];
             return { questionId: q.id, value: arr };
           }
           return { questionId: q.id, value: v };
         }),
+        // podríamos enviar "reason" al backend en el futuro si queremos
       };
 
       const r = await fetch(`${API}/attempts/${attemptId}/submit`, {
@@ -178,42 +165,22 @@ export default function Student() {
       });
 
       if (!r.ok) {
+        // Leemos el body como texto UNA sola vez
         const raw = await r.text();
         let msg = "Error al enviar el intento";
-        let errorCode = "";
 
         try {
           const parsed = JSON.parse(raw);
           if (parsed?.error) {
-            errorCode = String(parsed.error);
-            msg = errorCode;
+            msg = String(parsed.error);
           } else if (raw && raw.length < 300) {
             msg = raw;
           }
         } catch {
+          // No era JSON, puede ser HTML o cualquier cosa
           if (raw && raw.length < 300) {
             msg = raw;
           }
-        }
-
-        const normalized = (errorCode || msg).toUpperCase();
-
-        // 🔴 Caso especial: auto-submit sin respuestas ("NO_ANSWER", "NO ANSWER", etc.)
-        if (
-          isAuto &&
-          (normalized.includes("NO_ANSWER") ||
-            normalized.includes("NO ANSWER") ||
-            normalized.includes("NO_ANSWERS"))
-        ) {
-          // Lo consideramos igual como examen cerrado
-          setGradingMode("manual");
-          setScore(null);
-          setMaxScore(null);
-          setStep("submitted");
-          setErr(
-            "El examen se cerró automáticamente y no se registraron respuestas."
-          );
-          return;
         }
 
         throw new Error(msg);
@@ -226,8 +193,7 @@ export default function Student() {
       setMaxScore(data.maxScore ?? null);
       setStep("submitted");
     } catch (e: any) {
-      const msg = e?.message || "Error al enviar el intento";
-      setErr(msg);
+      setErr(e?.message || "Error al enviar el intento");
       setStep("exam");
     }
   }
@@ -249,7 +215,6 @@ export default function Student() {
           if (typeof data.livesRemaining === "number") {
             setLives(data.livesRemaining);
             if (data.livesRemaining <= 0) {
-              // Auto-submit por vidas agotadas (una sola vez)
               await submitAttempt("lives");
               return;
             }
@@ -317,7 +282,7 @@ export default function Student() {
     document.addEventListener("cut", onCut as any);
     document.addEventListener("paste", onPaste as any);
     document.addEventListener("keydown", onKey as any);
-    document.addEventListener("fullscreenchange", onFull as any);
+    document.addEventListener("fullscreenchange", onFull);
 
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
@@ -325,7 +290,7 @@ export default function Student() {
       document.removeEventListener("cut", onCut as any);
       document.removeEventListener("paste", onPaste as any);
       document.removeEventListener("keydown", onKey as any);
-      document.removeEventListener("fullscreenchange", onFull as any);
+      document.removeEventListener("fullscreenchange", onFull);
     };
   }, [step, attemptId, reportViolation]);
 
@@ -348,7 +313,6 @@ export default function Student() {
         if (prev == null) return prev;
         if (prev <= 1) {
           window.clearInterval(timer);
-          // Auto-submit por tiempo agotado (una sola vez)
           submitAttempt("time");
           return 0;
         }
@@ -367,9 +331,6 @@ export default function Student() {
       setErr("Ingresá tu nombre para comenzar.");
       return;
     }
-
-    // por las dudas, reseteamos el flag de auto-submit al iniciar intento
-    autoSubmitRef.current = false;
 
     try {
       // fullscreen (best effort)
@@ -417,7 +378,12 @@ export default function Student() {
         if (kind === "TRUE_FALSE") seed[q.id] = "";
         else if (kind === "MCQ") seed[q.id] = null;
         else if (kind === "SHORT") seed[q.id] = "";
-        else if (kind === "FIB") seed[q.id] = [];
+        else if (kind === "FIB") {
+          const blanks = fibParseToParts(q.stem || "").filter(
+            (p) => p.type === "box"
+          ).length;
+          seed[q.id] = Array(blanks).fill("");
+        }
       }
       setAnswers(seed);
 
@@ -566,7 +532,7 @@ export default function Student() {
       );
     }
 
-    // FILL IN BLANK
+    // FILL IN BLANK (con banco de palabras clickable + drag & drop)
     if (kind === "FIB") {
       const parts = fibParseToParts(q.stem || "");
       const vArr: string[] = Array.isArray(answers[q.id]) ? answers[q.id] : [];
@@ -579,6 +545,7 @@ export default function Student() {
 
       const bank = Array.isArray(q.choices) ? q.choices : [];
 
+      // click: llena el primer casillero vacío
       const selectFromBank = (word: string) => {
         const next = [...(vArr || [])];
         const emptyIndex = next.findIndex((x) => !x || x.trim() === "");
@@ -587,10 +554,23 @@ export default function Student() {
         setAnswers({ ...answers, [q.id]: next });
       };
 
+      // drag & drop
+      const handleDrop = (ix: number, e: React.DragEvent<HTMLInputElement>) => {
+        e.preventDefault();
+        const word = e.dataTransfer.getData("text/plain");
+        if (!word) return;
+        setAt(ix, word);
+      };
+
+      const handleDragOver = (e: React.DragEvent<HTMLInputElement>) => {
+        e.preventDefault();
+      };
+
       return (
         <div key={q.id} style={commonBox}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>{idx + 1}.</div>
 
+          {/* Enunciado con casilleros */}
           <div
             style={{
               display: "flex",
@@ -609,6 +589,8 @@ export default function Student() {
                   placeholder={`Casillero ${p.idx! + 1}`}
                   value={vArr[p.idx!] || ""}
                   onChange={(e) => setAt(p.idx!, e.target.value)}
+                  onDrop={(e) => handleDrop(p.idx!, e)}
+                  onDragOver={handleDragOver}
                   style={{
                     width: 160,
                     padding: 8,
@@ -620,6 +602,7 @@ export default function Student() {
             )}
           </div>
 
+          {/* Banco de palabras */}
           {bank.length > 0 && (
             <div style={{ marginBottom: 6 }}>
               <div
@@ -629,7 +612,8 @@ export default function Student() {
                   marginBottom: 4,
                 }}
               >
-                Opciones sugeridas:
+                Opciones sugeridas (podés hacer click o arrastrar hacia un
+                casillero):
               </div>
               <div
                 style={{
@@ -642,6 +626,10 @@ export default function Student() {
                   <button
                     key={i}
                     type="button"
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/plain", w);
+                    }}
                     onClick={() => selectFromBank(w)}
                     style={{
                       padding: "4px 8px",
@@ -649,7 +637,7 @@ export default function Student() {
                       border: "1px solid #e5e7eb",
                       background: "#f9fafb",
                       fontSize: 12,
-                      cursor: "pointer",
+                      cursor: "grab",
                     }}
                   >
                     {w}
