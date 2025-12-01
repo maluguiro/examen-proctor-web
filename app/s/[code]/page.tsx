@@ -10,9 +10,9 @@ type QKind = "TRUE_FALSE" | "MCQ" | "SHORT" | "FIB";
 
 type PaperQuestion = {
   id: string;
-  kind: QKind | string; // por compat
+  kind: QKind | string;
   stem: string;
-  choices?: string[] | null; // MCQ
+  choices?: string[] | null; // MCQ o banco FIB
   points?: number | null;
 };
 
@@ -28,7 +28,17 @@ type SubmitResponse = {
   maxScore?: number | null;
 };
 
-// parsea [[...]] -> piezas de texto y cajas (para FIB)
+type ExamInfoResponse = {
+  exam: {
+    title: string;
+    code: string;
+    durationMinutes?: number | null;
+    durationMin?: number | null;
+    lives?: number | null;
+  };
+};
+
+// parsea [[...]] -> texto + casilleros
 function fibParseToParts(stem: string) {
   const parts: Array<{ type: "text" | "box"; idx?: number; text?: string }> =
     [];
@@ -55,6 +65,16 @@ function fibParseToParts(stem: string) {
 
   return parts;
 }
+
+const mapKind = (k: string): QKind => {
+  const s = String(k || "").toUpperCase();
+  if (s === "TRUE_FALSE" || s === "TF" || s === "VOF") return "TRUE_FALSE";
+  if (s === "MCQ" || s === "MULTIPLE" || s === "MULTIPLE_CHOICE") return "MCQ";
+  if (s === "SHORT" || s === "TEXT" || s === "TEXT_SHORT" || s === "BREVE")
+    return "SHORT";
+  if (s === "FIB" || s.includes("FILL") || s.includes("BLANK")) return "FIB";
+  return "SHORT";
+};
 
 export default function Student() {
   const params = useParams<{ code: string }>();
@@ -95,53 +115,70 @@ export default function Student() {
   const [score, setScore] = React.useState<number | null>(null);
   const [maxScore, setMaxScore] = React.useState<number | null>(null);
 
-  // util: mapear kind sueltos a nuestros 4 soportados
-  const mapKind = (k: string): QKind => {
-    const s = String(k || "").toUpperCase();
-    if (s === "TRUE_FALSE" || s === "TF" || s === "VOF") return "TRUE_FALSE";
-    if (s === "MCQ" || s === "MULTIPLE" || s === "MULTIPLE_CHOICE")
-      return "MCQ";
-    if (s === "SHORT" || s === "TEXT" || s === "TEXT_SHORT" || s === "BREVE")
-      return "SHORT";
-    if (s === "FIB" || s.includes("FILL") || s.includes("BLANK")) return "FIB";
-    // fallback amigable
-    return "SHORT";
-  };
-
-  // ======= terminar intento (por vidas / tiempo / manual)
-  async function finishAttempt(reason?: "lives" | "time" | "manual") {
-    if (!attemptId) return;
-    try {
-      await fetch(`${API}/s/attempt/${attemptId}/finish`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: reason || "manual" }),
-      }).catch(() => {});
-    } finally {
-      setStep("submitting");
-    }
-  }
-
-  // ======= antifraude: summary + aviso visual
+  // ======= resumen (solo vidas, por ahora) =======
   const refreshSummary = React.useCallback(async () => {
     if (!attemptId) return;
+
     try {
       const r = await fetch(`${API}/attempts/${attemptId}/summary`, {
         cache: "no-store",
       });
       if (!r.ok) return;
       const data = await r.json();
-      setLives(Number.isFinite(data.remaining) ? data.remaining : null);
-      setSecondsLeft(data.secondsLeft ?? null);
 
-      if (data.remaining != null && data.remaining <= 0) {
-        await finishAttempt("lives");
+      if (typeof data.remaining === "number") {
+        setLives(Number.isFinite(data.remaining) ? data.remaining : null);
+
+        if (data.remaining <= 0) {
+          await submitAttempt("lives");
+        }
       }
     } catch {
       // ignore
     }
   }, [attemptId]);
 
+  // ======= enviar intento =======
+  async function submitAttempt(reason?: "manual" | "time" | "lives") {
+    if (!attemptId) return;
+    if (step === "submitting" || step === "submitted") return;
+
+    setErr(null);
+    setStep("submitting");
+
+    try {
+      const payload = {
+        reason: reason || "manual",
+        answers: questions.map((q) => {
+          const v = answers[q.id];
+          if (mapKind(q.kind as string) === "FIB") {
+            const arr = Array.isArray(v) ? v.map((x) => String(x ?? "")) : [];
+            return { questionId: q.id, value: arr };
+          }
+          return { questionId: q.id, value: v };
+        }),
+      };
+
+      const r = await fetch(`${API}/attempts/${attemptId}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!r.ok) throw new Error(await r.text());
+      const data: SubmitResponse = await r.json();
+
+      setGradingMode(data.gradingMode);
+      setScore(data.score ?? null);
+      setMaxScore(data.maxScore ?? null);
+      setStep("submitted");
+    } catch (e: any) {
+      setErr(e?.message || "Error al enviar el intento");
+      setStep("exam");
+    }
+  }
+
+  // ======= antifraude =======
   const reportViolation = React.useCallback(
     async (type: string, meta?: any) => {
       if (!attemptId) return;
@@ -158,13 +195,15 @@ export default function Student() {
           if (typeof data.livesRemaining === "number") {
             setLives(data.livesRemaining);
             if (data.livesRemaining <= 0) {
-              await finishAttempt("lives");
+              await submitAttempt("lives");
               return;
             }
           }
 
           setFlash(true);
           setTimeout(() => setFlash(false), 500);
+
+          // opcional: refresco extra por si el backend ajusta algo más
           await refreshSummary();
         }
       } catch (err) {
@@ -180,44 +219,42 @@ export default function Student() {
 
     const onVisibility = () => {
       if (document.visibilityState === "hidden") {
-        reportViolation("blur");
+        reportViolation("BLUR");
       }
     };
 
     const onCopy = (e: ClipboardEvent) => {
       e.preventDefault();
-      reportViolation("copy");
+      reportViolation("COPY");
     };
 
     const onCut = (e: ClipboardEvent) => {
       e.preventDefault();
-      reportViolation("cut");
+      reportViolation("CUT");
     };
 
     const onPaste = (e: ClipboardEvent) => {
       e.preventDefault();
-      reportViolation("paste");
+      reportViolation("PASTE");
     };
 
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
         e.preventDefault();
-        reportViolation("print");
+        reportViolation("PRINT");
       }
       if (e.key === "PrintScreen") {
         e.preventDefault();
-        reportViolation("printscreen");
+        reportViolation("PRINTSCREEN");
       }
     };
 
     const onFull = () => {
-      // si se sale del fullscreen, cuenta como violación
-      // @ts-ignore
       const fs =
         document.fullscreenElement ||
         // @ts-ignore
         (document as any).webkitFullscreenElement;
-      if (!fs) reportViolation("fullscreen-exit");
+      if (!fs) reportViolation("FULLSCREEN_EXIT");
     };
 
     document.addEventListener("visibilitychange", onVisibility);
@@ -237,15 +274,36 @@ export default function Student() {
     };
   }, [step, attemptId, reportViolation]);
 
-  // polling del summary (cada 2s mientras rinde)
+  // polling solo de vidas (por si las cambia el docente)
   React.useEffect(() => {
     if (step !== "exam" || !attemptId) return;
-    const t = setInterval(refreshSummary, 2000);
+    const t = setInterval(refreshSummary, 5000);
     refreshSummary();
     return () => clearInterval(t);
   }, [step, attemptId, refreshSummary]);
 
-  // ======= inicio intento
+  // temporizador local: baja secondsLeft cada segundo
+  React.useEffect(() => {
+    if (step !== "exam") return;
+    if (secondsLeft == null) return;
+    if (secondsLeft <= 0) return;
+
+    const timer = window.setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev == null) return prev;
+        if (prev <= 1) {
+          window.clearInterval(timer);
+          submitAttempt("time");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [step, secondsLeft]);
+
+  // ======= inicio intento =======
   async function startAttempt() {
     setErr(null);
     const name = studentName.trim();
@@ -255,7 +313,7 @@ export default function Student() {
     }
 
     try {
-      // fullscreen (mejor esfuerzo)
+      // fullscreen (best effort)
       const el: any = document.documentElement;
       if (el.requestFullscreen) {
         try {
@@ -296,12 +354,41 @@ export default function Student() {
       // semillas de respuestas
       const seed: Record<string, any> = {};
       for (const q of qs) {
-        if (q.kind === "TRUE_FALSE") seed[q.id] = "";
-        else if (q.kind === "MCQ") seed[q.id] = null;
-        else if (q.kind === "SHORT") seed[q.id] = "";
-        else if (q.kind === "FIB") seed[q.id] = [];
+        const kind = mapKind(q.kind as string);
+        if (kind === "TRUE_FALSE") seed[q.id] = "";
+        else if (kind === "MCQ") seed[q.id] = null;
+        else if (kind === "SHORT") seed[q.id] = "";
+        else if (kind === "FIB") seed[q.id] = [];
       }
       setAnswers(seed);
+
+      // cargar duración y vidas desde /exams/:code
+      try {
+        const infoRes = await fetch(`${API}/exams/${code}`, {
+          cache: "no-store",
+        });
+        if (infoRes.ok) {
+          const info: ExamInfoResponse = await infoRes.json();
+          const e = info.exam;
+
+          const mins =
+            typeof e.durationMinutes === "number"
+              ? e.durationMinutes
+              : typeof e.durationMin === "number"
+              ? e.durationMin
+              : null;
+
+          if (mins != null && !Number.isNaN(mins)) {
+            setSecondsLeft(mins * 60);
+          }
+
+          if (typeof e.lives === "number") {
+            setLives(e.lives);
+          }
+        }
+      } catch {
+        // si falla, el tiempo quedará en "—"
+      }
 
       setLoadingPaper(false);
       setStep("exam");
@@ -310,44 +397,7 @@ export default function Student() {
     }
   }
 
-  // ======= enviar intento
-  async function submitAttempt() {
-    if (!attemptId) return;
-    setErr(null);
-    setStep("submitting");
-
-    try {
-      const payload = {
-        answers: questions.map((q) => {
-          const v = answers[q.id];
-          if (q.kind === "FIB") {
-            const arr = Array.isArray(v) ? v.map((x) => String(x ?? "")) : [];
-            return { questionId: q.id, value: arr };
-          }
-          return { questionId: q.id, value: v };
-        }),
-      };
-
-      const r = await fetch(`${API}/attempts/${attemptId}/submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!r.ok) throw new Error(await r.text());
-      const data: SubmitResponse = await r.json();
-
-      setGradingMode(data.gradingMode);
-      setScore(data.score ?? null);
-      setMaxScore(data.maxScore ?? null);
-      setStep("submitted");
-    } catch (e: any) {
-      setErr(e?.message || "Error al enviar el intento");
-      setStep("exam");
-    }
-  }
-
-  // ======= UI helpers
+  // ======= UI helpers =======
 
   const Header = (
     <div>
@@ -468,17 +518,12 @@ export default function Student() {
         setAnswers({ ...answers, [q.id]: next });
       };
 
-      // Banco de palabras sugeridas (correctas por ahora)
       const bank = Array.isArray(q.choices) ? q.choices : [];
 
       const selectFromBank = (word: string) => {
-        // llenamos el primer casillero vacío
         const next = [...(vArr || [])];
         const emptyIndex = next.findIndex((x) => !x || x.trim() === "");
-        if (emptyIndex === -1) {
-          // si no hay vacío, no hacemos nada (o podríamos sobrescribir el último)
-          return;
-        }
+        if (emptyIndex === -1) return;
         next[emptyIndex] = word;
         setAnswers({ ...answers, [q.id]: next });
       };
@@ -487,7 +532,6 @@ export default function Student() {
         <div key={q.id} style={commonBox}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>{idx + 1}.</div>
 
-          {/* Texto con casilleros */}
           <div
             style={{
               display: "flex",
@@ -517,7 +561,6 @@ export default function Student() {
             )}
           </div>
 
-          {/* Banco de palabras */}
           {bank.length > 0 && (
             <div style={{ marginBottom: 6 }}>
               <div
@@ -575,7 +618,7 @@ export default function Student() {
     );
   }
 
-  // ======= render
+  // ======= render =======
   return (
     <div
       style={{
@@ -683,7 +726,10 @@ export default function Student() {
 
           {!loadingPaper && (
             <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-              <button onClick={submitAttempt} style={{ padding: "10px 14px" }}>
+              <button
+                onClick={() => submitAttempt("manual")}
+                style={{ padding: "10px 14px" }}
+              >
                 Enviar examen
               </button>
             </div>
