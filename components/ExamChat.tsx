@@ -28,9 +28,27 @@ export default function ExamChat({ code, role, defaultName }: Props) {
   const [err, setErr] = React.useState<string | null>(null);
   const [asBroadcast, setAsBroadcast] = React.useState(false); // solo docente
 
+  const [hasNew, setHasNew] = React.useState(false); // notificación cuando hay mensajes nuevos
+
   const canBroadcast = role === "teacher";
 
+  // Referencias para sonido y último mensaje visto
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  const lastMessageIdRef = React.useRef<string | null>(null);
+
+  // Ref para auto-scroll
+  const listRef = React.useRef<HTMLDivElement | null>(null);
+
+  // Cargar sonido una vez
+  React.useEffect(() => {
+    if (typeof Audio !== "undefined") {
+      // El archivo debe estar en web/public/message-notification-190034.mp3
+      audioRef.current = new Audio("/message-notification-190034.mp3");
+    }
+  }, []);
+
   const fetchMessages = React.useCallback(async () => {
+    if (!code) return;
     try {
       const r = await fetch(`${API}/exams/${code}/chat`, {
         cache: "no-store",
@@ -38,20 +56,63 @@ export default function ExamChat({ code, role, defaultName }: Props) {
       if (!r.ok) return;
       const data = await r.json();
       if (Array.isArray(data.items)) {
-        setMessages(data.items);
+        const list: ChatMessage[] = data.items;
+
+        // Detectar si hay un mensaje nuevo
+        const last = list[list.length - 1];
+        if (last) {
+          const prevId = lastMessageIdRef.current;
+          if (last.id !== prevId) {
+            // Evitamos notificar en la primera carga (cuando no hay prevId)
+            if (prevId !== null) {
+              const trimmedName = name.trim();
+              const isMine =
+                trimmedName &&
+                last.authorName === trimmedName &&
+                last.fromRole === role;
+
+              // solo notificamos si es mensaje de otra persona
+              if (!isMine) {
+                setHasNew(true);
+                if (audioRef.current) {
+                  audioRef.current.currentTime = 0;
+                  audioRef.current.play().catch(() => {
+                    // algunos navegadores bloquean autoplay; ignoramos
+                  });
+                }
+              }
+            }
+            lastMessageIdRef.current = last.id;
+          }
+        }
+
+        setMessages(list);
       }
     } catch (e) {
       console.error("CHAT_FETCH_ERROR", e);
     }
-  }, [code]);
+  }, [code, name, role]);
 
-  // Polling cada 3s mientras el chat está abierto
+  // Polling SIEMPRE (así hay notificaciones aunque el chat esté cerrado)
   React.useEffect(() => {
-    if (!open) return;
     fetchMessages();
     const id = window.setInterval(fetchMessages, 3000);
     return () => window.clearInterval(id);
-  }, [open, fetchMessages]);
+  }, [fetchMessages]);
+
+  // Auto-scroll al final cuando hay mensajes nuevos y el chat está abierto
+  React.useEffect(() => {
+    if (open && listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+  }, [open, messages.length]);
+
+  // Al abrir el chat, limpiamos el badge de "nuevo"
+  React.useEffect(() => {
+    if (open) {
+      setHasNew(false);
+    }
+  }, [open]);
 
   async function sendMessage() {
     setErr(null);
@@ -88,6 +149,7 @@ export default function ExamChat({ code, role, defaultName }: Props) {
       }
 
       setInput("");
+      setHasNew(false); // si estoy escribiendo, asumo que estoy al día
       // refrescamos la lista
       await fetchMessages();
     } catch (e: any) {
@@ -130,15 +192,29 @@ export default function ExamChat({ code, role, defaultName }: Props) {
         <button
           onClick={() => setOpen(true)}
           style={{
+            position: "relative",
             padding: "8px 12px",
             borderRadius: 999,
             border: "1px solid #d1d5db",
             background: "white",
             boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
             cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
           }}
         >
           💬 Chat
+          {hasNew && (
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "999px",
+                background: "#ef4444",
+              }}
+            />
+          )}
         </button>
       )}
 
@@ -169,7 +245,14 @@ export default function ExamChat({ code, role, defaultName }: Props) {
             <div style={{ fontWeight: 600, fontSize: 13 }}>Chat del examen</div>
             <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
               {canBroadcast && (
-                <label style={{ fontSize: 11, display: "flex", gap: 4 }}>
+                <label
+                  style={{
+                    fontSize: 11,
+                    display: "flex",
+                    gap: 4,
+                    alignItems: "center",
+                  }}
+                >
                   <input
                     type="checkbox"
                     checked={asBroadcast}
@@ -195,6 +278,7 @@ export default function ExamChat({ code, role, defaultName }: Props) {
 
           {/* Mensajes */}
           <div
+            ref={listRef}
             style={{
               flex: 1,
               padding: 8,
@@ -250,7 +334,13 @@ export default function ExamChat({ code, role, defaultName }: Props) {
                       {m.authorName ||
                         (m.fromRole === "teacher" ? "Docente" : "Alumno")}
                     </span>
-                    {m.broadcast ? <span>📢 broadcast</span> : null}
+                    <span>
+                      {m.broadcast
+                        ? "📢 Broadcast"
+                        : m.fromRole === "teacher"
+                        ? "Docente"
+                        : "Alumno"}
+                    </span>
                   </div>
                   <div>{m.message}</div>
                 </div>

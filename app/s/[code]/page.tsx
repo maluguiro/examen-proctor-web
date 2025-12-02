@@ -114,6 +114,9 @@ export default function Student() {
   const [score, setScore] = React.useState<number | null>(null);
   const [maxScore, setMaxScore] = React.useState<number | null>(null);
 
+  // para evitar doble envío cuando se acaban vidas/tiempo
+  const hasSubmittedRef = React.useRef(false);
+
   // ======= resumen (solo vidas, por ahora) =======
   const refreshSummary = React.useCallback(async () => {
     if (!attemptId) return;
@@ -137,11 +140,16 @@ export default function Student() {
     }
   }, [attemptId]);
 
-  // ======= enviar =======
+  // ======= enviar (idempotente) =======
   async function submitAttempt(
     reason?: "manual" | "time" | "lives"
   ): Promise<void> {
     if (!attemptId) return;
+
+    // Evitamos dobles envíos (antifraude + polling + timer)
+    if (hasSubmittedRef.current) return;
+    hasSubmittedRef.current = true;
+
     setErr(null);
     setStep("submitting");
 
@@ -155,7 +163,6 @@ export default function Student() {
           }
           return { questionId: q.id, value: v };
         }),
-        // podríamos enviar "reason" al backend en el futuro si queremos
       };
 
       const r = await fetch(`${API}/attempts/${attemptId}/submit`, {
@@ -165,7 +172,6 @@ export default function Student() {
       });
 
       if (!r.ok) {
-        // Leemos el body como texto UNA sola vez
         const raw = await r.text();
         let msg = "Error al enviar el intento";
 
@@ -177,13 +183,23 @@ export default function Student() {
             msg = raw;
           }
         } catch {
-          // No era JSON, puede ser HTML o cualquier cosa
           if (raw && raw.length < 300) {
             msg = raw;
           }
         }
 
-        throw new Error(msg);
+        // Si es envío manual, dejamos que el alumno vea el error y reintente
+        if (reason === "manual") {
+          hasSubmittedRef.current = false; // permitir reintentar manualmente
+          setErr(msg);
+          setStep("exam");
+          return;
+        } else {
+          console.error("Auto-submit failed:", msg);
+          // en auto (tiempo/vidas) no volvemos al examen para evitar parpadeos
+          setStep("submitted");
+          return;
+        }
       }
 
       const data: SubmitResponse = await r.json();
@@ -193,8 +209,16 @@ export default function Student() {
       setMaxScore(data.maxScore ?? null);
       setStep("submitted");
     } catch (e: any) {
-      setErr(e?.message || "Error al enviar el intento");
-      setStep("exam");
+      const msg = e?.message || "Error al enviar el intento";
+
+      if (reason === "manual") {
+        hasSubmittedRef.current = false; // permitir reintento manual
+        setErr(msg);
+        setStep("exam");
+      } else {
+        console.error("Auto-submit error:", msg);
+        setStep("submitted");
+      }
     }
   }
 
@@ -216,7 +240,7 @@ export default function Student() {
             setLives(data.livesRemaining);
             if (data.livesRemaining <= 0) {
               await submitAttempt("lives");
-              return;
+              return; // no más flash / summary en este evento
             }
           }
 
@@ -282,7 +306,7 @@ export default function Student() {
     document.addEventListener("cut", onCut as any);
     document.addEventListener("paste", onPaste as any);
     document.addEventListener("keydown", onKey as any);
-    document.addEventListener("fullscreenchange", onFull);
+    document.addEventListener("fullscreenchange", onFull as any);
 
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
@@ -290,7 +314,7 @@ export default function Student() {
       document.removeEventListener("cut", onCut as any);
       document.removeEventListener("paste", onPaste as any);
       document.removeEventListener("keydown", onKey as any);
-      document.removeEventListener("fullscreenchange", onFull);
+      document.removeEventListener("fullscreenchange", onFull as any);
     };
   }, [step, attemptId, reportViolation]);
 
@@ -353,6 +377,7 @@ export default function Student() {
 
       const data = await r.json();
       setAttemptId(data.attempt.id);
+      hasSubmittedRef.current = false; // por si abre un nuevo intento
 
       // paper
       setLoadingPaper(true);

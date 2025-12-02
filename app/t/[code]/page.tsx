@@ -1076,15 +1076,11 @@ export default function TeacherExamPage() {
                         onChange={(e) => setFillDistractors(e.target.value)}
                         placeholder="Ej: insecto, juguetón, peludo"
                       />
-                      <div
-                        style={{
-                          fontSize: 12,
-                          opacity: 0.8,
-                        }}
-                      >
-                        Estas palabras se mezclarán con las respuestas correctas
-                        en el banco que ve el alumno para completar los
-                        casilleros.
+                      <div style={{ fontSize: 12, opacity: 0.8 }}>
+                        Escribí las palabras distractoras separadas por coma.
+                        Ej: <code>insecto, juguetón, peludo</code>. Se mezclarán
+                        con las respuestas correctas en el banco que ve el
+                        alumno.
                       </div>
                     </div>
                   )}
@@ -1155,9 +1151,22 @@ export default function TeacherExamPage() {
                     <button
                       type="button"
                       onClick={() => setStep(4)}
-                      style={{ marginLeft: "auto" }}
+                      style={{
+                        marginLeft: "auto",
+                        padding: "8px 14px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: "#16a34a", // verde
+                        color: "white",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        fontSize: 14,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
                     >
-                      Ir al tablero (paso 4)
+                      📊 Ir al tablero y chat (paso 4)
                     </button>
                   </div>
                 </div>
