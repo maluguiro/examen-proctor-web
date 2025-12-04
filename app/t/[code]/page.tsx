@@ -3,10 +3,11 @@
 import * as React from "react";
 import { useParams } from "next/navigation";
 import { API, patchAttemptLives } from "@/lib/api";
-import { loadTeacherProfile, type TeacherProfile } from "@/lib/teacherProfile";
 import ExamChat from "@/components/ExamChat";
 
-// ================= Tipos del examen / meta / intentos =================
+// ---------- tipos básicos ----------
+
+type Step = 1 | 2 | 3 | 4;
 
 type ExamResponse = {
   exam: {
@@ -50,7 +51,7 @@ type AttemptsResponse = {
   }[];
 };
 
-// ================= Tipos y helpers de preguntas =================
+// ---------- tipos preguntas ----------
 
 type QuestionKind = "MCQ" | "TRUE_FALSE" | "SHORT_TEXT" | "FILL_IN";
 
@@ -64,7 +65,9 @@ type QuestionLite = {
   points: number;
 };
 
-// Extrae respuestas [entre corchetes] del texto del docente
+// ---------- helpers FILL_IN ----------
+
+// extrae [respuestas] del texto raw del docente
 function extractFillAnswersFromStem(raw: string): string[] {
   if (!raw) return [];
   const regex = /\[(.+?)\]/g;
@@ -76,7 +79,7 @@ function extractFillAnswersFromStem(raw: string): string[] {
   return out;
 }
 
-// Convierte texto del docente con [respuestas] al stem que ve el alumno ([[1]], [[2]]…)
+// docente escribe con [respuestas], alumno verá [[1]], [[2]]...
 function buildStudentStemFromRaw(raw: string): {
   stem: string;
   answers: string[];
@@ -106,23 +109,28 @@ function buildStudentStemFromRaw(raw: string): {
   return { stem: result, answers };
 }
 
-// ================= Componente principal =================
+// inverso: del stem alumno ([[1]]...) + answers => texto con [respuestas]
+function buildRawFromStudentStem(stem: string, answers: string[]): string {
+  let out = stem || "";
+  answers.forEach((ans, idx) => {
+    const token = `[[${idx + 1}]]`;
+    out = out.split(token).join(`[${ans}]`);
+  });
+  return out;
+}
 
-type Step = 1 | 2 | 3 | 4;
+// ---------- componente principal ----------
 
 export default function TeacherExamPage() {
   const params = useParams<{ code: string }>();
   const code = (params?.code || "").toString().toUpperCase();
 
-  // Perfil local
-  const [profile, setProfile] = React.useState<TeacherProfile | null>(null);
-
-  // Estado general
   const [step, setStep] = React.useState<Step>(1);
+
+  // loading / error / info
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState<string | null>(null);
   const [info, setInfo] = React.useState<string | null>(null);
-  const [examNotFound, setExamNotFound] = React.useState(false);
 
   const [savingMeta, setSavingMeta] = React.useState(false);
   const [savingExam, setSavingExam] = React.useState(false);
@@ -150,86 +158,38 @@ export default function TeacherExamPage() {
     []
   );
   const [loadingAttempts, setLoadingAttempts] = React.useState(false);
-  const [updatingAttemptId, setUpdatingAttemptId] = React.useState<
+
+  // preguntas
+  const [questions, setQuestions] = React.useState<QuestionLite[]>([]);
+  const [loadingQuestions, setLoadingQuestions] = React.useState(false);
+  const [savingQuestion, setSavingQuestion] = React.useState(false);
+  const [questionErr, setQuestionErr] = React.useState<string | null>(null);
+  const [editingQuestionId, setEditingQuestionId] = React.useState<
     string | null
   >(null);
 
-  // preguntas (editor inline)
-  const [questionsLoading, setQuestionsLoading] = React.useState(false);
-  const [questionsError, setQuestionsError] = React.useState<string | null>(
-    null
-  );
-  const [items, setItems] = React.useState<QuestionLite[]>([]);
+  const [qKind, setQKind] = React.useState<QuestionKind>("MCQ");
+  const [qStem, setQStem] = React.useState(""); // texto raw con [respuestas]
+  const [qPoints, setQPoints] = React.useState(1);
 
-  // Formulario de nueva / edit pregunta
-  const [kind, setKind] = React.useState<QuestionKind>("MCQ");
-  const [stem, setStem] = React.useState(""); // texto del docente
   const [mcqChoices, setMcqChoices] = React.useState<string[]>([
     "Opción 1",
     "Opción 2",
   ]);
   const [mcqCorrect, setMcqCorrect] = React.useState(0);
+
   const [tfCorrect, setTfCorrect] = React.useState(true);
   const [shortAnswer, setShortAnswer] = React.useState("");
-  const [points, setPoints] = React.useState(1);
-  const [fillDistractors, setFillDistractors] = React.useState("");
-  const [savingQuestion, setSavingQuestion] = React.useState(false);
-  const [editingQuestion, setEditingQuestion] =
-    React.useState<QuestionLite | null>(null);
 
-  // ====================== Helpers UI ======================
+  // palabras distractoras de FILL_IN (texto, separadas por coma)
+  const [fillDistractorsText, setFillDistractorsText] = React.useState("");
 
-  const containerStyle: React.CSSProperties = {
-    maxWidth: 960,
-    margin: "0 auto",
-    padding: 16,
-    display: "grid",
-    gap: 16,
-  };
+  // ----------------- carga inicial -----------------
 
-  const cardStyle: React.CSSProperties = {
-    border: "1px solid #e5e7eb",
-    borderRadius: 12,
-    padding: 16,
-    background: "#fff",
-  };
-
-  function formatDateTime(dt: string | null) {
-    if (!dt) return "—";
-    try {
-      const d = new Date(dt);
-      if (isNaN(d.getTime())) return "—";
-      return d.toLocaleString();
-    } catch {
-      return "—";
-    }
-  }
-
-  function studentLink() {
-    if (typeof window === "undefined") return "";
-    return `${window.location.origin}/s/${code}`;
-  }
-
-  function formatViolations(v: string | null | undefined) {
-    if (!v) return "—";
-    // De momento mostramos el string tal cual, es un resumen del backend.
-    return v;
-  }
-
-  // ====================== Carga inicial ======================
-
-  React.useEffect(() => {
-    // perfil local (para prellenar docente/materia)
-    const p = loadTeacherProfile();
-    setProfile(p);
-  }, []);
-
-  async function loadExamAndMeta() {
-    if (!code) return;
+  const loadExamAndMeta = React.useCallback(async () => {
     setLoading(true);
     setErr(null);
     setInfo(null);
-    setExamNotFound(false);
 
     try {
       const [examRes, metaRes, attemptsRes, questionsRes] = await Promise.all([
@@ -241,14 +201,7 @@ export default function TeacherExamPage() {
 
       // EXAM
       if (!examRes.ok) {
-        const txt = await examRes.text();
-        if (txt.includes("EXAM_NOT_FOUND")) {
-          setExamNotFound(true);
-          setErr(null);
-          setLoading(false);
-          return;
-        }
-        throw new Error(txt || "No se pudo cargar el examen");
+        throw new Error(await examRes.text());
       }
       const examData: ExamResponse = await examRes.json();
       const e = examData.exam;
@@ -281,19 +234,10 @@ export default function TeacherExamPage() {
           if (m.openAt) {
             const d = new Date(m.openAt);
             if (!isNaN(d.getTime())) {
-              const iso = d.toISOString().slice(0, 16);
+              const iso = d.toISOString().slice(0, 16); // yyyy-MM-ddTHH:mm
               setOpenAt(iso);
             }
           }
-        }
-      }
-
-      // Si no había teacherName/subject y tenemos perfil, prellenamos
-      if (!teacherName || !subject) {
-        const p = loadTeacherProfile();
-        if (p) {
-          if (!teacherName && p.name) setTeacherName(p.name);
-          if (!subject && p.subject) setSubject(p.subject);
         }
       }
 
@@ -306,7 +250,7 @@ export default function TeacherExamPage() {
       // QUESTIONS
       if (questionsRes.ok) {
         const qData = await questionsRes.json();
-        setItems(qData.items ?? []);
+        setQuestions(qData.items ?? []);
       }
     } catch (e: any) {
       console.error(e);
@@ -314,16 +258,148 @@ export default function TeacherExamPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  React.useEffect(() => {
-    loadExamAndMeta();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  // ====================== Guardar META docente (Paso 1) ======================
+  React.useEffect(() => {
+    if (!code) return;
+    loadExamAndMeta();
+  }, [code, loadExamAndMeta]);
 
-  async function saveMeta(goNext?: boolean) {
+  // ----------------- helpers UI -----------------
+
+  const steps: { id: Step; label: string }[] = [
+    { id: 1, label: "Docente y materia" },
+    { id: 2, label: "Configuración básica" },
+    { id: 3, label: "Preguntas" },
+    { id: 4, label: "Tablero y chat" },
+  ];
+
+  function formatDateTime(dt: string | null) {
+    if (!dt) return "—";
+    try {
+      const d = new Date(dt);
+      if (isNaN(d.getTime())) return "—";
+      // Hora cortita: 18:23
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "—";
+    }
+  }
+
+  // Estado "lindo" del intento para el tablero
+  function prettyAttemptStatus(a: AttemptsResponse["attempts"][number]): {
+    label: string;
+    bg: string;
+    color: string;
+  } {
+    const raw = String(a.status || "").toUpperCase();
+
+    // Intento en curso (sin fecha de fin)
+    if (!a.finishedAt) {
+      return {
+        label: "En curso",
+        bg: "#dcfce7", // verde clarito
+        color: "#166534",
+      };
+    }
+
+    // Algunos nombres posibles que podamos usar en el backend
+    if (raw.includes("FRAUD") || raw.includes("LIVES")) {
+      return {
+        label: "Cerrado por fraude",
+        bg: "#fee2e2", // rojo clarito
+        color: "#b91c1c",
+      };
+    }
+
+    if (raw.includes("TIME")) {
+      return {
+        label: "Cerrado por tiempo",
+        bg: "#fef9c3", // amarillo clarito
+        color: "#854d0e",
+      };
+    }
+
+    if (
+      raw.includes("SUBMIT") ||
+      raw.includes("FINISH") ||
+      raw.includes("DONE")
+    ) {
+      return {
+        label: "Finalizado",
+        bg: "#e5e7eb", // gris
+        color: "#374151",
+      };
+    }
+
+    // Fallback
+    return {
+      label: raw || "Desconocido",
+      bg: "#e5e7eb",
+      color: "#374151",
+    };
+  }
+
+  const cardStyle: React.CSSProperties = {
+    border: "1px solid #e5e7eb",
+    borderRadius: 12,
+    padding: 16,
+    background: "#fff",
+  };
+  function summarizeViolations(raw: string | null | undefined): string {
+    if (!raw) return "";
+    let arr: string[] = [];
+    const trimmed = String(raw).trim();
+
+    try {
+      // Si viene como JSON: ["DOCENTE_TABLERO","COPY",...]
+      if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          arr = parsed.map((x) => String(x));
+        } else {
+          arr = [trimmed];
+        }
+      } else {
+        // Si viene como texto plano separado por comas/espacios
+        arr = trimmed.split(/[,\s]+/).filter(Boolean);
+      }
+    } catch {
+      arr = [trimmed];
+    }
+
+    if (!arr.length) return "";
+
+    const counts = new Map<string, number>();
+    for (const v of arr) {
+      const key = v.toUpperCase();
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+
+    const labelFor = (key: string): string => {
+      if (key === "COPY") return "Copiar";
+      if (key === "PASTE") return "Pegar";
+      if (key === "CUT") return "Cortar";
+      if (key === "BLUR" || key === "BLUR_TAB" || key === "BLUR_WINDOW")
+        return "Fuera de página";
+      if (key === "PRINT" || key === "PRINTSCREEN") return "Imprimir / captura";
+      if (key === "FULLSCREEN_EXIT") return "Salir de pantalla completa";
+      if (key === "DOCENTE_TABLERO" || key === "DOCENTE")
+        return "Acción del docente";
+      return key;
+    };
+
+    const parts: string[] = [];
+    for (const [key, count] of counts) {
+      const label = labelFor(key);
+      parts.push(count > 1 ? `${label} ×${count}` : label);
+    }
+
+    return parts.join(" · ");
+  }
+  // ----------------- guardar META -----------------
+
+  async function saveMeta() {
     if (!examId) return;
     setSavingMeta(true);
     setErr(null);
@@ -352,7 +428,6 @@ export default function TeacherExamPage() {
 
       if (!r.ok) throw new Error(await r.text());
       setInfo("Datos del docente guardados.");
-      if (goNext) setStep(2);
     } catch (e: any) {
       setErr(e?.message || "Error al guardar los datos del docente");
     } finally {
@@ -360,9 +435,14 @@ export default function TeacherExamPage() {
     }
   }
 
-  // ====================== Guardar config examen (Paso 2) ======================
+  async function onSaveMeta(goNext: boolean) {
+    await saveMeta();
+    if (goNext) setStep(2);
+  }
 
-  async function saveAndOpenExam(goNext?: boolean) {
+  // ----------------- guardar CONFIG EXAMEN -----------------
+
+  async function saveAndOpenExam(goNext: boolean) {
     if (!examId) return;
     setSavingExam(true);
     setErr(null);
@@ -402,7 +482,170 @@ export default function TeacherExamPage() {
     }
   }
 
-  // ====================== Tablero / intentos (Paso 4) ======================
+  // ----------------- preguntas: cargar / guardar / editar -----------------
+
+  async function reloadQuestions() {
+    try {
+      setLoadingQuestions(true);
+      const r = await fetch(`${API}/exams/${code}/questions`, {
+        cache: "no-store",
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      setQuestions(data.items ?? []);
+    } catch (e) {
+      console.error("LOAD_QUESTIONS_ERROR", e);
+    } finally {
+      setLoadingQuestions(false);
+    }
+  }
+
+  function resetQuestionForm() {
+    setEditingQuestionId(null);
+    setQKind("MCQ");
+    setQStem("");
+    setQPoints(1);
+    setMcqChoices(["Opción 1", "Opción 2"]);
+    setMcqCorrect(0);
+    setTfCorrect(true);
+    setShortAnswer("");
+    setFillDistractorsText("");
+    setQuestionErr(null);
+  }
+
+  async function saveQuestion() {
+    setSavingQuestion(true);
+    setQuestionErr(null);
+
+    try {
+      const stemRaw = qStem.trim();
+      if (!stemRaw) {
+        throw new Error("Falta el enunciado / consigna.");
+      }
+
+      let body: any = {
+        kind: qKind,
+        stem: stemRaw,
+        points: Number(qPoints) || 1,
+      };
+
+      if (qKind === "MCQ") {
+        const choices = mcqChoices.map((s) => s.trim()).filter(Boolean);
+        if (choices.length < 2) {
+          throw new Error("Opción múltiple requiere al menos 2 opciones.");
+        }
+        if (mcqCorrect < 0 || mcqCorrect >= choices.length) {
+          throw new Error("La opción correcta está fuera de rango.");
+        }
+        body.choices = choices;
+        body.answer = mcqCorrect;
+      } else if (qKind === "TRUE_FALSE") {
+        body.answer = Boolean(tfCorrect);
+        // choices fijos los arma el backend
+      } else if (qKind === "SHORT_TEXT") {
+        body.answer = shortAnswer.trim() || null;
+      } else if (qKind === "FILL_IN") {
+        const { stem: studentStem, answers } = buildStudentStemFromRaw(stemRaw);
+        if (!answers.length) {
+          throw new Error(
+            "Para los casilleros, escribí el texto completo y colocá cada respuesta correcta entre corchetes. Ej: El perro es un [animal] doméstico."
+          );
+        }
+
+        const distractors = fillDistractorsText
+          .split(/[,\n;]/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+        const bank = [...answers, ...distractors];
+
+        body.stem = studentStem; // lo que verá el alumno ([[1]], [[2]]…)
+        body.answer = { answers, blanks: answers.length };
+        body.choices = bank;
+      }
+
+      const url = editingQuestionId
+        ? `${API}/questions/${editingQuestionId}`
+        : `${API}/exams/${code}/questions`;
+      const method = editingQuestionId ? "PUT" : "POST";
+
+      const r = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!r.ok) {
+        const t = await r.text();
+        throw new Error(t || "No se pudo guardar la pregunta.");
+      }
+
+      await reloadQuestions();
+      resetQuestionForm();
+      setInfo(editingQuestionId ? "Pregunta actualizada." : "Pregunta creada.");
+    } catch (e: any) {
+      console.error(e);
+      const msg = e.message || String(e);
+      try {
+        const parsed = JSON.parse(msg);
+        if (parsed?.error) setQuestionErr(parsed.error);
+        else setQuestionErr(msg);
+      } catch {
+        setQuestionErr(msg);
+      }
+    } finally {
+      setSavingQuestion(false);
+    }
+  }
+
+  function startEditQuestion(q: QuestionLite) {
+    setEditingQuestionId(q.id);
+    setQKind(q.kind);
+    setQPoints(q.points ?? 1);
+
+    if (q.kind === "MCQ") {
+      setMcqChoices(q.choices ?? []);
+      const ansIdx =
+        typeof q.answer === "number" ? q.answer : Number(q.answer ?? 0) || 0;
+      setMcqCorrect(ansIdx);
+      setQStem(q.stem);
+    } else if (q.kind === "TRUE_FALSE") {
+      setTfCorrect(Boolean(q.answer));
+      setQStem(q.stem);
+    } else if (q.kind === "SHORT_TEXT") {
+      setShortAnswer(q.answer != null ? String(q.answer ?? "").trim() : "");
+      setQStem(q.stem);
+    } else if (q.kind === "FILL_IN") {
+      let answers: string[] = [];
+      if (q.answer && Array.isArray(q.answer.answers)) {
+        answers = q.answer.answers.map((x: any) => String(x ?? ""));
+      }
+      const raw = buildRawFromStudentStem(q.stem, answers);
+      setQStem(raw);
+
+      const bank = Array.isArray(q.choices) ? q.choices : [];
+      const distractors = bank.filter((w) => !answers.includes(w));
+      setFillDistractorsText(distractors.join(", "));
+    }
+
+    setStep(3);
+  }
+
+  async function deleteQuestion(id: string) {
+    if (!window.confirm("¿Eliminar esta pregunta?")) return;
+    try {
+      await fetch(`${API}/questions/${id}`, { method: "DELETE" });
+      await reloadQuestions();
+      if (editingQuestionId === id) resetQuestionForm();
+    } catch (e) {
+      console.error("DELETE_QUESTION_ERROR", e);
+    }
+  }
+
+  const fillAnswersPreview =
+    qKind === "FILL_IN" ? extractFillAnswersFromStem(qStem) : [];
+
+  // ----------------- TABLERO: intentos + vidas -----------------
 
   async function reloadAttempts() {
     if (!code) return;
@@ -420,310 +663,118 @@ export default function TeacherExamPage() {
       setLoadingAttempts(false);
     }
   }
-
-  async function adjustLives(attemptId: string, op: "increment" | "decrement") {
-    try {
-      setUpdatingAttemptId(attemptId);
-      const res: any = await patchAttemptLives(attemptId, op, "docente");
-      // el backend puede devolver varios formatos, intentamos leer alguno razonable
-      const newLives =
-        typeof res?.livesRemaining === "number"
-          ? res.livesRemaining
-          : typeof res?.remaining === "number"
-          ? res.remaining
-          : null;
-
-      if (typeof newLives === "number") {
-        setAttempts((prev) =>
-          prev.map((a) =>
-            a.id === attemptId ? { ...a, livesRemaining: newLives } : a
-          )
-        );
-      } else {
-        // si no sabemos, forzamos recarga del tablero
-        await reloadAttempts();
-      }
-    } catch (e) {
-      console.error("PATCH_LIVES_ERROR", e);
-      alert("No se pudo actualizar las vidas de este alumno.");
-    } finally {
-      setUpdatingAttemptId(null);
-    }
-  }
-
-  // ====================== Preguntas (Paso 3) ======================
-
-  async function loadQuestions() {
-    if (!code) return;
-    setQuestionsLoading(true);
-    setQuestionsError(null);
-    try {
-      const r = await fetch(`${API}/exams/${code}/questions`, {
-        cache: "no-store",
-      });
-      if (!r.ok) throw new Error(await r.text());
-      const data = await r.json();
-      setItems(data.items ?? []);
-    } catch (e: any) {
-      console.error(e);
-      setQuestionsError("No se pudieron cargar las preguntas.");
-    } finally {
-      setQuestionsLoading(false);
-    }
-  }
-
+  // Auto-refresh del tablero mientras estoy en el Paso 4 (Tablero y chat)
   React.useEffect(() => {
-    if (step === 3) {
-      loadQuestions();
-    }
+    if (step !== 4) return; // solo cuando estoy en el tablero
+
+    // refresco inicial apenas entro al paso 4
+    reloadAttempts();
+
+    // luego refresco cada 5 segundos
+    const id = window.setInterval(() => {
+      reloadAttempts();
+    }, 3000);
+
+    return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
-  function resetQuestionForm() {
-    setStem("");
-    setPoints(1);
-    setMcqChoices(["Opción 1", "Opción 2"]);
-    setMcqCorrect(0);
-    setTfCorrect(true);
-    setShortAnswer("");
-    setFillDistractors("");
-    setEditingQuestion(null);
-  }
-
-  function addMcqChoice() {
-    setMcqChoices((prev) => [...prev, `Opción ${prev.length + 1}`]);
-  }
-
-  function removeMcqChoice(idx: number) {
-    setMcqChoices((prev) => prev.filter((_, i) => i !== idx));
-    setMcqCorrect((prev) => {
-      const newLen = mcqChoices.length - 1;
-      if (prev >= newLen) return Math.max(0, newLen - 1);
-      return prev;
-    });
-  }
-
-  function updateMcqChoice(idx: number, val: string) {
-    setMcqChoices((prev) => prev.map((c, i) => (i === idx ? val : c)));
-  }
-
-  async function saveQuestion() {
-    setSavingQuestion(true);
-    setQuestionsError(null);
-
+  async function changeLives(
+    attempt: AttemptsResponse["attempts"][number],
+    op: "increment" | "decrement"
+  ) {
     try {
-      if (!stem.trim()) {
-        throw new Error("Falta el enunciado / consigna.");
-      }
+      await patchAttemptLives(attempt.id, op, "DOCENTE_TABLERO");
+      await reloadAttempts();
 
-      let body: any = {
-        kind,
-        stem: stem.trim(),
-        points: Number(points) || 1,
-      };
+      const deltaText = op === "increment" ? "+1 vida" : "-1 vida";
+      const name = attempt.studentName || "este alumno";
 
-      if (kind === "MCQ") {
-        const choices = mcqChoices.map((s) => s.trim()).filter(Boolean);
-        if (choices.length < 2) {
-          throw new Error("Opción múltiple requiere al menos 2 opciones.");
-        }
-        if (mcqCorrect < 0 || mcqCorrect >= choices.length) {
-          throw new Error("La opción correcta está fuera de rango.");
-        }
-        body.choices = choices;
-        body.answer = mcqCorrect;
-      } else if (kind === "TRUE_FALSE") {
-        body.answer = Boolean(tfCorrect);
-      } else if (kind === "SHORT_TEXT") {
-        body.answer = shortAnswer.trim() || null;
-      } else if (kind === "FILL_IN") {
-        const raw = stem.trim();
-        const { stem: studentStem, answers } = buildStudentStemFromRaw(raw);
-
-        if (!answers.length) {
-          throw new Error(
-            "Para los casilleros, escribí el texto completo y colocá cada respuesta correcta entre corchetes. Ej: El perro es un [animal] doméstico."
-          );
-        }
-
-        const distractors = fillDistractors
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-
-        const allOptions = [...answers, ...distractors];
-
-        body.stem = studentStem; // ve el alumno ([[1]], [[2]]…)
-        body.answer = { answers }; // para corrección
-        body.choices = allOptions; // banco que ve el alumno
-      }
-
-      if (!editingQuestion) {
-        // Crear
-        const r = await fetch(`${API}/exams/${code}/questions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        if (!r.ok) {
-          const t = await r.text();
-          throw new Error(t || "No se pudo crear la pregunta.");
-        }
+      setInfo(`Se aplicó ${deltaText} a ${name}.`);
+    } catch (e) {
+      console.error("PATCH_LIVES_ERROR", e);
+      alert("No se pudo actualizar las vidas de este alumno.");
+    }
+  }
+  function copyStudentLink() {
+    try {
+      const base = typeof window !== "undefined" ? window.location.origin : "";
+      const link = `${base}/s/${code}`;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(link);
+        setInfo("Link del examen copiado al portapapeles.");
       } else {
-        // Editar
-        const r = await fetch(`${API}/questions/${editingQuestion.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        if (!r.ok) {
-          const t = await r.text();
-          throw new Error(t || "No se pudo editar la pregunta.");
-        }
+        window.prompt("Copiá el link:", link);
       }
-
-      resetQuestionForm();
-      await loadQuestions();
-    } catch (e: any) {
-      console.error(e);
-      const msg = e.message || String(e);
-      setQuestionsError(msg);
-    } finally {
-      setSavingQuestion(false);
+    } catch (e) {
+      console.error("COPY_LINK_ERROR", e);
     }
   }
 
-  function startEditQuestion(q: QuestionLite) {
-    setEditingQuestion(q);
-    setKind(q.kind);
-    setPoints(q.points ?? 1);
-
-    if (q.kind === "MCQ") {
-      setStem(q.stem);
-      setMcqChoices(Array.isArray(q.choices) ? q.choices : []);
-      setMcqCorrect(typeof q.answer === "number" ? q.answer : 0);
-      setTfCorrect(true);
-      setShortAnswer("");
-      setFillDistractors("");
-    } else if (q.kind === "TRUE_FALSE") {
-      setStem(q.stem);
-      setTfCorrect(Boolean(q.answer));
-      setMcqChoices(["Opción 1", "Opción 2"]);
-      setMcqCorrect(0);
-      setShortAnswer("");
-      setFillDistractors("");
-    } else if (q.kind === "SHORT_TEXT") {
-      setStem(q.stem);
-      setShortAnswer(
-        typeof q.answer === "string" ? q.answer : q.answer?.expected || ""
-      );
-      setMcqChoices(["Opción 1", "Opción 2"]);
-      setMcqCorrect(0);
-      setTfCorrect(true);
-      setFillDistractors("");
-    } else if (q.kind === "FILL_IN") {
-      setStem(q.stem);
-      const bank = Array.isArray(q.choices) ? q.choices : [];
-      setFillDistractors("");
-      setMcqChoices(["Opción 1", "Opción 2"]);
-      setMcqCorrect(0);
-      setTfCorrect(true);
-      setShortAnswer("");
-      if (bank.length) {
-        console.log("Banco actual:", bank);
-      }
-    }
-  }
-
-  const fillAnswersPreview =
-    kind === "FILL_IN" ? extractFillAnswersFromStem(stem) : [];
-
-  // ====================== Render pasos ======================
-
-  const Header = (
-    <header>
-      <h1 style={{ margin: 0, fontSize: 24 }}>
-        Crear / configurar examen — {code}
-      </h1>
-      <p style={{ margin: "4px 0 0", fontSize: 13, opacity: 0.8 }}>
-        Paso {step} de 4 · 1) Docente y materia · 2) Configuración básica · 3)
-        Preguntas · 4) Tablero y chat.
-      </p>
-    </header>
-  );
-
-  if (examNotFound) {
-    return (
-      <main style={containerStyle}>
-        <h1>Examen no encontrado</h1>
-        <p style={{ fontSize: 14 }}>
-          No encontré un examen con el código <b>{code}</b>. Es posible que haya
-          sido eliminado o que el código sea incorrecto.
-        </p>
-        <a
-          href="/t"
-          style={{
-            display: "inline-block",
-            marginTop: 8,
-            padding: "8px 12px",
-            borderRadius: 999,
-            border: "1px solid #d4d4d8",
-            textDecoration: "none",
-            fontSize: 14,
-          }}
-        >
-          ← Volver al panel docente
-        </a>
-      </main>
-    );
-  }
+  // ----------------- render -----------------
 
   return (
-    <main style={containerStyle}>
-      {Header}
+    <main
+      style={{
+        maxWidth: 960,
+        margin: "0 auto",
+        padding: 16,
+        display: "grid",
+        gap: 16,
+      }}
+    >
+      {/* ENCABEZADO */}
+      <header>
+        <h1 style={{ fontSize: 24, marginBottom: 4 }}>
+          Crear / configurar examen — {code.toUpperCase()}
+        </h1>
+        <p style={{ fontSize: 14, opacity: 0.8 }}>
+          Paso {step} de 4 · 1) Docente y materia · 2) Configuración básica · 3)
+          Preguntas · 4) Tablero y chat.
+        </p>
+      </header>
+
+      {/* STEPPER */}
+      <nav
+        style={{
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+        }}
+      >
+        {steps.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => setStep(s.id)}
+            disabled={loading}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 999,
+              border: step === s.id ? "1px solid #2563eb" : "1px solid #e5e7eb",
+              background: step === s.id ? "#2563eb" : "#f9fafb",
+              color: step === s.id ? "white" : "#111827",
+              fontSize: 12,
+              cursor: loading ? "default" : "pointer",
+            }}
+          >
+            {s.id}. {s.label}
+          </button>
+        ))}
+      </nav>
 
       {loading && (
-        <section style={cardStyle}>
+        <div style={cardStyle}>
           <p>Cargando configuración…</p>
-        </section>
+        </div>
       )}
 
       {!loading && (
         <>
-          {/* Mensajes globales */}
-          {err && (
-            <div
-              style={{
-                borderRadius: 8,
-                border: "1px solid #fecaca",
-                background: "#fef2f2",
-                padding: 8,
-                fontSize: 13,
-              }}
-            >
-              {err}
-            </div>
-          )}
-          {info && (
-            <div
-              style={{
-                borderRadius: 8,
-                border: "1px solid #bbf7d0",
-                background: "#ecfdf5",
-                padding: 8,
-                fontSize: 13,
-              }}
-            >
-              {info}
-            </div>
-          )}
-
-          {/* Paso 1: Docente y materia */}
+          {/* PASO 1: Docente y materia */}
           {step === 1 && (
             <section style={cardStyle}>
-              <h2 style={{ marginTop: 0 }}>
-                Paso 1 — Datos del docente y materia
-              </h2>
+              <h2 style={{ marginBottom: 8 }}>Paso 1 — Docente y materia</h2>
 
               <div style={{ display: "grid", gap: 10 }}>
                 <div>
@@ -834,13 +885,13 @@ export default function TeacherExamPage() {
                   </p>
                 </div>
 
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                   <button
-                    onClick={() => saveMeta(true)}
+                    onClick={() => onSaveMeta(false)}
                     disabled={savingMeta}
                     style={{
                       padding: "8px 12px",
-                      borderRadius: 999,
+                      borderRadius: 8,
                       border: "none",
                       background: savingMeta ? "#9ca3af" : "#2563eb",
                       color: "white",
@@ -848,17 +899,32 @@ export default function TeacherExamPage() {
                       fontSize: 14,
                     }}
                   >
-                    {savingMeta ? "Guardando…" : "Guardar y continuar"}
+                    {savingMeta ? "Guardando…" : "Guardar"}
+                  </button>
+                  <button
+                    onClick={() => onSaveMeta(true)}
+                    disabled={savingMeta}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      border: "none",
+                      background: savingMeta ? "#9ca3af" : "#16a34a",
+                      color: "white",
+                      cursor: savingMeta ? "default" : "pointer",
+                      fontSize: 14,
+                    }}
+                  >
+                    {savingMeta ? "Guardando…" : "Guardar y continuar →"}
                   </button>
                 </div>
               </div>
             </section>
           )}
 
-          {/* Paso 2: Configuración básica */}
+          {/* PASO 2: Configuración básica */}
           {step === 2 && (
             <section style={cardStyle}>
-              <h2 style={{ marginTop: 0 }}>Paso 2 — Configuración básica</h2>
+              <h2 style={{ marginBottom: 8 }}>Paso 2 — Configuración básica</h2>
 
               <div style={{ display: "grid", gap: 10 }}>
                 <div>
@@ -912,7 +978,7 @@ export default function TeacherExamPage() {
 
                 <div>
                   <label style={{ fontSize: 13, display: "block" }}>
-                    Vidas del examen (puede ser 0, 1, 3, 6…)
+                    Vidas del examen (0, 1, 3, 6…)
                   </label>
                   <input
                     type="number"
@@ -942,33 +1008,28 @@ export default function TeacherExamPage() {
                   </p>
                 </div>
 
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginTop: 8,
-                  }}
-                >
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                   <button
-                    type="button"
-                    onClick={() => setStep(1)}
+                    onClick={() => saveAndOpenExam(false)}
+                    disabled={savingExam}
                     style={{
                       padding: "8px 12px",
-                      borderRadius: 999,
-                      border: "1px solid #e5e7eb",
-                      background: "#f9fafb",
-                      fontSize: 13,
-                      cursor: "pointer",
+                      borderRadius: 8,
+                      border: "none",
+                      background: savingExam ? "#9ca3af" : "#2563eb",
+                      color: "white",
+                      cursor: savingExam ? "default" : "pointer",
+                      fontSize: 14,
                     }}
                   >
-                    ← Volver al paso 1
+                    {savingExam ? "Guardando…" : "Guardar configuración"}
                   </button>
                   <button
                     onClick={() => saveAndOpenExam(true)}
                     disabled={savingExam}
                     style={{
                       padding: "8px 12px",
-                      borderRadius: 999,
+                      borderRadius: 8,
                       border: "none",
                       background: savingExam ? "#9ca3af" : "#16a34a",
                       color: "white",
@@ -978,75 +1039,65 @@ export default function TeacherExamPage() {
                   >
                     {savingExam
                       ? "Guardando…"
-                      : "Guardar configuración y continuar"}
+                      : "Guardar y continuar a preguntas →"}
                   </button>
                 </div>
               </div>
             </section>
           )}
 
-          {/* Paso 3: Preguntas */}
+          {/* PASO 3: Preguntas */}
           {step === 3 && (
             <section style={cardStyle}>
-              <h2 style={{ marginTop: 0 }}>Paso 3 — Preguntas del examen</h2>
-
-              <p style={{ fontSize: 13, opacity: 0.75, marginTop: 0 }}>
-                Armá las consignas y sus opciones de respuesta. Podés crear
-                nuevas preguntas o editar las existentes.
+              <h2 style={{ marginBottom: 8 }}>Paso 3 — Preguntas</h2>
+              <p style={{ fontSize: 13, color: "#555" }}>
+                Armá las consignas y sus opciones. Para los casilleros, escribí
+                las respuestas correctas entre corchetes y las palabras
+                distractoras separadas por comas.
               </p>
 
-              {/* Formulario nueva / editar */}
-              <div
-                style={{
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 10,
-                  padding: 12,
-                  marginBottom: 16,
-                  display: "grid",
-                  gap: 10,
-                }}
-              >
-                <h3 style={{ margin: 0, fontSize: 16 }}>
-                  {editingQuestion ? "Editar pregunta" : "Nueva pregunta"}
-                </h3>
-
+              <div style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+                {/* Tipo */}
                 <div>
                   <label>Tipo de pregunta:</label>
                   <select
-                    value={kind}
-                    onChange={(e) => setKind(e.target.value as QuestionKind)}
+                    value={qKind}
+                    onChange={(e) => setQKind(e.target.value as QuestionKind)}
                     style={{ marginLeft: 8, padding: 4 }}
-                    disabled={!!editingQuestion}
                   >
                     <option value="MCQ">Opción múltiple</option>
                     <option value="TRUE_FALSE">Verdadero / Falso</option>
                     <option value="SHORT_TEXT">Texto breve</option>
                     <option value="FILL_IN">Relleno de casilleros</option>
                   </select>
-                  {editingQuestion && (
-                    <span style={{ fontSize: 11, marginLeft: 8, opacity: 0.7 }}>
-                      (el tipo no se puede cambiar en edición)
+                  {editingQuestionId && (
+                    <span
+                      style={{
+                        marginLeft: 8,
+                        fontSize: 12,
+                        color: "#2563eb",
+                      }}
+                    >
+                      Editando pregunta existente
                     </span>
                   )}
                 </div>
 
+                {/* Enunciado */}
                 <div>
                   <label>Enunciado / consigna</label>
                   <textarea
-                    value={stem}
-                    onChange={(e) => setStem(e.target.value)}
+                    value={qStem}
+                    onChange={(e) => setQStem(e.target.value)}
                     rows={3}
                     placeholder={
-                      kind === "FILL_IN"
-                        ? "Ej: ¿Por qué juegan los niños? Por [placer], para [expresar la agresión], para controlar la [ansiedad]..."
+                      qKind === "FILL_IN"
+                        ? "Ej: El perro es un [animal] doméstico y muy [fiel]."
                         : "Escribí la consigna de la pregunta…"
                     }
-                    style={{
-                      width: "100%",
-                      marginTop: 4,
-                    }}
+                    style={{ width: "100%", marginTop: 4 }}
                   />
-                  {kind === "FILL_IN" && (
+                  {qKind === "FILL_IN" && (
                     <div
                       style={{
                         fontSize: 12,
@@ -1070,7 +1121,7 @@ export default function TeacherExamPage() {
                 </div>
 
                 {/* Campos por tipo */}
-                {kind === "MCQ" && (
+                {qKind === "MCQ" && (
                   <div style={{ display: "grid", gap: 10 }}>
                     <div
                       style={{
@@ -1082,15 +1133,12 @@ export default function TeacherExamPage() {
                       <b>Opciones</b>
                       <button
                         type="button"
-                        onClick={addMcqChoice}
-                        style={{
-                          padding: "4px 8px",
-                          borderRadius: 999,
-                          border: "1px solid #e5e7eb",
-                          background: "#f9fafb",
-                          cursor: "pointer",
-                          fontSize: 12,
-                        }}
+                        onClick={() =>
+                          setMcqChoices((prev) => [
+                            ...prev,
+                            `Opción ${prev.length + 1}`,
+                          ])
+                        }
                       >
                         + Agregar opción
                       </button>
@@ -1113,12 +1161,22 @@ export default function TeacherExamPage() {
                         />
                         <input
                           value={c}
-                          onChange={(e) => updateMcqChoice(idx, e.target.value)}
+                          onChange={(e) =>
+                            setMcqChoices((prev) =>
+                              prev.map((cc, i) =>
+                                i === idx ? e.target.value : cc
+                              )
+                            )
+                          }
                           style={{ flex: 1 }}
                         />
                         <button
                           type="button"
-                          onClick={() => removeMcqChoice(idx)}
+                          onClick={() =>
+                            setMcqChoices((prev) =>
+                              prev.filter((_, i) => i !== idx)
+                            )
+                          }
                           disabled={mcqChoices.length <= 2}
                         >
                           🗑
@@ -1128,7 +1186,7 @@ export default function TeacherExamPage() {
                   </div>
                 )}
 
-                {kind === "TRUE_FALSE" && (
+                {qKind === "TRUE_FALSE" && (
                   <div
                     style={{
                       display: "flex",
@@ -1158,7 +1216,7 @@ export default function TeacherExamPage() {
                   </div>
                 )}
 
-                {kind === "SHORT_TEXT" && (
+                {qKind === "SHORT_TEXT" && (
                   <div style={{ display: "grid", gap: 6 }}>
                     <label>Respuesta de referencia (opcional)</label>
                     <input
@@ -1169,26 +1227,23 @@ export default function TeacherExamPage() {
                   </div>
                 )}
 
-                {kind === "FILL_IN" && (
+                {qKind === "FILL_IN" && (
                   <div style={{ display: "grid", gap: 6 }}>
-                    <label>
-                      Palabras distractoras (separadas por coma, opcional)
-                    </label>
+                    <label>Palabras distractoras</label>
                     <input
-                      value={fillDistractors}
-                      onChange={(e) => setFillDistractors(e.target.value)}
-                      placeholder="Ej: insecto, peludo, rudo"
+                      value={fillDistractorsText}
+                      onChange={(e) => setFillDistractorsText(e.target.value)}
+                      placeholder="insecto, peludo, rudo"
                     />
-                    <p
+                    <div
                       style={{
-                        fontSize: 11,
-                        opacity: 0.7,
+                        fontSize: 12,
+                        opacity: 0.8,
                       }}
                     >
                       Estas palabras se mezclarán con las respuestas correctas
-                      en el banco que ve el alumno para arrastrar a los
-                      casilleros.
-                    </p>
+                      en el banco que ve el alumno. Separalas con <b>comas</b>.
+                    </div>
                   </div>
                 )}
 
@@ -1204,52 +1259,36 @@ export default function TeacherExamPage() {
                   <label>Puntos</label>
                   <input
                     type="number"
-                    value={points}
+                    value={qPoints}
                     onChange={(e) =>
-                      setPoints(parseInt(e.target.value, 10) || 1)
+                      setQPoints(parseInt(e.target.value, 10) || 1)
                     }
                     style={{ width: 120 }}
                   />
                   <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-                    {editingQuestion && (
+                    {editingQuestionId && (
                       <button
                         type="button"
                         onClick={resetQuestionForm}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 999,
-                          border: "1px solid #e5e7eb",
-                          background: "#f9fafb",
-                          fontSize: 12,
-                          cursor: "pointer",
-                        }}
+                        disabled={savingQuestion}
                       >
                         Cancelar edición
                       </button>
                     )}
                     <button
-                      disabled={savingQuestion || !stem.trim()}
+                      disabled={savingQuestion || !qStem.trim()}
                       onClick={saveQuestion}
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: 999,
-                        border: "none",
-                        background: savingQuestion ? "#9ca3af" : "#2563eb",
-                        color: "white",
-                        cursor: savingQuestion ? "default" : "pointer",
-                        fontSize: 13,
-                      }}
                     >
                       {savingQuestion
                         ? "Guardando..."
-                        : editingQuestion
+                        : editingQuestionId
                         ? "Guardar cambios"
                         : "Guardar pregunta"}
                     </button>
                   </div>
                 </div>
 
-                {questionsError && (
+                {questionErr && (
                   <div
                     style={{
                       background: "#fee",
@@ -1261,205 +1300,163 @@ export default function TeacherExamPage() {
                       fontSize: 12,
                     }}
                   >
-                    Error: {questionsError}
+                    Error: {questionErr}
                   </div>
                 )}
               </div>
 
-              {/* Lista de preguntas */}
+              {/* LISTA DE PREGUNTAS */}
               <div
                 style={{
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 10,
-                  padding: 12,
+                  borderTop: "1px solid #e5e7eb",
+                  marginTop: 12,
+                  paddingTop: 12,
                 }}
               >
-                <h3 style={{ marginTop: 0, fontSize: 16 }}>
-                  Preguntas ({items.length})
+                <h3 style={{ marginTop: 0 }}>
+                  Preguntas creadas ({questions.length})
                 </h3>
-                {questionsLoading && (
-                  <p style={{ fontSize: 13 }}>Cargando preguntas…</p>
-                )}
-                {!questionsLoading && items.length === 0 && (
+                {loadingQuestions && <p>Cargando preguntas…</p>}
+                {!loadingQuestions && !questions.length && (
                   <p style={{ fontSize: 13, opacity: 0.7 }}>
-                    Todavía no hay preguntas.
+                    No hay preguntas todavía.
                   </p>
                 )}
-                {!questionsLoading && items.length > 0 && (
-                  <ol>
-                    {items.map((q, idx) => (
-                      <li key={q.id} style={{ marginBottom: 10 }}>
-                        <div
+                <ol>
+                  {questions.map((q, idx) => (
+                    <li key={q.id} style={{ marginBottom: 12 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          alignItems: "baseline",
+                        }}
+                      >
+                        <b
                           style={{
-                            display: "flex",
-                            gap: 8,
-                            alignItems: "baseline",
+                            fontSize: 12,
+                            background: "#eef",
+                            padding: "2px 6px",
+                            borderRadius: 6,
                           }}
                         >
-                          <b
+                          {q.kind}
+                        </b>
+                        <span style={{ fontWeight: 600 }}>{idx + 1}.</span>
+                        <span>{q.stem}</span>
+                        {typeof q.points === "number" && (
+                          <span
                             style={{
+                              marginLeft: "auto",
                               fontSize: 12,
-                              background: "#eef",
-                              padding: "2px 6px",
-                              borderRadius: 6,
+                              opacity: 0.7,
                             }}
                           >
-                            {q.kind}
-                          </b>
-                          <span style={{ fontWeight: 600 }}>{idx + 1}.</span>
-                          <span>{q.stem}</span>
-                          {typeof q.points === "number" && (
-                            <span
-                              style={{
-                                marginLeft: "auto",
-                                fontSize: 12,
-                                opacity: 0.7,
-                              }}
-                            >
-                              Puntos: {q.points}
-                            </span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => startEditQuestion(q)}
-                            style={{
-                              marginLeft: 8,
-                              padding: "2px 6px",
-                              borderRadius: 999,
-                              border: "1px solid #e5e7eb",
-                              background: "#f9fafb",
-                              fontSize: 11,
-                              cursor: "pointer",
-                            }}
-                          >
-                            Editar
-                          </button>
-                        </div>
-                        {Array.isArray(q.choices) && q.choices.length > 0 && (
-                          <ul style={{ marginTop: 4 }}>
-                            {q.choices.map((c, i) => (
-                              <li key={i}>{c}</li>
-                            ))}
-                          </ul>
+                            Puntos: {q.points}
+                          </span>
                         )}
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </div>
+                      </div>
+                      {Array.isArray(q.choices) && q.choices.length > 0 && (
+                        <ul style={{ marginTop: 6 }}>
+                          {q.choices.map((c, i) => (
+                            <li key={i}>{c}</li>
+                          ))}
+                        </ul>
+                      )}
+                      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                        <button
+                          type="button"
+                          onClick={() => startEditQuestion(q)}
+                          style={{ fontSize: 12 }}
+                        >
+                          ✏️ Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteQuestion(q.id)}
+                          style={{ fontSize: 12, color: "#b91c1c" }}
+                        >
+                          🗑 Eliminar
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
 
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginTop: 12,
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setStep(2)}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 999,
-                    border: "1px solid #e5e7eb",
-                    background: "#f9fafb",
-                    fontSize: 13,
-                    cursor: "pointer",
-                  }}
-                >
-                  ← Volver al paso 2
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStep(4)}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 999,
-                    border: "none",
-                    background: "#16a34a",
-                    color: "white",
-                    fontSize: 14,
-                    cursor: "pointer",
-                  }}
-                >
-                  Ir al tablero y chat →
-                </button>
+                <div style={{ marginTop: 12 }}>
+                  <button type="button" onClick={() => setStep(4)}>
+                    Continuar al tablero →{" "}
+                  </button>
+                </div>
               </div>
             </section>
           )}
 
-          {/* Paso 4: Tablero + chat */}
           {step === 4 && (
             <section style={cardStyle}>
-              <h2 style={{ marginTop: 0 }}>Paso 4 — Tablero y chat</h2>
-
               <div
                 style={{
                   display: "flex",
-                  flexWrap: "wrap",
-                  gap: 8,
-                  marginBottom: 12,
                   alignItems: "center",
+                  gap: 8,
+                  marginBottom: 8,
                 }}
               >
+                <h2 style={{ margin: 0 }}>Paso 4 — Tablero y chat</h2>
                 <button
-                  type="button"
-                  onClick={() => setStep(3)}
-                  style={{
-                    padding: "6px 10px",
-                    borderRadius: 999,
-                    border: "1px solid #e5e7eb",
-                    background: "#f9fafb",
-                    fontSize: 13,
-                    cursor: "pointer",
-                  }}
-                >
-                  ← Volver a preguntas
-                </button>
-
-                <button
-                  type="button"
                   onClick={reloadAttempts}
                   disabled={loadingAttempts}
                   style={{
-                    padding: "6px 10px",
-                    borderRadius: 999,
+                    marginLeft: "auto",
+                    padding: "4px 8px",
+                    borderRadius: 8,
                     border: "1px solid #e5e7eb",
                     background: "#f9fafb",
-                    fontSize: 13,
+                    fontSize: 12,
                     cursor: loadingAttempts ? "default" : "pointer",
                   }}
                 >
-                  {loadingAttempts ? "Actualizando…" : "Refrescar tablero"}
+                  {loadingAttempts ? "Actualizando…" : "Refrescar"}
                 </button>
+              </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    const link = studentLink();
-                    if (!link) return;
-                    navigator.clipboard
-                      .writeText(link)
-                      .then(() =>
-                        alert(
-                          "Link copiado para enviar a los alumnos:\n" + link
-                        )
-                      )
-                      .catch(() =>
-                        alert("No pude copiar automáticamente. Link:\n" + link)
-                      );
-                  }}
+              <p
+                style={{
+                  fontSize: 11,
+                  opacity: 0.65,
+                  marginTop: -4,
+                  marginBottom: 8,
+                }}
+              >
+                El tablero se actualiza automáticamente cada 5 segundos mientras
+                estés en este paso.
+              </p>
+
+              {/* link para alumnos */}
+              <div
+                style={{
+                  fontSize: 13,
+                  marginBottom: 10,
+                  padding: 8,
+                  background: "#f9fafb",
+                  borderRadius: 8,
+                  border: "1px solid #e5e7eb",
+                }}
+              >
+                <div style={{ marginBottom: 4 }}>Link para alumnos:</div>
+                <code
                   style={{
-                    padding: "6px 10px",
-                    borderRadius: 999,
-                    border: "1px solid #22c55e",
-                    background: "#dcfce7",
-                    fontSize: 13,
-                    cursor: "pointer",
+                    fontSize: 12,
+                    padding: "4px 6px",
+                    background: "white",
+                    borderRadius: 6,
+                    border: "1px solid #e5e7eb",
                   }}
                 >
-                  Copiar link para alumnos
-                </button>
+                  {typeof window !== "undefined"
+                    ? `${window.location.origin}/s/${code}`
+                    : `/s/${code}`}
+                </code>
               </div>
 
               {attempts.length === 0 ? (
@@ -1467,7 +1464,11 @@ export default function TeacherExamPage() {
                   Todavía no hay intentos registrados para este examen.
                 </p>
               ) : (
-                <div style={{ overflowX: "auto" }}>
+                <div
+                  style={{
+                    overflowX: "auto",
+                  }}
+                >
                   <table
                     style={{
                       width: "100%",
@@ -1512,7 +1513,7 @@ export default function TeacherExamPage() {
                             borderBottom: "1px solid #e5e7eb",
                           }}
                         >
-                          Fraudes / eventos
+                          Antifraude
                         </th>
                         <th
                           style={{
@@ -1520,7 +1521,7 @@ export default function TeacherExamPage() {
                             borderBottom: "1px solid #e5e7eb",
                           }}
                         >
-                          Inicio
+                          Tiempo (inicio / fin)
                         </th>
                         <th
                           style={{
@@ -1528,144 +1529,199 @@ export default function TeacherExamPage() {
                             borderBottom: "1px solid #e5e7eb",
                           }}
                         >
-                          Fin
+                          Acciones
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {attempts.map((a) => (
-                        <tr key={a.id}>
-                          <td
-                            style={{
-                              padding: 6,
-                              borderBottom: "1px solid #f3f4f6",
-                            }}
-                          >
-                            {a.studentName}
-                          </td>
-                          <td
-                            style={{
-                              padding: 6,
-                              borderBottom: "1px solid #f3f4f6",
-                            }}
-                          >
-                            {a.status}
-                          </td>
-                          <td
-                            style={{
-                              padding: 6,
-                              borderBottom: "1px solid #f3f4f6",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            <span
+                      {attempts.map((a) => {
+                        const st = prettyAttemptStatus(a);
+
+                        return (
+                          <tr key={a.id}>
+                            {/* Alumno */}
+                            <td
                               style={{
-                                marginRight: 6,
-                                color:
-                                  a.livesRemaining <= 0 ? "#b91c1c" : undefined,
+                                padding: 6,
+                                borderBottom: "1px solid #f3f4f6",
                               }}
                             >
-                              {a.livesRemaining}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => adjustLives(a.id, "increment")}
-                              disabled={updatingAttemptId === a.id}
-                              title="Sumar 1 vida"
+                              {a.studentName || "—"}
+                            </td>
+
+                            {/* Estado */}
+                            <td
                               style={{
-                                padding: "0 6px",
-                                borderRadius: 999,
-                                border: "1px solid #d4d4d8",
-                                background: "#f9fafb",
+                                padding: 6,
+                                borderBottom: "1px solid #f3f4f6",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  padding: "2px 8px",
+                                  borderRadius: 999,
+                                  background: st.bg,
+                                  color: st.color,
+                                  fontSize: 11,
+                                }}
+                              >
+                                {st.label}
+                              </span>
+                            </td>
+
+                            {/* Vidas */}
+                            <td
+                              style={{
+                                padding: 6,
+                                borderBottom: "1px solid #f3f4f6",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontWeight: 600,
+                                  color:
+                                    a.livesRemaining <= 0
+                                      ? "#b91c1c"
+                                      : a.livesRemaining === 1
+                                      ? "#f97316"
+                                      : "#16a34a",
+                                }}
+                              >
+                                {a.livesRemaining}
+                              </span>
+                            </td>
+
+                            {/* Antifraude resumido */}
+                            <td
+                              style={{
+                                padding: 6,
+                                borderBottom: "1px solid #f3f4f6",
                                 fontSize: 11,
-                                cursor:
-                                  updatingAttemptId === a.id
-                                    ? "default"
-                                    : "pointer",
-                                marginRight: 2,
+                                maxWidth: 220,
+                                whiteSpace: "normal",
+                                wordBreak: "break-word",
                               }}
                             >
-                              +1
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => adjustLives(a.id, "decrement")}
-                              disabled={updatingAttemptId === a.id}
-                              title="Restar 1 vida"
+                              {(() => {
+                                const vText = summarizeViolations(
+                                  a.violations as any
+                                );
+                                if (!vText) {
+                                  return (
+                                    <span style={{ opacity: 0.6 }}>—</span>
+                                  );
+                                }
+                                return (
+                                  <span
+                                    style={{
+                                      color: "#b91c1c",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {vText}
+                                  </span>
+                                );
+                              })()}
+                            </td>
+
+                            {/* Tiempo */}
+                            <td
                               style={{
-                                padding: "0 6px",
-                                borderRadius: 999,
-                                border: "1px solid #d4d4d8",
-                                background: "#f9fafb",
-                                fontSize: 11,
-                                cursor:
-                                  updatingAttemptId === a.id
-                                    ? "default"
-                                    : "pointer",
+                                padding: 6,
+                                borderBottom: "1px solid #f3f4f6",
+                                fontSize: 12,
                               }}
                             >
-                              −1
-                            </button>
-                          </td>
-                          <td
-                            style={{
-                              padding: 6,
-                              borderBottom: "1px solid #f3f4f6",
-                              maxWidth: 220,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                            title={a.violations}
-                          >
-                            {formatViolations(a.violations)}
-                          </td>
-                          <td
-                            style={{
-                              padding: 6,
-                              borderBottom: "1px solid #f3f4f6",
-                            }}
-                          >
-                            {formatDateTime(a.startedAt)}
-                          </td>
-                          <td
-                            style={{
-                              padding: 6,
-                              borderBottom: "1px solid #f3f4f6",
-                            }}
-                          >
-                            {formatDateTime(a.finishedAt)}
-                          </td>
-                        </tr>
-                      ))}
+                              <div>Inicio: {formatDateTime(a.startedAt)}</div>
+                              <div>Fin: {formatDateTime(a.finishedAt)}</div>
+                            </td>
+
+                            {/* Acciones */}
+                            <td
+                              style={{
+                                padding: 6,
+                                borderBottom: "1px solid #f3f4f6",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 6,
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => changeLives(a, "increment")}
+                                  style={{
+                                    fontSize: 12,
+                                    padding: "2px 6px",
+                                    borderRadius: 999,
+                                  }}
+                                >
+                                  +1 vida
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => changeLives(a, "decrement")}
+                                  style={{
+                                    fontSize: 12,
+                                    padding: "2px 6px",
+                                    borderRadius: 999,
+                                  }}
+                                >
+                                  -1 vida
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
 
-              {/* Chat docente flotante */}
+              {/* Chat sigue igual debajo, si lo tenías aquí */}
               <div style={{ marginTop: 16 }}>
-                <p
-                  style={{
-                    fontSize: 12,
-                    opacity: 0.75,
-                    marginBottom: 4,
-                  }}
-                >
-                  El chat del examen está disponible en la esquina inferior
-                  derecha. Como docente vas a poder enviar mensajes a todos los
-                  alumnos o responder consultas.
-                </p>
+                <ExamChat
+                  code={code}
+                  role="teacher"
+                  defaultName={teacherName || "Docente"}
+                />
               </div>
-
-              <ExamChat
-                code={code}
-                role="teacher"
-                defaultName={teacherName || profile?.name || "Docente"}
-              />
             </section>
           )}
         </>
+      )}
+
+      {err && (
+        <div
+          style={{
+            borderRadius: 8,
+            border: "1px solid #fecaca",
+            background: "#fef2f2",
+            padding: 8,
+            fontSize: 13,
+          }}
+        >
+          {err}
+        </div>
+      )}
+
+      {info && (
+        <div
+          style={{
+            borderRadius: 8,
+            border: "1px solid #bbf7d0",
+            background: "#ecfdf5",
+            padding: 8,
+            fontSize: 13,
+          }}
+        >
+          {info}
+        </div>
       )}
     </main>
   );
