@@ -1458,6 +1458,43 @@ export default function TeacherExamPage() {
                     : `/s/${code}`}
                 </code>
               </div>
+              {/* descarga de registro en PDF */}
+              <div
+                style={{
+                  fontSize: 13,
+                  marginBottom: 12,
+                }}
+              >
+                <a
+                  href={`${API}/exams/${code}/activity.pdf`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <button
+                    type="button"
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #e5e7eb",
+                      background: "#eef2ff",
+                      cursor: "pointer",
+                      fontSize: 13,
+                    }}
+                  >
+                    ⬇️ Descargar registro del examen (PDF)
+                  </button>
+                </a>
+                <div
+                  style={{
+                    fontSize: 11,
+                    opacity: 0.6,
+                    marginTop: 4,
+                  }}
+                >
+                  Incluye intentos, antifraude y chat (según lo que definamos en
+                  el backend).
+                </div>
+              </div>
 
               {attempts.length === 0 ? (
                 <p style={{ fontSize: 13, opacity: 0.7 }}>
