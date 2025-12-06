@@ -84,6 +84,10 @@ export default function Student() {
     "name" | "exam" | "submitting" | "submitted"
   >("name");
 
+  // para el cartel de avisos
+  const [showFullscreenWarning, setShowFullscreenWarning] =
+    React.useState(false);
+
   // alumno
   const [studentName, setStudentName] = React.useState("");
 
@@ -103,6 +107,9 @@ export default function Student() {
   const [lives, setLives] = React.useState<number | null>(null);
   const [secondsLeft, setSecondsLeft] = React.useState<number | null>(null);
   const [flash, setFlash] = React.useState(false); // aviso visual pérdida vida
+  // 👇 nuevo estado para el pop-up de advertencia
+  const [showFullscreenWarning, setShowFullscreenWarning] =
+    React.useState(false);
 
   // respuestas
   const [answers, setAnswers] = React.useState<Record<string, any>>({});
@@ -222,34 +229,31 @@ export default function Student() {
     }
   }
 
-  // ======= antifraude =======
+  // ======= antifraude: reportador genérico + aviso visual
   const reportViolation = React.useCallback(
     async (type: string, meta?: any) => {
       if (!attemptId) return;
       try {
-        const r = await fetch(`${API}/s/attempt/${attemptId}/event`, {
+        // POST real: descuenta vida y devuelve remaining en backend
+        const r = await fetch(`${API}/attempts/${attemptId}/antifraud`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type, meta }),
         });
 
-        if (r.ok) {
-          const data = await r.json();
+        if (!r.ok) return;
 
-          if (typeof data.livesRemaining === "number") {
-            setLives(data.livesRemaining);
-            if (data.livesRemaining <= 0) {
-              await submitAttempt("lives");
-              return; // no más flash / summary en este evento
-            }
-          }
-
-          setFlash(true);
-          setTimeout(() => setFlash(false), 500);
-
-          // opcional: refresco extra por si el backend ajusta algo más
-          await refreshSummary();
+        // 👇 si salió de pantalla completa, mostramos el aviso
+        if (type === "fullscreen-exit") {
+          setShowFullscreenWarning(true);
         }
+
+        // feedback inmediato (flash de cabecera)
+        setFlash(true);
+        setTimeout(() => setFlash(false), 500);
+
+        // refrescar resumen para vidas / tiempo
+        await refreshSummary();
       } catch (err) {
         console.error("Antifraude error", err);
       }

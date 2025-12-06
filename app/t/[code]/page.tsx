@@ -381,9 +381,9 @@ export default function TeacherExamPage() {
       if (key === "PASTE") return "Pegar";
       if (key === "CUT") return "Cortar";
       if (key === "BLUR" || key === "BLUR_TAB" || key === "BLUR_WINDOW")
-        return "Fuera de página";
+        return "Fuera del examen";
       if (key === "PRINT" || key === "PRINTSCREEN") return "Imprimir / captura";
-      if (key === "FULLSCREEN_EXIT") return "Salir de pantalla completa";
+      if (key === "FULLSCREEN_EXIT") return "Fullscreen Salida";
       if (key === "DOCENTE_TABLERO" || key === "DOCENTE")
         return "Acción del docente";
       return key;
