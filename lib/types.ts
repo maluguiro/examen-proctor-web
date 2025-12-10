@@ -29,12 +29,18 @@ export type ExamSettings = {
 
 export type ExamMeta = {
   examId: string;
+  code: string;
+  title: string;
+  status: string;
+  durationMinutes: number | null;
+  lives: number | null;
   teacherName: string | null;
   subject: string | null;
   gradingMode: GradingMode;
-  reviewMode: ReviewMode;
+  reviewMode: ReviewMode; // Mantenemos reviewMode si existía o lo agregamos si viene del back
   maxScore: number;
-  openAt: string | null; // fecha/hora sugerida de apertura
+  openAt: string | null;
+  closeAt: string | null;
 };
 
 export type Exam = {

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useParams } from "next/navigation";
 import { API, patchAttemptLives } from "@/lib/api";
+import { ExamMeta } from "@/lib/types";
 import ExamChat from "@/components/ExamChat";
 
 // ---------- tipos básicos ----------
@@ -20,18 +21,7 @@ type ExamResponse = {
   };
 };
 
-type Meta = {
-  examId: string;
-  teacherName: string | null;
-  subject: string | null;
-  gradingMode: "auto" | "manual";
-  maxScore: number;
-  openAt: string | null;
-};
-
-type MetaResponse = {
-  meta: Meta | null;
-};
+// Meta types removed (using ExamMeta from lib/types)
 
 type AttemptsResponse = {
   exam: {
@@ -216,27 +206,25 @@ export default function TeacherExamPage() {
 
       // META
       if (metaRes.ok) {
-        const metaData: MetaResponse = await metaRes.json();
-        if (metaData.meta) {
-          const m = metaData.meta;
-          setTeacherName(m.teacherName || "");
-          setSubject(m.subject || "");
-          setGradingMode(
-            (m.gradingMode || "auto").toLowerCase() === "manual"
-              ? "manual"
-              : "auto"
-          );
-          setMaxScore(
-            typeof m.maxScore === "number" && !isNaN(m.maxScore)
-              ? m.maxScore
-              : ""
-          );
-          if (m.openAt) {
-            const d = new Date(m.openAt);
-            if (!isNaN(d.getTime())) {
-              const iso = d.toISOString().slice(0, 16); // yyyy-MM-ddTHH:mm
-              setOpenAt(iso);
-            }
+        const m: ExamMeta = await metaRes.json();
+
+        setTeacherName(m.teacherName || "");
+        setSubject(m.subject || "");
+        setGradingMode(
+          (m.gradingMode || "auto").toLowerCase() === "manual"
+            ? "manual"
+            : "auto"
+        );
+        setMaxScore(
+          typeof m.maxScore === "number" && !isNaN(m.maxScore)
+            ? m.maxScore
+            : ""
+        );
+        if (m.openAt) {
+          const d = new Date(m.openAt);
+          if (!isNaN(d.getTime())) {
+            const iso = d.toISOString().slice(0, 16); // yyyy-MM-ddTHH:mm
+            setOpenAt(iso);
           }
         }
       }
@@ -1281,8 +1269,8 @@ export default function TeacherExamPage() {
                       {savingQuestion
                         ? "Guardando..."
                         : editingQuestionId
-                        ? "Guardar cambios"
-                        : "Guardar pregunta"}
+                          ? "Guardar cambios"
+                          : "Guardar pregunta"}
                     </button>
                   </div>
                 </div>
@@ -1620,8 +1608,8 @@ export default function TeacherExamPage() {
                                     a.livesRemaining <= 0
                                       ? "#b91c1c"
                                       : a.livesRemaining === 1
-                                      ? "#f97316"
-                                      : "#16a34a",
+                                        ? "#f97316"
+                                        : "#16a34a",
                                 }}
                               >
                                 {a.livesRemaining}

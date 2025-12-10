@@ -430,7 +430,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
       }
 
       const data = await r.json();
-      const openAtRaw = data?.meta?.openAt as string | null | undefined;
+      const openAtRaw = data?.openAt as string | null | undefined;
 
       if (openAtRaw) {
         const openDate = new Date(openAtRaw);
@@ -819,15 +819,15 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                 <b>Tiempo:</b>{" "}
                 {secondsLeft != null
                   ? (() => {
-                      const m = Math.floor(secondsLeft / 60);
-                      const s = secondsLeft % 60;
-                      const danger = secondsLeft <= 600;
-                      return (
-                        <span style={{ color: danger ? "red" : undefined }}>
-                          {m}:{String(s).padStart(2, "0")}
-                        </span>
-                      );
-                    })()
+                    const m = Math.floor(secondsLeft / 60);
+                    const s = secondsLeft % 60;
+                    const danger = secondsLeft <= 600;
+                    return (
+                      <span style={{ color: danger ? "red" : undefined }}>
+                        {m}:{String(s).padStart(2, "0")}
+                      </span>
+                    );
+                  })()
                   : "—"}
               </div>
             </div>
