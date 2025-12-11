@@ -68,6 +68,10 @@ export function BoardClient({ code }: { code: string }) {
     const [sortMode, setSortMode] = React.useState<"activity" | "name-asc">(
         "activity"
     );
+    const [filterMode, setFilterMode] = React.useState<
+        "all" | "in-progress" | "submitted" | "violations"
+    >("all");
+    const [searchTerm, setSearchTerm] = React.useState("");
 
     const attempts: AttemptSummary[] = data?.attempts ?? [];
     const total = attempts.length;
@@ -125,6 +129,24 @@ export function BoardClient({ code }: { code: string }) {
         return list;
     }, [attempts, sortMode]);
 
+    const finalAttempts = React.useMemo(() => {
+        // 1. Filtro por Estado
+        const byStatus = sortedAttempts.filter((a) => {
+            if (filterMode === "in-progress") return a.status !== "submitted";
+            if (filterMode === "submitted") return a.status === "submitted";
+            if (filterMode === "violations") return (a.violationsCount ?? 0) > 0;
+            return true;
+        });
+
+        // 2. Filtro por Nombre
+        const term = searchTerm.trim().toLowerCase();
+        if (!term) return byStatus;
+
+        return byStatus.filter((a) =>
+            (a.studentName || "").toLowerCase().includes(term)
+        );
+    }, [sortedAttempts, filterMode, searchTerm]);
+
     function toggleSort() {
         setSortMode((prev) => (prev === "activity" ? "name-asc" : "activity"));
     }
@@ -136,6 +158,17 @@ export function BoardClient({ code }: { code: string }) {
         background: "#fff",
         marginTop: 16,
     };
+
+    const examTitle =
+        exam?.title && String(exam.title).trim().length > 0
+            ? String(exam.title).trim()
+            : "(sin título)";
+
+    const examStatusLabel = (() => {
+        const raw = exam?.status;
+        const mapped = mapStatusLabel(raw);
+        return mapped && mapped.trim().length > 0 ? mapped : "Borrador";
+    })();
 
     return (
         <section style={cardStyle}>
@@ -167,16 +200,87 @@ export function BoardClient({ code }: { code: string }) {
 
             {exam && (
                 <p style={{ color: "#555", fontSize: 13, marginBottom: 12 }}>
-                    Examen: <b>{exam.title}</b>{" "}
+                    Examen: <b>{examTitle}</b>{" "}
                     {typeof exam.lives === "number" && (
                         <>
                             · Vidas por alumno: <b>{exam.lives}</b>
                         </>
                     )}{" "}
-                    · Estado: <b>{mapStatusLabel(exam.status)}</b> · Participantes:{" "}
+                    · Estado: <b>{examStatusLabel}</b> · Participantes:{" "}
                     <b>{total}</b>
                 </p>
             )}
+
+            {/* Filtros Unificados */}
+            <div
+                style={{
+                    display: "flex",
+                    gap: 12,
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    marginBottom: 16,
+                    background: "#f9fafb",
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #f0f0f0",
+                }}
+            >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <label style={{ fontSize: 13, color: "#555", fontWeight: 500 }}>
+                        Ver:
+                    </label>
+                    <select
+                        value={filterMode}
+                        onChange={(e) =>
+                            setFilterMode(
+                                e.target.value as
+                                | "all"
+                                | "in-progress"
+                                | "submitted"
+                                | "violations"
+                            )
+                        }
+                        style={{
+                            padding: "6px 8px",
+                            fontSize: 13,
+                            borderRadius: 6,
+                            border: "1px solid #ccc",
+                            background: "white",
+                            cursor: "pointer",
+                        }}
+                    >
+                        <option value="all">Todos</option>
+                        <option value="in-progress">En curso</option>
+                        <option value="submitted">Enviados</option>
+                        <option value="violations">Con fraude</option>
+                    </select>
+                </div>
+
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flex: 1,
+                        minWidth: 200,
+                    }}
+                >
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Buscar alumno..."
+                        style={{
+                            flex: 1,
+                            padding: "6px 10px",
+                            fontSize: 13,
+                            borderRadius: 6,
+                            border: "1px solid #ccc",
+                            outline: "none",
+                        }}
+                    />
+                </div>
+            </div>
 
             {err && (
                 <div style={{ color: "crimson", marginBottom: 12, fontSize: 13 }}>
@@ -271,128 +375,156 @@ export function BoardClient({ code }: { code: string }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {sortedAttempts.map((a) => {
-                                const examLives = exam?.lives ?? 0;
-                                const livesRemaining =
-                                    examLives > 0
-                                        ? Math.max(0, examLives - (a.livesUsed ?? 0))
-                                        : 0;
+                            {finalAttempts.length === 0 ? (
+                                <tr>
+                                    <td
+                                        colSpan={6}
+                                        style={{
+                                            padding: 24,
+                                            textAlign: "center",
+                                            color: "#666",
+                                            fontSize: 13,
+                                        }}
+                                    >
+                                        No hay intentos que coincidan con el filtro/búsqueda actual.
+                                    </td>
+                                </tr>
+                            ) : (
+                                finalAttempts.map((a) => {
+                                    const examLives = exam?.lives ?? 0;
+                                    const livesRemaining =
+                                        examLives > 0
+                                            ? Math.max(0, examLives - (a.livesUsed ?? 0))
+                                            : 0;
 
-                                return (
-                                    <tr key={a.id}>
-                                        <td
-                                            style={{
-                                                padding: 8,
-                                                borderBottom: "1px solid #f0f0f0",
-                                            }}
-                                        >
-                                            {a.studentName || (
-                                                <span style={{ color: "#999" }}>(sin nombre)</span>
-                                            )}
-                                        </td>
-                                        <td
-                                            style={{
-                                                padding: 8,
-                                                borderBottom: "1px solid #f0f0f0",
-                                                textAlign: "center",
-                                            }}
-                                        >
-                                            {examLives ? `${livesRemaining}/${examLives}` : "—"}
-                                        </td>
-                                        <td
-                                            style={{
-                                                padding: 8,
-                                                borderBottom: "1px solid #f0f0f0",
-                                                textAlign: "center",
-                                            }}
-                                        >
-                                            {typeof a.score === "number" ? a.score : "—"}
-                                        </td>
-                                        <td
-                                            style={{
-                                                padding: 8,
-                                                borderBottom: "1px solid #f0f0f0",
-                                                textAlign: "center",
-                                            }}
-                                        >
-                                            <div
+                                    let scoreText: string;
+                                    if (typeof a.score === "number") {
+                                        scoreText = new Intl.NumberFormat("es-AR", {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 2,
+                                        }).format(a.score);
+                                    } else if (a.status === "submitted") {
+                                        scoreText = "Pendiente";
+                                    } else {
+                                        scoreText = "—";
+                                    }
+
+                                    return (
+                                        <tr key={a.id}>
+                                            <td
                                                 style={{
-                                                    display: "flex",
-                                                    flexWrap: "wrap",
-                                                    gap: 6,
-                                                    justifyContent: "center",
+                                                    padding: 8,
+                                                    borderBottom: "1px solid #f0f0f0",
                                                 }}
                                             >
-                                                <button
-                                                    onClick={() => modAttempt(a.id, "forgive_life")}
-                                                    style={{ padding: "4px 8px", fontSize: 11 }}
-                                                >
-                                                    Perdonar
-                                                </button>
-                                                <button
-                                                    onClick={() => modAttempt(a.id, "add_time", 300)}
-                                                    style={{ padding: "4px 8px", fontSize: 11 }}
-                                                >
-                                                    +5 min
-                                                </button>
-                                                {a.paused ? (
-                                                    <button
-                                                        onClick={() => modAttempt(a.id, "resume")}
-                                                        style={{ padding: "4px 8px", fontSize: 11 }}
-                                                    >
-                                                        ▶
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => modAttempt(a.id, "pause")}
-                                                        style={{ padding: "4px 8px", fontSize: 11 }}
-                                                    >
-                                                        ⏸
-                                                    </button>
+                                                {a.studentName || (
+                                                    <span style={{ color: "#999" }}>(sin nombre)</span>
                                                 )}
-                                            </div>
-                                        </td>
-                                        <td
-                                            style={{
-                                                padding: 8,
-                                                borderBottom: "1px solid #f0f0f0",
-                                            }}
-                                        >
-                                            {renderAttemptStatus(a.status, a.paused ?? false)}
-                                        </td>
-                                        <td
-                                            style={{
-                                                padding: 8,
-                                                borderBottom: "1px solid #f0f0f0",
-                                                fontSize: 12,
-                                                color: "#666",
-                                            }}
-                                        >
-                                            {a.violationsCount && a.violationsCount > 0 ? (
+                                            </td>
+                                            <td
+                                                style={{
+                                                    padding: 8,
+                                                    borderBottom: "1px solid #f0f0f0",
+                                                    textAlign: "center",
+                                                }}
+                                            >
+                                                {examLives ? `${livesRemaining}/${examLives}` : "—"}
+                                            </td>
+                                            <td
+                                                style={{
+                                                    padding: 8,
+                                                    borderBottom: "1px solid #f0f0f0",
+                                                    textAlign: "center",
+                                                }}
+                                            >
+                                                {scoreText}
+                                            </td>
+                                            <td
+                                                style={{
+                                                    padding: 8,
+                                                    borderBottom: "1px solid #f0f0f0",
+                                                    textAlign: "center",
+                                                }}
+                                            >
                                                 <div
-                                                    title={
-                                                        a.violationTypes
-                                                            ?.map((v) => `${v.type} x${v.count}`)
-                                                            .join(", ") || ""
-                                                    }
-                                                    style={{ cursor: "help" }}
+                                                    style={{
+                                                        display: "flex",
+                                                        flexWrap: "wrap",
+                                                        gap: 6,
+                                                        justifyContent: "center",
+                                                    }}
                                                 >
-                                                    <span style={{ color: "#d32f2f", fontWeight: 500 }}>
-                                                        {a.violationsCount} violaciones
-                                                    </span>
-                                                    {a.lastViolationReason && (
-                                                        <span style={{ marginLeft: 6, color: "#888" }}>
-                                                            · {a.lastViolationReason}
-                                                        </span>
+                                                    <button
+                                                        onClick={() => modAttempt(a.id, "forgive_life")}
+                                                        style={{ padding: "4px 8px", fontSize: 11 }}
+                                                    >
+                                                        Perdonar
+                                                    </button>
+                                                    <button
+                                                        onClick={() => modAttempt(a.id, "add_time", 300)}
+                                                        style={{ padding: "4px 8px", fontSize: 11 }}
+                                                    >
+                                                        +5 min
+                                                    </button>
+                                                    {a.paused ? (
+                                                        <button
+                                                            onClick={() => modAttempt(a.id, "resume")}
+                                                            style={{ padding: "4px 8px", fontSize: 11 }}
+                                                        >
+                                                            ▶
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => modAttempt(a.id, "pause")}
+                                                            style={{ padding: "4px 8px", fontSize: 11 }}
+                                                        >
+                                                            ⏸
+                                                        </button>
                                                     )}
                                                 </div>
-                                            ) : (
-                                                <span style={{ color: "#aaa" }}>Sin incidencias</span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                                            </td>
+                                            <td
+                                                style={{
+                                                    padding: 8,
+                                                    borderBottom: "1px solid #f0f0f0",
+                                                }}
+                                            >
+                                                {renderAttemptStatus(a.status, a.paused ?? false)}
+                                            </td>
+                                            <td
+                                                style={{
+                                                    padding: 8,
+                                                    borderBottom: "1px solid #f0f0f0",
+                                                    fontSize: 12,
+                                                    color: "#666",
+                                                }}
+                                            >
+                                                {a.violationsCount && a.violationsCount > 0 ? (
+                                                    <div
+                                                        title={
+                                                            a.violationTypes
+                                                                ?.map((v) => `${v.type} x${v.count}`)
+                                                                .join(", ") || ""
+                                                        }
+                                                        style={{ cursor: "help" }}
+                                                    >
+                                                        <span style={{ color: "#d32f2f", fontWeight: 500 }}>
+                                                            {a.violationsCount} violaciones
+                                                        </span>
+                                                        {a.lastViolationReason && (
+                                                            <span style={{ marginLeft: 6, color: "#888" }}>
+                                                                · {a.lastViolationReason}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <span style={{ color: "#aaa" }}>Sin incidencias</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
                         </tbody>
                     </table>
                 </div>

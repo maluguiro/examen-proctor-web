@@ -84,6 +84,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
   const [exam, setExam] = React.useState<{
     title: string;
     code: string;
+    openAt?: string | null;
   } | null>(null);
   const [questions, setQuestions] = React.useState<PaperQuestion[]>([]);
   const [loadingPaper, setLoadingPaper] = React.useState(false);
@@ -141,11 +142,16 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     const run = async () => {
       try {
         setLoadingPaper(true);
-        const r = await fetch(`${API}/exams/${code}/paper`);
-        if (!r.ok) {
-          throw new Error(`Error al cargar examen (${r.status})`);
+        const [paperRes, metaRes] = await Promise.all([
+          fetch(`${API}/exams/${code}/paper`),
+          fetch(`${API}/exams/${code}/meta`),
+        ]);
+
+        if (!paperRes.ok) {
+          throw new Error(`Error al cargar examen (${paperRes.status})`);
         }
-        const data = await r.json();
+        const data = await paperRes.json();
+        const meta = metaRes.ok ? await metaRes.json() : {};
         if (cancelled) return;
 
         const rawQs: any[] = Array.isArray(data.questions)
@@ -155,6 +161,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
         setExam({
           title: data.exam?.title || "Examen",
           code: data.exam?.code || code,
+          openAt: meta.openAt || null,
         });
 
         setQuestions(
@@ -882,31 +889,64 @@ export default function StudentPage({ params }: { params: { code: string } }) {
         <div style={{ display: "grid", gap: 12 }}>
           {Header}
 
-          {gradingMode === "auto" ? (
-            <>
-              <div
-                style={{
-                  padding: 10,
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 10,
-                }}
-              >
-                <div>
-                  <b>Tu examen fue enviado.</b>
-                </div>
-                <div>
-                  Calificación automática: <b>{score}</b> / <b>{maxScore}</b>
-                </div>
-              </div>
 
-              {attemptId && (
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button onClick={handleDownloadReview}>
-                    🖨️ Ver/Descargar revisión (PDF)
-                  </button>
-                </div>
-              )}
-            </>
+          {gradingMode === "auto" ? (
+            (() => {
+              // Lógica de visibilidad
+              // Si hay fecha openAt, chequeamos si ya pasó.
+              // Si no hay fecha, se muestra siempre (canViewReview = true).
+              const openDate = exam?.openAt ? new Date(exam.openAt) : null;
+              const now = new Date();
+              const canViewReview = !openDate || now >= openDate;
+
+              if (!canViewReview && openDate) {
+                return (
+                  <div
+                    style={{
+                      padding: 16,
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 10,
+                      background: "#f9fafb",
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                      Tu examen fue enviado.
+                    </div>
+                    <div style={{ fontSize: 14, color: "#4b5563" }}>
+                      La calificación y revisión estarán disponibles a partir del:{" "}
+                      <b>{openDate.toLocaleString()}</b>.
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <>
+                  <div
+                    style={{
+                      padding: 10,
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 10,
+                    }}
+                  >
+                    <div>
+                      <b>Tu examen fue enviado.</b>
+                    </div>
+                    <div>
+                      Calificación automática: <b>{score}</b> / <b>{maxScore}</b>
+                    </div>
+                  </div>
+
+                  {attemptId && (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button onClick={handleDownloadReview}>
+                        🖨️ Ver/Descargar revisión (PDF)
+                      </button>
+                    </div>
+                  )}
+                </>
+              );
+            })()
           ) : (
             <>
               <div
