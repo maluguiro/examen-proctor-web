@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import { useParams } from "next/navigation";
-import { API, patchAttemptLives } from "@/lib/api";
+import { API } from "@/lib/api";
 import { ExamMeta } from "@/lib/types";
 import ExamChat from "@/components/ExamChat";
+import { BoardClient } from "./board/BoardClient";
 
 // ---------- tipos básicos ----------
 
@@ -23,23 +24,7 @@ type ExamResponse = {
 
 // Meta types removed (using ExamMeta from lib/types)
 
-type AttemptsResponse = {
-  exam: {
-    id: string;
-    code: string;
-    isOpen: boolean;
-  };
-  attempts: {
-    id: string;
-    studentName: string;
-    startedAt: string;
-    finishedAt: string | null;
-    status: string;
-    livesRemaining: number;
-    paused: boolean;
-    violations: string;
-  }[];
-};
+
 
 // ---------- tipos preguntas ----------
 
@@ -143,11 +128,7 @@ export default function TeacherExamPage() {
   const [maxScore, setMaxScore] = React.useState<string | number>("");
   const [openAt, setOpenAt] = React.useState(""); // datetime-local
 
-  // tablero / intentos
-  const [attempts, setAttempts] = React.useState<AttemptsResponse["attempts"]>(
-    []
-  );
-  const [loadingAttempts, setLoadingAttempts] = React.useState(false);
+
 
   // preguntas
   const [questions, setQuestions] = React.useState<QuestionLite[]>([]);
@@ -184,10 +165,9 @@ export default function TeacherExamPage() {
     setInfo(null);
 
     try {
-      const [examRes, metaRes, attemptsRes, questionsRes] = await Promise.all([
+      const [examRes, metaRes, questionsRes] = await Promise.all([
         fetch(`${API}/exams/${code}`, { cache: "no-store" }),
         fetch(`${API}/exams/${code}/meta`, { cache: "no-store" }),
-        fetch(`${API}/exams/${code}/attempts`, { cache: "no-store" }),
         fetch(`${API}/exams/${code}/questions`, { cache: "no-store" }),
       ]);
 
@@ -231,11 +211,7 @@ export default function TeacherExamPage() {
         }
       }
 
-      // ATTEMPTS (tablero)
-      if (attemptsRes.ok) {
-        const attemptsData: AttemptsResponse = await attemptsRes.json();
-        setAttempts(attemptsData.attempts || []);
-      }
+
 
       // QUESTIONS
       if (questionsRes.ok) {
@@ -264,71 +240,9 @@ export default function TeacherExamPage() {
     { id: 4, label: "Tablero y chat" },
   ];
 
-  function formatDateTime(dt: string | null) {
-    if (!dt) return "—";
-    try {
-      const d = new Date(dt);
-      if (isNaN(d.getTime())) return "—";
-      // Hora cortita: 18:23
-      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    } catch {
-      return "—";
-    }
-  }
 
-  // Estado "lindo" del intento para el tablero
-  function prettyAttemptStatus(a: AttemptsResponse["attempts"][number]): {
-    label: string;
-    bg: string;
-    color: string;
-  } {
-    const raw = String(a.status || "").toUpperCase();
 
-    // Intento en curso (sin fecha de fin)
-    if (!a.finishedAt) {
-      return {
-        label: "En curso",
-        bg: "#dcfce7", // verde clarito
-        color: "#166534",
-      };
-    }
 
-    // Algunos nombres posibles que podamos usar en el backend
-    if (raw.includes("FRAUD") || raw.includes("LIVES")) {
-      return {
-        label: "Cerrado por fraude",
-        bg: "#fee2e2", // rojo clarito
-        color: "#b91c1c",
-      };
-    }
-
-    if (raw.includes("TIME")) {
-      return {
-        label: "Cerrado por tiempo",
-        bg: "#fef9c3", // amarillo clarito
-        color: "#854d0e",
-      };
-    }
-
-    if (
-      raw.includes("SUBMIT") ||
-      raw.includes("FINISH") ||
-      raw.includes("DONE")
-    ) {
-      return {
-        label: "Finalizado",
-        bg: "#e5e7eb", // gris
-        color: "#374151",
-      };
-    }
-
-    // Fallback
-    return {
-      label: raw || "Desconocido",
-      bg: "#e5e7eb",
-      color: "#374151",
-    };
-  }
 
   const cardStyle: React.CSSProperties = {
     border: "1px solid #e5e7eb",
@@ -336,57 +250,7 @@ export default function TeacherExamPage() {
     padding: 16,
     background: "#fff",
   };
-  function summarizeViolations(raw: string | null | undefined): string {
-    if (!raw) return "";
-    let arr: string[] = [];
-    const trimmed = String(raw).trim();
 
-    try {
-      // Si viene como JSON: ["DOCENTE_TABLERO","COPY",...]
-      if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          arr = parsed.map((x) => String(x));
-        } else {
-          arr = [trimmed];
-        }
-      } else {
-        // Si viene como texto plano separado por comas/espacios
-        arr = trimmed.split(/[,\s]+/).filter(Boolean);
-      }
-    } catch {
-      arr = [trimmed];
-    }
-
-    if (!arr.length) return "";
-
-    const counts = new Map<string, number>();
-    for (const v of arr) {
-      const key = v.toUpperCase();
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-
-    const labelFor = (key: string): string => {
-      if (key === "COPY") return "Copiar";
-      if (key === "PASTE") return "Pegar";
-      if (key === "CUT") return "Cortar";
-      if (key === "BLUR" || key === "BLUR_TAB" || key === "BLUR_WINDOW")
-        return "Fuera del examen";
-      if (key === "PRINT" || key === "PRINTSCREEN") return "Imprimir / captura";
-      if (key === "FULLSCREEN_EXIT") return "Fullscreen Salida";
-      if (key === "DOCENTE_TABLERO" || key === "DOCENTE")
-        return "Acción del docente";
-      return key;
-    };
-
-    const parts: string[] = [];
-    for (const [key, count] of counts) {
-      const label = labelFor(key);
-      parts.push(count > 1 ? `${label} ×${count}` : label);
-    }
-
-    return parts.join(" · ");
-  }
   // ----------------- guardar META -----------------
 
   async function saveMeta() {
@@ -637,55 +501,7 @@ export default function TeacherExamPage() {
 
   // ----------------- TABLERO: intentos + vidas -----------------
 
-  async function reloadAttempts() {
-    if (!code) return;
-    setLoadingAttempts(true);
-    try {
-      const r = await fetch(`${API}/exams/${code}/attempts`, {
-        cache: "no-store",
-      });
-      if (!r.ok) return;
-      const data: AttemptsResponse = await r.json();
-      setAttempts(data.attempts || []);
-    } catch (e) {
-      console.error("LOAD_ATTEMPTS_ERROR", e);
-    } finally {
-      setLoadingAttempts(false);
-    }
-  }
-  // Auto-refresh del tablero mientras estoy en el Paso 4 (Tablero y chat)
-  React.useEffect(() => {
-    if (step !== 4) return; // solo cuando estoy en el tablero
 
-    // refresco inicial apenas entro al paso 4
-    reloadAttempts();
-
-    // luego refresco cada 5 segundos
-    const id = window.setInterval(() => {
-      reloadAttempts();
-    }, 3000);
-
-    return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
-
-  async function changeLives(
-    attempt: AttemptsResponse["attempts"][number],
-    op: "increment" | "decrement"
-  ) {
-    try {
-      await patchAttemptLives(attempt.id, op, "DOCENTE_TABLERO");
-      await reloadAttempts();
-
-      const deltaText = op === "increment" ? "+1 vida" : "-1 vida";
-      const name = attempt.studentName || "este alumno";
-
-      setInfo(`Se aplicó ${deltaText} a ${name}.`);
-    } catch (e) {
-      console.error("PATCH_LIVES_ERROR", e);
-      alert("No se pudo actualizar las vidas de este alumno.");
-    }
-  }
   function copyStudentLink() {
     try {
       const base = typeof window !== "undefined" ? window.location.origin : "";
@@ -1393,34 +1209,8 @@ export default function TeacherExamPage() {
                 }}
               >
                 <h2 style={{ margin: 0 }}>Paso 4 — Tablero y chat</h2>
-                <button
-                  onClick={reloadAttempts}
-                  disabled={loadingAttempts}
-                  style={{
-                    marginLeft: "auto",
-                    padding: "4px 8px",
-                    borderRadius: 8,
-                    border: "1px solid #e5e7eb",
-                    background: "#f9fafb",
-                    fontSize: 12,
-                    cursor: loadingAttempts ? "default" : "pointer",
-                  }}
-                >
-                  {loadingAttempts ? "Actualizando…" : "Refrescar"}
-                </button>
               </div>
 
-              <p
-                style={{
-                  fontSize: 11,
-                  opacity: 0.65,
-                  marginTop: -4,
-                  marginBottom: 8,
-                }}
-              >
-                El tablero se actualiza automáticamente cada 5 segundos mientras
-                estés en este paso.
-              </p>
 
               {/* link para alumnos */}
               <div
@@ -1505,231 +1295,9 @@ export default function TeacherExamPage() {
                 </div>
               </div>
 
-              {attempts.length === 0 ? (
-                <p style={{ fontSize: 13, opacity: 0.7 }}>
-                  Todavía no hay intentos registrados para este examen.
-                </p>
-              ) : (
-                <div
-                  style={{
-                    overflowX: "auto",
-                  }}
-                >
-                  <table
-                    style={{
-                      width: "100%",
-                      fontSize: 13,
-                      borderCollapse: "collapse",
-                    }}
-                  >
-                    <thead>
-                      <tr
-                        style={{
-                          background: "#f3f4f6",
-                          textAlign: "left",
-                        }}
-                      >
-                        <th
-                          style={{
-                            padding: 6,
-                            borderBottom: "1px solid #e5e7eb",
-                          }}
-                        >
-                          Alumno
-                        </th>
-                        <th
-                          style={{
-                            padding: 6,
-                            borderBottom: "1px solid #e5e7eb",
-                          }}
-                        >
-                          Estado
-                        </th>
-                        <th
-                          style={{
-                            padding: 6,
-                            borderBottom: "1px solid #e5e7eb",
-                          }}
-                        >
-                          Vidas
-                        </th>
-                        <th
-                          style={{
-                            padding: 6,
-                            borderBottom: "1px solid #e5e7eb",
-                          }}
-                        >
-                          Antifraude
-                        </th>
-                        <th
-                          style={{
-                            padding: 6,
-                            borderBottom: "1px solid #e5e7eb",
-                          }}
-                        >
-                          Tiempo (inicio / fin)
-                        </th>
-                        <th
-                          style={{
-                            padding: 6,
-                            borderBottom: "1px solid #e5e7eb",
-                          }}
-                        >
-                          Acciones
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {attempts.map((a) => {
-                        const st = prettyAttemptStatus(a);
 
-                        return (
-                          <tr key={a.id}>
-                            {/* Alumno */}
-                            <td
-                              style={{
-                                padding: 6,
-                                borderBottom: "1px solid #f3f4f6",
-                              }}
-                            >
-                              {a.studentName || "—"}
-                            </td>
+              <BoardClient code={code} />
 
-                            {/* Estado */}
-                            <td
-                              style={{
-                                padding: 6,
-                                borderBottom: "1px solid #f3f4f6",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  display: "inline-block",
-                                  padding: "2px 8px",
-                                  borderRadius: 999,
-                                  background: st.bg,
-                                  color: st.color,
-                                  fontSize: 11,
-                                }}
-                              >
-                                {st.label}
-                              </span>
-                            </td>
-
-                            {/* Vidas */}
-                            <td
-                              style={{
-                                padding: 6,
-                                borderBottom: "1px solid #f3f4f6",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontWeight: 600,
-                                  color:
-                                    a.livesRemaining <= 0
-                                      ? "#b91c1c"
-                                      : a.livesRemaining === 1
-                                        ? "#f97316"
-                                        : "#16a34a",
-                                }}
-                              >
-                                {a.livesRemaining}
-                              </span>
-                            </td>
-
-                            {/* Antifraude resumido */}
-                            <td
-                              style={{
-                                padding: 6,
-                                borderBottom: "1px solid #f3f4f6",
-                                fontSize: 11,
-                                maxWidth: 220,
-                                whiteSpace: "normal",
-                                wordBreak: "break-word",
-                              }}
-                            >
-                              {(() => {
-                                const vText = summarizeViolations(
-                                  a.violations as any
-                                );
-                                if (!vText) {
-                                  return (
-                                    <span style={{ opacity: 0.6 }}>—</span>
-                                  );
-                                }
-                                return (
-                                  <span
-                                    style={{
-                                      color: "#b91c1c",
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    {vText}
-                                  </span>
-                                );
-                              })()}
-                            </td>
-
-                            {/* Tiempo */}
-                            <td
-                              style={{
-                                padding: 6,
-                                borderBottom: "1px solid #f3f4f6",
-                                fontSize: 12,
-                              }}
-                            >
-                              <div>Inicio: {formatDateTime(a.startedAt)}</div>
-                              <div>Fin: {formatDateTime(a.finishedAt)}</div>
-                            </td>
-
-                            {/* Acciones */}
-                            <td
-                              style={{
-                                padding: 6,
-                                borderBottom: "1px solid #f3f4f6",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  gap: 6,
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => changeLives(a, "increment")}
-                                  style={{
-                                    fontSize: 12,
-                                    padding: "2px 6px",
-                                    borderRadius: 999,
-                                  }}
-                                >
-                                  +1 vida
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => changeLives(a, "decrement")}
-                                  style={{
-                                    fontSize: 12,
-                                    padding: "2px 6px",
-                                    borderRadius: 999,
-                                  }}
-                                >
-                                  -1 vida
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Chat sigue igual debajo, si lo tenías aquí */}
               <div style={{ marginTop: 16 }}>
                 <ExamChat
                   code={code}

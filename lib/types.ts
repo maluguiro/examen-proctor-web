@@ -70,7 +70,7 @@ export type Exam = {
 export type QuestionType = "mcq" | "tf" | "text" | "fill";
 
 export type QuestionOption = {
-  id: string;   // "A", "B", "C"...
+  id: string; // "A", "B", "C"...
   text: string; // texto visible
 };
 
@@ -127,19 +127,20 @@ export type MessageSummary = {
 
 export type AttemptSummary = {
   id: string;
-  studentId: string;
-  studentName: string | null;
-  status: AttemptStatus;
-  score: number | null;
-  livesUsed: number;
-  paused: boolean;
-
+  studentName: string;
+  status: string;
+  livesRemaining: number;
+  // estos tres los necesitamos para ordenar:
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  lastActivityAt?: string | null;
+  // estos pueden ya estar:
   violationsCount?: number;
   lastViolationReason?: string | null;
   violationTypes?: { type: string; count: number }[];
-  startedAt?: string;
-  finishedAt?: string | null;
-  lastActivityAt?: string | null;
+  score?: number | null;
+  livesUsed?: number;
+  paused?: boolean;
 
   events: EventSummary[];
   messages: MessageSummary[];
