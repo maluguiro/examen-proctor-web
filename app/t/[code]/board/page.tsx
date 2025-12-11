@@ -67,6 +67,10 @@ export default function BoardPage({
     }
   }
 
+  const [sortMode, setSortMode] = React.useState<"activity" | "name-asc">(
+    "activity"
+  );
+
   const attempts: AttemptSummary[] = data?.attempts ?? [];
   const total = attempts.length;
   const exam = data?.exam;
@@ -90,6 +94,58 @@ export default function BoardPage({
       default:
         return status || "";
     }
+  }
+
+  const sortedAttempts = React.useMemo(() => {
+    const list = [...attempts];
+    if (sortMode === "name-asc") {
+      list.sort((a, b) =>
+        (a.studentName || "").localeCompare(b.studentName || "")
+      );
+    } else {
+      // activity
+      list.sort((a, b) => {
+        // 1. Prioridad absoluta: tiene actividad reciente vs no tiene
+        const hasA = !!a.lastActivityAt;
+        const hasB = !!b.lastActivityAt;
+
+        if (hasA && hasB) {
+          // Ambos tienen actividad -> el más reciente gana
+          const tA = new Date(a.lastActivityAt!).getTime();
+          const tB = new Date(b.lastActivityAt!).getTime();
+          if (!isNaN(tA) && !isNaN(tB) && tA !== tB) {
+            return tB - tA;
+          }
+        }
+
+        if (hasA && !hasB) return -1; // A tiene actividad, B no -> A va primero
+        if (!hasA && hasB) return 1; // B tiene actividad, A no -> B va primero
+
+        // --- Si llegamos acá, EMPATE en lastActivityAt (ambos null o mismo ts) ---
+
+        // 2. Fallback: fecha de fin (los más recientes arriba)
+        const fA = a.finishedAt ? new Date(a.finishedAt).getTime() : 0;
+        const fB = b.finishedAt ? new Date(b.finishedAt).getTime() : 0;
+        if (fA !== fB) return fB - fA;
+
+        // 3. Fallback: fecha de inicio (los más recientes arriba)
+        const sA = a.startedAt ? new Date(a.startedAt).getTime() : 0;
+        const sB = b.startedAt ? new Date(b.startedAt).getTime() : 0;
+        if (sA !== sB) return sB - sA;
+
+        // 4. Fallback: Violations desc
+        const vA = a.violationsCount || 0;
+        const vB = b.violationsCount || 0;
+        if (vA !== vB) return vB - vA;
+
+        return 0;
+      });
+    }
+    return list;
+  }, [attempts, sortMode]);
+
+  function toggleSort() {
+    setSortMode((prev) => (prev === "activity" ? "name-asc" : "activity"));
   }
 
   return (
@@ -152,9 +208,16 @@ export default function BoardPage({
                 textAlign: "left",
                 padding: 8,
                 borderBottom: "1px solid #ddd",
+                cursor: "pointer",
+                userSelect: "none",
               }}
+              onClick={toggleSort}
+              title="Click para cambiar criterio de orden"
             >
-              Alumno
+              Alumno{" "}
+              <span style={{ fontSize: 11, color: "#666", fontWeight: 400 }}>
+                {sortMode === "activity" ? "(Actividad ⚡)" : "(A-Z ▲)"}
+              </span>
             </th>
             <th
               style={{
@@ -199,7 +262,7 @@ export default function BoardPage({
                 borderBottom: "1px solid #ddd",
               }}
             >
-              Último evento
+              Fraude
             </th>
           </tr>
         </thead>
@@ -220,7 +283,7 @@ export default function BoardPage({
             </tr>
           )}
 
-          {attempts.map((a) => {
+          {sortedAttempts.map((a) => {
             const examLives = exam?.lives ?? 0;
             const livesRemaining =
               examLives > 0 ? Math.max(0, examLives - (a.livesUsed ?? 0)) : 0;
@@ -316,14 +379,26 @@ export default function BoardPage({
                     color: "#666",
                   }}
                 >
-                  {lastEvent ? (
-                    <>
-                      {lastEvent.type}
-                      {lastEvent.reason ? ` · ${lastEvent.reason}` : ""} ·{" "}
-                      {new Date(lastEvent.ts).toLocaleTimeString()}
-                    </>
+                  {a.violationsCount && a.violationsCount > 0 ? (
+                    <div
+                      title={
+                        a.violationTypes
+                          ?.map((v) => `${v.type} x${v.count}`)
+                          .join(", ") || ""
+                      }
+                      style={{ cursor: "help" }}
+                    >
+                      <span style={{ color: "#d32f2f", fontWeight: 500 }}>
+                        {a.violationsCount} violaciones
+                      </span>
+                      {a.lastViolationReason && (
+                        <span style={{ marginLeft: 6, color: "#888" }}>
+                          · {a.lastViolationReason}
+                        </span>
+                      )}
+                    </div>
                   ) : (
-                    "—"
+                    <span style={{ color: "#aaa" }}>Sin incidencias</span>
                   )}
                 </td>
               </tr>

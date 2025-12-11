@@ -134,6 +134,13 @@ export type AttemptSummary = {
   livesUsed: number;
   paused: boolean;
 
+  violationsCount?: number;
+  lastViolationReason?: string | null;
+  violationTypes?: { type: string; count: number }[];
+  startedAt?: string;
+  finishedAt?: string | null;
+  lastActivityAt?: string | null;
+
   events: EventSummary[];
   messages: MessageSummary[];
 };

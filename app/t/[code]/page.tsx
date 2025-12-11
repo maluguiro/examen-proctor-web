@@ -174,6 +174,8 @@ export default function TeacherExamPage() {
   // palabras distractoras de FILL_IN (texto, separadas por coma)
   const [fillDistractorsText, setFillDistractorsText] = React.useState("");
 
+  const [linkCopied, setLinkCopied] = React.useState(false);
+
   // ----------------- carga inicial -----------------
 
   const loadExamAndMeta = React.useCallback(async () => {
@@ -690,7 +692,8 @@ export default function TeacherExamPage() {
       const link = `${base}/s/${code}`;
       if (navigator.clipboard) {
         navigator.clipboard.writeText(link);
-        setInfo("Link del examen copiado al portapapeles.");
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2000);
       } else {
         window.prompt("Copiá el link:", link);
       }
@@ -1428,9 +1431,12 @@ export default function TeacherExamPage() {
                   background: "#f9fafb",
                   borderRadius: 8,
                   border: "1px solid #e5e7eb",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
                 }}
               >
-                <div style={{ marginBottom: 4 }}>Link para alumnos:</div>
+                <div style={{ marginBottom: 0 }}>Link para alumnos:</div>
                 <code
                   style={{
                     fontSize: 12,
@@ -1444,6 +1450,22 @@ export default function TeacherExamPage() {
                     ? `${window.location.origin}/s/${code}`
                     : `/s/${code}`}
                 </code>
+                <button
+                  onClick={copyStudentLink}
+                  style={{
+                    marginLeft: "auto",
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    border: "1px solid #d1d5db",
+                    background: linkCopied ? "#dcfce7" : "white",
+                    color: linkCopied ? "#166534" : "#374151",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {linkCopied ? "¡Copiado!" : "Copiar"}
+                </button>
               </div>
               {/* descarga de registro en PDF */}
               <div

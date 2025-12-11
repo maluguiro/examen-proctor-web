@@ -353,7 +353,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
   );
 
   React.useEffect(() => {
-    if (!attemptId) return;
+    if (!attemptId || step !== "exam") return;
 
     const onBlur = () => {
       reportViolation("blur");
@@ -399,7 +399,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
       document.removeEventListener("cut", onCut);
       document.removeEventListener("paste", onPaste);
     };
-  }, [attemptId, reportViolation]);
+  }, [attemptId, reportViolation, step]);
 
   // ============================ Manejadores de respuestas ====================
   const handleChangeAnswer = (qid: string, value: any) => {
