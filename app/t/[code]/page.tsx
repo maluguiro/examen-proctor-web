@@ -6,7 +6,11 @@ import { API } from "@/lib/api";
 import { ExamMeta } from "@/lib/types";
 import ExamChat from "@/components/ExamChat";
 import { BoardClient } from "./board/BoardClient";
-import { loadTeacherProfile, type TeacherProfile, type Institution } from "@/lib/teacherProfile";
+import {
+  loadTeacherProfile,
+  type TeacherProfile,
+  type Institution,
+} from "@/lib/teacherProfile";
 
 // ---------- tipos básicos ----------
 
@@ -22,10 +26,6 @@ type ExamResponse = {
     code: string;
   };
 };
-
-// Meta types removed (using ExamMeta from lib/types)
-
-
 
 // ---------- tipos preguntas ----------
 
@@ -129,8 +129,6 @@ export default function TeacherExamPage() {
   const [maxScore, setMaxScore] = React.useState<string | number>("");
   const [openAt, setOpenAt] = React.useState(""); // datetime-local
 
-
-
   // preguntas
   const [questions, setQuestions] = React.useState<QuestionLite[]>([]);
   const [loadingQuestions, setLoadingQuestions] = React.useState(false);
@@ -157,10 +155,14 @@ export default function TeacherExamPage() {
   const [fillDistractorsText, setFillDistractorsText] = React.useState("");
 
   const [linkCopied, setLinkCopied] = React.useState(false);
+  // TODO: reconstruir lógica real de casilleros FILL_IN.
+  // Por ahora evitamos que explote el render si no está implementado.
+  const fillAnswersPreview: string[] = [];
 
   // Perfil Docente (para selects)
   const [profile, setProfile] = React.useState<TeacherProfile | null>(null);
   const [selectedUniName, setSelectedUniName] = React.useState("");
+  const [manualSubjectMode, setManualSubjectMode] = React.useState(false);
 
   // ----------------- carga inicial -----------------
 
@@ -203,9 +205,7 @@ export default function TeacherExamPage() {
             : "auto"
         );
         setMaxScore(
-          typeof m.maxScore === "number" && !isNaN(m.maxScore)
-            ? m.maxScore
-            : ""
+          typeof m.maxScore === "number" && !isNaN(m.maxScore) ? m.maxScore : ""
         );
         if (m.openAt) {
           const d = new Date(m.openAt);
@@ -215,8 +215,6 @@ export default function TeacherExamPage() {
           }
         }
       }
-
-
 
       // QUESTIONS
       if (questionsRes.ok) {
@@ -243,13 +241,13 @@ export default function TeacherExamPage() {
   React.useEffect(() => {
     if (profile?.institutions && subject && !selectedUniName) {
       // Buscar si alguna universidad tiene esta materia
-      const found = profile.institutions.find(inst =>
-        inst.subjects.some(s => s.name === subject)
+      const found = profile.institutions.find((inst) =>
+        inst.subjects.some((s) => s.name === subject)
       );
       if (found) {
         setSelectedUniName(found.name);
       } else if (profile.institutions.length > 0) {
-        // Default a la primera si no la encontramos? No, mejor dejar que el usuario elija
+        // Default a la primera si no la encontramos? Dejar que usuario elija
       }
     }
   }, [profile, subject, selectedUniName]);
@@ -262,10 +260,6 @@ export default function TeacherExamPage() {
     { id: 3, label: "Preguntas" },
     { id: 4, label: "Tablero y chat" },
   ];
-
-
-
-
 
   const cardStyle: React.CSSProperties = {
     background: "white",
@@ -419,7 +413,6 @@ export default function TeacherExamPage() {
         body.answer = mcqCorrect;
       } else if (qKind === "TRUE_FALSE") {
         body.answer = Boolean(tfCorrect);
-        // choices fijos los arma el backend
       } else if (qKind === "SHORT_TEXT") {
         body.answer = shortAnswer.trim() || null;
       } else if (qKind === "FILL_IN") {
@@ -437,7 +430,7 @@ export default function TeacherExamPage() {
 
         const bank = [...answers, ...distractors];
 
-        body.stem = studentStem; // lo que verá el alumno ([[1]], [[2]]…)
+        body.stem = studentStem;
         body.answer = { answers, blanks: answers.length };
         body.choices = bank;
       }
@@ -520,12 +513,6 @@ export default function TeacherExamPage() {
     }
   }
 
-  const fillAnswersPreview =
-    qKind === "FILL_IN" ? extractFillAnswersFromStem(qStem) : [];
-
-  // ----------------- TABLERO: intentos + vidas -----------------
-
-
   function copyStudentLink() {
     try {
       const base = typeof window !== "undefined" ? window.location.origin : "";
@@ -565,35 +552,6 @@ export default function TeacherExamPage() {
         </p>
       </header>
 
-      {/* STEPPER */}
-      <nav
-        style={{
-          display: "flex",
-          gap: 8,
-          flexWrap: "wrap",
-        }}
-      >
-        {steps.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => setStep(s.id)}
-            disabled={loading}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 999,
-              border: step === s.id ? "1px solid #2563eb" : "1px solid #e5e7eb",
-              background: step === s.id ? "#2563eb" : "#f9fafb",
-              color: step === s.id ? "white" : "#111827",
-              fontSize: 12,
-              cursor: loading ? "default" : "pointer",
-            }}
-          >
-            {s.id}. {s.label}
-          </button>
-        ))}
-      </nav>
-
       {loading && (
         <div style={cardStyle}>
           <p>Cargando configuración…</p>
@@ -601,794 +559,960 @@ export default function TeacherExamPage() {
       )}
 
       {!loading && (
-        <>
-          {/* PASO 1: Docente y materia */}
-          {step === 1 && (
-            <section style={cardStyle}>
-              <h2 style={{ marginBottom: 8 }}>Paso 1 — Docente y materia</h2>
+        <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
+          {/* SIDEBAR NAVIGATION */}
+          <nav
+            style={{
+              width: 220,
+              flexShrink: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+            }}
+          >
+            {steps.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setStep(s.id)}
+                disabled={loading}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 8,
+                  textAlign: "left",
+                  border: "none",
+                  background: step === s.id ? "#dbeafe" : "transparent",
+                  color: step === s.id ? "#1e40af" : "#4b5563",
+                  fontSize: 14,
+                  fontWeight: step === s.id ? 600 : 500,
+                  cursor: loading ? "default" : "pointer",
+                  transition: "all 0.2s",
+                }}
+              >
+                <span style={{ marginRight: 8, opacity: 0.7 }}>{s.id}.</span>
+                {s.label}
+              </button>
+            ))}
+          </nav>
 
-              <div style={{ display: "grid", gap: 10 }}>
-                <div>
-                  <label style={{ fontSize: 13, display: "block" }}>
-                    Nombre del docente
-                  </label>
-                  <input
-                    value={teacherName}
-                    onChange={(e) => setTeacherName(e.target.value)}
-                    placeholder="Ej: Prof. Gómez"
-                    style={{
-                      padding: 8,
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 8,
-                      width: "100%",
-                    }}
-                  />
-                </div>
+          {/* CONTENT AREA */}
+          <div style={{ flex: 1 }}>
+            {/* PASO 1: Docente y materia */}
+            {step === 1 && (
+              <section style={cardStyle}>
+                <h2
+                  style={{
+                    marginBottom: 16,
+                    fontSize: 18,
+                    borderBottom: "1px solid #f3f4f6",
+                    paddingBottom: 12,
+                  }}
+                >
+                  Docente y materia
+                </h2>
 
-                <div>
-                  <label style={{ fontSize: 13, display: "block", marginBottom: 6, fontWeight: 500 }}>
-                    Materia y Universidad
-                  </label>
-
-                  {/* SELECT UNIVERSIDAD */}
-                  <div style={{ marginBottom: 12 }}>
-                    <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
-                      Universidad / Institución
+                <div style={{ display: "grid", gap: 16 }}>
+                  <div>
+                    <label
+                      style={{
+                        fontSize: 13,
+                        display: "block",
+                        marginBottom: 4,
+                      }}
+                    >
+                      Nombre del docente
                     </label>
-                    {!profile?.institutions || profile.institutions.length === 0 ? (
-                      <div style={{ padding: 10, background: "#fef2f2", color: "#b91c1c", borderRadius: 8, fontSize: 13 }}>
-                        No tenés universidades configuradas.
-                        <a href="/t/profile" style={{ textDecoration: "underline", marginLeft: 4, color: "#b91c1c", fontWeight: 600 }}>
-                          Configurar en Perfil
-                        </a>
-                      </div>
-                    ) : (
-                      <select
-                        value={selectedUniName}
-                        onChange={(e) => {
-                          setSelectedUniName(e.target.value);
-                          setSubject(""); // Reset subject when uni changes
-                        }}
+                    <input
+                      value={teacherName}
+                      onChange={(e) => setTeacherName(e.target.value)}
+                      placeholder="Ej: Prof. Gómez"
+                      style={{
+                        padding: "10px",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        width: "100%",
+                        fontSize: 14,
+                      }}
+                    />
+                  </div>
+
+                  {/* LOGIC FOR SUBJECT SELECTION */}
+                  <div>
+                    <label
+                      style={{
+                        fontSize: 13,
+                        display: "block",
+                        marginBottom: 6,
+                        fontWeight: 500,
+                      }}
+                    >
+                      Asignatura
+                    </label>
+
+                    {/* MODE 1: SELECTS (If institutions exist AND not manual mode) */}
+                    {profile?.institutions &&
+                    profile.institutions.length > 0 &&
+                    !manualSubjectMode ? (
+                      <div
                         style={{
-                          width: "100%",
-                          padding: "10px",
-                          borderRadius: 8,
-                          border: "1px solid #d1d5db",
-                          background: "white",
-                          fontSize: 14,
+                          background: "#f9fafb",
+                          padding: 16,
+                          borderRadius: 12,
                         }}
                       >
-                        <option value="">-- Seleccioná Universidad --</option>
-                        {profile.institutions.map(inst => (
-                          <option key={inst.id} value={inst.name}>{inst.name}</option>
-                        ))}
-                      </select>
+                        {/* Uni Select */}
+                        <div style={{ marginBottom: 12 }}>
+                          <label
+                            style={{
+                              fontSize: 12,
+                              color: "#6b7280",
+                              display: "block",
+                              marginBottom: 4,
+                            }}
+                          >
+                            Universidad / Institución
+                          </label>
+                          <select
+                            value={selectedUniName}
+                            onChange={(e) => {
+                              setSelectedUniName(e.target.value);
+                              setSubject("");
+                            }}
+                            style={{
+                              width: "100%",
+                              padding: "10px",
+                              borderRadius: 8,
+                              border: "1px solid #d1d5db",
+                              fontSize: 14,
+                            }}
+                          >
+                            <option value="">-- Seleccionar --</option>
+                            {profile.institutions.map((inst) => (
+                              <option key={inst.id} value={inst.name}>
+                                {inst.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Subject Select */}
+                        <div>
+                          <label
+                            style={{
+                              fontSize: 12,
+                              color: "#6b7280",
+                              display: "block",
+                              marginBottom: 4,
+                            }}
+                          >
+                            Materia
+                          </label>
+                          <select
+                            value={subject}
+                            onChange={(e) => setSubject(e.target.value)}
+                            disabled={!selectedUniName}
+                            style={{
+                              width: "100%",
+                              padding: "10px",
+                              borderRadius: 8,
+                              border: "1px solid #d1d5db",
+                              fontSize: 14,
+                              opacity: selectedUniName ? 1 : 0.6,
+                            }}
+                          >
+                            <option value="">-- Seleccionar materia --</option>
+                            {profile.institutions
+                              .find((i) => i.name === selectedUniName)
+                              ?.subjects.map((s) => (
+                                <option key={s.id} value={s.name}>
+                                  {s.name}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+
+                        <button
+                          onClick={() => setManualSubjectMode(true)}
+                          style={{
+                            marginTop: 12,
+                            background: "none",
+                            border: "none",
+                            color: "#6b7280",
+                            fontSize: 12,
+                            textDecoration: "underline",
+                            cursor: "pointer",
+                            padding: 0,
+                          }}
+                        >
+                          ¿No encuentras tu materia? Escribir manualmente
+                        </button>
+                      </div>
+                    ) : (
+                      /* MODE 2: MANUAL INPUT */
+                      <div
+                        style={{
+                          background: "#f9fafb",
+                          padding: 16,
+                          borderRadius: 12,
+                        }}
+                      >
+                        <input
+                          value={subject}
+                          onChange={(e) => setSubject(e.target.value)}
+                          placeholder="Ej: Matemática I"
+                          style={{
+                            width: "100%",
+                            padding: "10px",
+                            border: "1px solid #d1d5db",
+                            borderRadius: 8,
+                            fontSize: 14,
+                          }}
+                        />
+                        {profile?.institutions &&
+                          profile.institutions.length > 0 && (
+                            <button
+                              onClick={() => setManualSubjectMode(false)}
+                              style={{
+                                marginTop: 8,
+                                background: "none",
+                                border: "none",
+                                color: "#2563eb",
+                                fontSize: 12,
+                                cursor: "pointer",
+                                padding: 0,
+                              }}
+                            >
+                              ← Volver a seleccionar de mis listas
+                            </button>
+                          )}
+                      </div>
                     )}
                   </div>
 
-                  {/* SELECT MATERIA */}
-                  {selectedUniName && profile?.institutions && (
-                    <div style={{ opacity: selectedUniName ? 1 : 0.5 }}>
-                      <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
-                        Materia
+                  <div>
+                    <label style={{ fontSize: 13, display: "block" }}>
+                      Modo de corrección
+                    </label>
+                    <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+                      <label style={{ fontSize: 13 }}>
+                        <input
+                          type="radio"
+                          checked={gradingMode === "auto"}
+                          onChange={() => setGradingMode("auto")}
+                        />{" "}
+                        Instantánea (automática)
                       </label>
-                      <select
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        style={{
-                          width: "100%",
-                          padding: "10px",
-                          borderRadius: 8,
-                          border: "1px solid #d1d5db",
-                          background: "white",
-                          fontSize: 14,
-                        }}
-                      >
-                        <option value="">-- Seleccioná Materia --</option>
-                        {profile.institutions
-                          .find(i => i.name === selectedUniName)
-                          ?.subjects.map(s => (
-                            <option key={s.id} value={s.name}>{s.name}</option>
-                          ))
-                        }
-                      </select>
+                      <label style={{ fontSize: 13 }}>
+                        <input
+                          type="radio"
+                          checked={gradingMode === "manual"}
+                          onChange={() => setGradingMode("manual")}
+                        />{" "}
+                        Manual
+                      </label>
                     </div>
-                  )}
-
-                  {/* Fallback/Manual Subject display or hidden input if needed to debug */}
-                  {/* We keep syncing 'subject' state, so saveMeta will pick it up */}
-                </div>
-
-                <div>
-                  <label style={{ fontSize: 13, display: "block" }}>
-                    Modo de corrección
-                  </label>
-                  <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
-                    <label style={{ fontSize: 13 }}>
-                      <input
-                        type="radio"
-                        checked={gradingMode === "auto"}
-                        onChange={() => setGradingMode("auto")}
-                      />{" "}
-                      Instantánea (automática)
-                    </label>
-                    <label style={{ fontSize: 13 }}>
-                      <input
-                        type="radio"
-                        checked={gradingMode === "manual"}
-                        onChange={() => setGradingMode("manual")}
-                      />{" "}
-                      Manual
-                    </label>
                   </div>
-                </div>
 
-                <div>
-                  <label style={{ fontSize: 13, display: "block" }}>
-                    Nota máxima del examen
-                  </label>
-                  <input
-                    type="number"
-                    value={maxScore}
-                    onChange={(e) =>
-                      setMaxScore(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
-                    }
-                    placeholder="Ej: 10"
-                    style={{
-                      padding: 8,
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 8,
-                      width: "100%",
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: 13, display: "block" }}>
-                    Hora programada para la revisión (opcional)
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={openAt}
-                    onChange={(e) => setOpenAt(e.target.value)}
-                    style={{
-                      padding: 8,
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 8,
-                      width: "100%",
-                    }}
-                  />
-                  <p
-                    style={{
-                      fontSize: 11,
-                      opacity: 0.7,
-                      marginTop: 4,
-                    }}
-                  >
-                    Define desde cuándo los alumnos pueden ver la revisión. Si
-                    está vacío, se habilita al terminar el examen.
-                  </p>
-                </div>
-
-                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                  <button
-                    onClick={() => onSaveMeta(false)}
-                    disabled={savingMeta}
-                    style={{
-                      padding: "8px 12px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: savingMeta ? "#9ca3af" : "#2563eb",
-                      color: "white",
-                      cursor: savingMeta ? "default" : "pointer",
-                      fontSize: 14,
-                    }}
-                  >
-                    {savingMeta ? "Guardando…" : "Guardar"}
-                  </button>
-                  <button
-                    onClick={() => onSaveMeta(true)}
-                    disabled={savingMeta}
-                    style={{
-                      padding: "8px 12px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: savingMeta ? "#9ca3af" : "#16a34a",
-                      color: "white",
-                      cursor: savingMeta ? "default" : "pointer",
-                      fontSize: 14,
-                    }}
-                  >
-                    {savingMeta ? "Guardando…" : "Guardar y continuar →"}
-                  </button>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* PASO 2: Configuración básica */}
-          {step === 2 && (
-            <section style={cardStyle}>
-              <h2 style={{ marginBottom: 8 }}>Paso 2 — Configuración básica</h2>
-
-              <div style={{ display: "grid", gap: 10 }}>
-                <div>
-                  <label style={{ fontSize: 13, display: "block" }}>
-                    Título del examen
-                  </label>
-                  <input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Ej: Parcial 1 - Unidad 1"
-                    style={{
-                      padding: 8,
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 8,
-                      width: "100%",
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: 13, display: "block" }}>
-                    Estado
-                  </label>
-                  <p style={{ marginTop: 4, fontSize: 14 }}>
-                    <b>{isOpen ? "Abierto" : "Cerrado"}</b> · Se abrirá al
-                    guardar la configuración.
-                  </p>
-                </div>
-
-                <div>
-                  <label style={{ fontSize: 13, display: "block" }}>
-                    Duración del examen (minutos)
-                  </label>
-                  <input
-                    type="number"
-                    value={durationMinutes}
-                    onChange={(e) =>
-                      setDurationMinutes(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
-                    }
-                    placeholder="Ej: 60"
-                    style={{
-                      padding: 8,
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 8,
-                      width: "100%",
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: 13, display: "block" }}>
-                    Vidas del examen (0, 1, 3, 6…)
-                  </label>
-                  <input
-                    type="number"
-                    value={lives}
-                    onChange={(e) =>
-                      setLives(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
-                    }
-                    placeholder="Ej: 3"
-                    style={{
-                      padding: 8,
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 8,
-                      width: "100%",
-                    }}
-                  />
-                  <p
-                    style={{
-                      fontSize: 11,
-                      opacity: 0.7,
-                      marginTop: 4,
-                    }}
-                  >
-                    Cada vez que se detecta fraude, se pierde 1 vida. Al llegar
-                    a 0, el examen se cierra para ese alumno.
-                  </p>
-                </div>
-
-                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                  <button
-                    onClick={() => saveAndOpenExam(false)}
-                    disabled={savingExam}
-                    style={{
-                      padding: "8px 12px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: savingExam ? "#9ca3af" : "#2563eb",
-                      color: "white",
-                      cursor: savingExam ? "default" : "pointer",
-                      fontSize: 14,
-                    }}
-                  >
-                    {savingExam ? "Guardando…" : "Guardar configuración"}
-                  </button>
-                  <button
-                    onClick={() => saveAndOpenExam(true)}
-                    disabled={savingExam}
-                    style={{
-                      padding: "8px 12px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: savingExam ? "#9ca3af" : "#16a34a",
-                      color: "white",
-                      cursor: savingExam ? "default" : "pointer",
-                      fontSize: 14,
-                    }}
-                  >
-                    {savingExam
-                      ? "Guardando…"
-                      : "Guardar y continuar a preguntas →"}
-                  </button>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* PASO 3: Preguntas */}
-          {step === 3 && (
-            <section style={cardStyle}>
-              <h2 style={{ marginBottom: 8 }}>Paso 3 — Preguntas</h2>
-              <p style={{ fontSize: 13, color: "#555" }}>
-                Armá las consignas y sus opciones. Para los casilleros, escribí
-                las respuestas correctas entre corchetes y las palabras
-                distractoras separadas por comas.
-              </p>
-
-              <div style={{ display: "grid", gap: 12, marginBottom: 16 }}>
-                {/* Tipo */}
-                <div>
-                  <label>Tipo de pregunta:</label>
-                  <select
-                    value={qKind}
-                    onChange={(e) => setQKind(e.target.value as QuestionKind)}
-                    style={{ marginLeft: 8, padding: 4 }}
-                  >
-                    <option value="MCQ">Opción múltiple</option>
-                    <option value="TRUE_FALSE">Verdadero / Falso</option>
-                    <option value="SHORT_TEXT">Texto breve</option>
-                    <option value="FILL_IN">Relleno de casilleros</option>
-                  </select>
-                  {editingQuestionId && (
-                    <span
+                  <div>
+                    <label style={{ fontSize: 13, display: "block" }}>
+                      Nota máxima del examen
+                    </label>
+                    <input
+                      type="number"
+                      value={maxScore}
+                      onChange={(e) =>
+                        setMaxScore(
+                          e.target.value === "" ? "" : Number(e.target.value)
+                        )
+                      }
+                      placeholder="Ej: 10"
                       style={{
-                        marginLeft: 8,
-                        fontSize: 12,
-                        color: "#2563eb",
+                        padding: "10px",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        width: "100%",
+                        fontSize: 14,
                       }}
-                    >
-                      Editando pregunta existente
-                    </span>
-                  )}
-                </div>
+                    />
+                  </div>
 
-                {/* Enunciado */}
-                <div>
-                  <label>Enunciado / consigna</label>
-                  <textarea
-                    value={qStem}
-                    onChange={(e) => setQStem(e.target.value)}
-                    rows={3}
-                    placeholder={
-                      qKind === "FILL_IN"
-                        ? "Ej: El perro es un [animal] doméstico y muy [fiel]."
-                        : "Escribí la consigna de la pregunta…"
-                    }
-                    style={{ width: "100%", marginTop: 4 }}
-                  />
-                  {qKind === "FILL_IN" && (
-                    <div
+                  <div>
+                    <label style={{ fontSize: 13, display: "block" }}>
+                      Hora programada para la revisión (opcional)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={openAt}
+                      onChange={(e) => setOpenAt(e.target.value)}
                       style={{
-                        fontSize: 12,
-                        opacity: 0.8,
+                        padding: "10px",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        width: "100%",
+                        fontSize: 14,
+                      }}
+                    />
+                    <p
+                      style={{
+                        fontSize: 11,
+                        opacity: 0.7,
                         marginTop: 4,
                       }}
                     >
-                      Escribí el texto completo con las respuestas correctas
-                      entre corchetes. Ejemplo:{" "}
-                      <code>
-                        El perro es un [animal] doméstico que suele ser muy
-                        [fiel].
-                      </code>
-                      <br />
-                      Detectamos <b>{fillAnswersPreview.length}</b>{" "}
-                      casillero(s):{" "}
-                      {fillAnswersPreview.length > 0 &&
-                        fillAnswersPreview.join(" · ")}
-                    </div>
-                  )}
-                </div>
+                      Define desde cuándo los alumnos pueden ver la revisión. Si
+                      está vacío, se habilita al terminar el examen.
+                    </p>
+                  </div>
 
-                {/* Campos por tipo */}
-                {qKind === "MCQ" && (
-                  <div style={{ display: "grid", gap: 10 }}>
-                    <div
+                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    <button
+                      onClick={() => onSaveMeta(false)}
+                      disabled={savingMeta}
                       style={{
-                        display: "flex",
-                        gap: 8,
-                        alignItems: "center",
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: savingMeta ? "#9ca3af" : "#2563eb",
+                        color: "white",
+                        cursor: savingMeta ? "default" : "pointer",
+                        fontSize: 14,
                       }}
                     >
-                      <b>Opciones</b>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setMcqChoices((prev) => [
-                            ...prev,
-                            `Opción ${prev.length + 1}`,
-                          ])
-                        }
+                      {savingMeta ? "Guardando…" : "Guardar"}
+                    </button>
+                    <button
+                      onClick={() => onSaveMeta(true)}
+                      disabled={savingMeta}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: savingMeta ? "#9ca3af" : "#16a34a",
+                        color: "white",
+                        cursor: savingMeta ? "default" : "pointer",
+                        fontSize: 14,
+                      }}
+                    >
+                      {savingMeta ? "Guardando…" : "Guardar y continuar →"}
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* PASO 2: Configuración básica */}
+            {step === 2 && (
+              <section style={cardStyle}>
+                <h2 style={{ marginBottom: 16, fontSize: 18 }}>
+                  Configuración básica
+                </h2>
+
+                <div style={{ display: "grid", gap: 16 }}>
+                  <div>
+                    <label style={{ fontSize: 13, display: "block" }}>
+                      Título del examen
+                    </label>
+                    <input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Ej: Parcial 1 - Unidad 1"
+                      style={{
+                        padding: "10px",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        width: "100%",
+                        fontSize: 14,
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 13, display: "block" }}>
+                      Estado
+                    </label>
+                    <p style={{ marginTop: 4, fontSize: 14 }}>
+                      <b>{isOpen ? "Abierto" : "Cerrado"}</b> · Se abrirá al
+                      guardar la configuración.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 13, display: "block" }}>
+                      Duración del examen (minutos)
+                    </label>
+                    <input
+                      type="number"
+                      value={durationMinutes}
+                      onChange={(e) =>
+                        setDurationMinutes(
+                          e.target.value === "" ? "" : Number(e.target.value)
+                        )
+                      }
+                      placeholder="Ej: 60"
+                      style={{
+                        padding: "10px",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        width: "100%",
+                        fontSize: 14,
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 13, display: "block" }}>
+                      Vidas del examen (0, 1, 3, 6…)
+                    </label>
+                    <input
+                      type="number"
+                      value={lives}
+                      onChange={(e) =>
+                        setLives(
+                          e.target.value === "" ? "" : Number(e.target.value)
+                        )
+                      }
+                      placeholder="Ej: 3"
+                      style={{
+                        padding: "10px",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        width: "100%",
+                        fontSize: 14,
+                      }}
+                    />
+                    <p
+                      style={{
+                        fontSize: 11,
+                        opacity: 0.7,
+                        marginTop: 4,
+                      }}
+                    >
+                      Cada vez que se detecta fraude, se pierde 1 vida. Al
+                      llegar a 0, el examen se cierra para ese alumno.
+                    </p>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    <button
+                      onClick={() => saveAndOpenExam(false)}
+                      disabled={savingExam}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: savingExam ? "#9ca3af" : "#2563eb",
+                        color: "white",
+                        cursor: savingExam ? "default" : "pointer",
+                        fontSize: 14,
+                      }}
+                    >
+                      {savingExam ? "Guardando…" : "Guardar configuración"}
+                    </button>
+                    <button
+                      onClick={() => saveAndOpenExam(true)}
+                      disabled={savingExam}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: savingExam ? "#9ca3af" : "#16a34a",
+                        color: "white",
+                        cursor: savingExam ? "default" : "pointer",
+                        fontSize: 14,
+                      }}
+                    >
+                      {savingExam
+                        ? "Guardando…"
+                        : "Guardar y continuar a preguntas →"}
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* PASO 3: Preguntas */}
+            {step === 3 && (
+              <section style={cardStyle}>
+                <h2 style={{ marginBottom: 8, fontSize: 18 }}>Preguntas</h2>
+                <p style={{ fontSize: 13, color: "#555" }}>
+                  Armá las consignas y sus opciones. Para los casilleros,
+                  escribí las respuestas correctas entre corchetes y las
+                  palabras distractoras separadas por comas.
+                </p>
+
+                <div style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+                  {/* Tipo */}
+                  <div>
+                    <label>Tipo de pregunta:</label>
+                    <select
+                      value={qKind}
+                      onChange={(e) => setQKind(e.target.value as QuestionKind)}
+                      style={{ marginLeft: 8, padding: 4 }}
+                    >
+                      <option value="MCQ">Opción múltiple</option>
+                      <option value="TRUE_FALSE">Verdadero / Falso</option>
+                      <option value="SHORT_TEXT">Texto breve</option>
+                      <option value="FILL_IN">Relleno de casilleros</option>
+                    </select>
+                    {editingQuestionId && (
+                      <span
+                        style={{
+                          marginLeft: 8,
+                          fontSize: 12,
+                          color: "#2563eb",
+                        }}
                       >
-                        + Agregar opción
-                      </button>
-                    </div>
-                    {mcqChoices.map((c, idx) => (
+                        Editando pregunta existente
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Enunciado */}
+                  <div>
+                    <label>Enunciado / consigna</label>
+                    <textarea
+                      value={qStem}
+                      onChange={(e) => setQStem(e.target.value)}
+                      rows={3}
+                      placeholder={
+                        qKind === "FILL_IN"
+                          ? "Ej: El perro es un [animal] doméstico y muy [fiel]."
+                          : "Escribí la consigna de la pregunta…"
+                      }
+                      style={{ width: "100%", marginTop: 4, padding: 8 }}
+                    />
+                    {qKind === "FILL_IN" && (
                       <div
-                        key={idx}
+                        style={{
+                          fontSize: 12,
+                          opacity: 0.8,
+                          marginTop: 4,
+                        }}
+                      >
+                        Escribí el texto completo con las respuestas correctas
+                        entre corchetes. Ejemplo:{" "}
+                        <code>
+                          El perro es un [animal] doméstico que suele ser muy
+                          [fiel].
+                        </code>
+                        <br />
+                        Detectamos <b>{fillAnswersPreview.length}</b>{" "}
+                        casillero(s):{" "}
+                        {fillAnswersPreview.length > 0 &&
+                          fillAnswersPreview.join(" · ")}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Campos por tipo */}
+                  {qKind === "MCQ" && (
+                    <div style={{ display: "grid", gap: 10 }}>
+                      <div
                         style={{
                           display: "flex",
                           gap: 8,
                           alignItems: "center",
                         }}
                       >
-                        <input
-                          type="radio"
-                          name="mcqCorrect"
-                          checked={mcqCorrect === idx}
-                          onChange={() => setMcqCorrect(idx)}
-                          title="Correcta"
-                        />
-                        <input
-                          value={c}
-                          onChange={(e) =>
-                            setMcqChoices((prev) =>
-                              prev.map((cc, i) =>
-                                i === idx ? e.target.value : cc
-                              )
-                            )
-                          }
-                          style={{ flex: 1 }}
-                        />
+                        <b>Opciones</b>
                         <button
                           type="button"
                           onClick={() =>
-                            setMcqChoices((prev) =>
-                              prev.filter((_, i) => i !== idx)
-                            )
+                            setMcqChoices((prev) => [
+                              ...prev,
+                              `Opción ${prev.length + 1}`,
+                            ])
                           }
-                          disabled={mcqChoices.length <= 2}
                         >
-                          🗑
+                          + Agregar opción
                         </button>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      {mcqChoices.map((c, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            display: "flex",
+                            gap: 8,
+                            alignItems: "center",
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="mcqCorrect"
+                            checked={mcqCorrect === idx}
+                            onChange={() => setMcqCorrect(idx)}
+                            title="Correcta"
+                          />
+                          <input
+                            value={c}
+                            onChange={(e) =>
+                              setMcqChoices((prev) =>
+                                prev.map((cc, i) =>
+                                  i === idx ? e.target.value : cc
+                                )
+                              )
+                            }
+                            style={{ flex: 1, padding: 4 }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setMcqChoices((prev) =>
+                                prev.filter((_, i) => i !== idx)
+                              )
+                            }
+                            disabled={mcqChoices.length <= 2}
+                          >
+                            🗑
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
-                {qKind === "TRUE_FALSE" && (
+                  {qKind === "TRUE_FALSE" && (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 12,
+                        alignItems: "center",
+                      }}
+                    >
+                      <label>Respuesta correcta:</label>
+                      <label>
+                        <input
+                          type="radio"
+                          name="tf"
+                          checked={tfCorrect === true}
+                          onChange={() => setTfCorrect(true)}
+                        />{" "}
+                        Verdadero
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          name="tf"
+                          checked={tfCorrect === false}
+                          onChange={() => setTfCorrect(false)}
+                        />{" "}
+                        Falso
+                      </label>
+                    </div>
+                  )}
+
+                  {qKind === "SHORT_TEXT" && (
+                    <div style={{ display: "grid", gap: 6 }}>
+                      <label>Respuesta de referencia (opcional)</label>
+                      <input
+                        value={shortAnswer}
+                        onChange={(e) => setShortAnswer(e.target.value)}
+                        placeholder="Respuesta esperada (opcional)"
+                        style={{ padding: 4 }}
+                      />
+                    </div>
+                  )}
+
+                  {qKind === "FILL_IN" && (
+                    <div style={{ display: "grid", gap: 6 }}>
+                      <label>Palabras distractoras</label>
+                      <input
+                        value={fillDistractorsText}
+                        onChange={(e) => setFillDistractorsText(e.target.value)}
+                        placeholder="insecto, peludo, rudo"
+                        style={{ padding: 4 }}
+                      />
+                      <div
+                        style={{
+                          fontSize: 12,
+                          opacity: 0.8,
+                        }}
+                      >
+                        Estas palabras se mezclarán con las respuestas correctas
+                        en el banco que ve el alumno. Separalas con <b>comas</b>
+                        .
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Puntos + botones */}
                   <div
                     style={{
                       display: "flex",
                       gap: 12,
                       alignItems: "center",
+                      marginTop: 4,
                     }}
                   >
-                    <label>Respuesta correcta:</label>
-                    <label>
-                      <input
-                        type="radio"
-                        name="tf"
-                        checked={tfCorrect === true}
-                        onChange={() => setTfCorrect(true)}
-                      />{" "}
-                      Verdadero
-                    </label>
-                    <label>
-                      <input
-                        type="radio"
-                        name="tf"
-                        checked={tfCorrect === false}
-                        onChange={() => setTfCorrect(false)}
-                      />{" "}
-                      Falso
-                    </label>
-                  </div>
-                )}
-
-                {qKind === "SHORT_TEXT" && (
-                  <div style={{ display: "grid", gap: 6 }}>
-                    <label>Respuesta de referencia (opcional)</label>
+                    <label>Puntos</label>
                     <input
-                      value={shortAnswer}
-                      onChange={(e) => setShortAnswer(e.target.value)}
-                      placeholder="Respuesta esperada (opcional)"
-                    />
-                  </div>
-                )}
-
-                {qKind === "FILL_IN" && (
-                  <div style={{ display: "grid", gap: 6 }}>
-                    <label>Palabras distractoras</label>
-                    <input
-                      value={fillDistractorsText}
-                      onChange={(e) => setFillDistractorsText(e.target.value)}
-                      placeholder="insecto, peludo, rudo"
+                      type="number"
+                      value={qPoints}
+                      onChange={(e) =>
+                        setQPoints(parseInt(e.target.value, 10) || 1)
+                      }
+                      style={{ width: 120, padding: 4 }}
                     />
                     <div
-                      style={{
-                        fontSize: 12,
-                        opacity: 0.8,
-                      }}
+                      style={{ marginLeft: "auto", display: "flex", gap: 8 }}
                     >
-                      Estas palabras se mezclarán con las respuestas correctas
-                      en el banco que ve el alumno. Separalas con <b>comas</b>.
-                    </div>
-                  </div>
-                )}
-
-                {/* Puntos + botones */}
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 12,
-                    alignItems: "center",
-                    marginTop: 4,
-                  }}
-                >
-                  <label>Puntos</label>
-                  <input
-                    type="number"
-                    value={qPoints}
-                    onChange={(e) =>
-                      setQPoints(parseInt(e.target.value, 10) || 1)
-                    }
-                    style={{ width: 120 }}
-                  />
-                  <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-                    {editingQuestionId && (
+                      {editingQuestionId && (
+                        <button
+                          type="button"
+                          onClick={resetQuestionForm}
+                          disabled={savingQuestion}
+                        >
+                          Cancelar edición
+                        </button>
+                      )}
                       <button
-                        type="button"
-                        onClick={resetQuestionForm}
-                        disabled={savingQuestion}
+                        disabled={savingQuestion || !qStem.trim()}
+                        onClick={saveQuestion}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          background: "#2563eb",
+                          color: "white",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
                       >
-                        Cancelar edición
-                      </button>
-                    )}
-                    <button
-                      disabled={savingQuestion || !qStem.trim()}
-                      onClick={saveQuestion}
-                    >
-                      {savingQuestion
-                        ? "Guardando..."
-                        : editingQuestionId
+                        {savingQuestion
+                          ? "Guardando..."
+                          : editingQuestionId
                           ? "Guardar cambios"
                           : "Guardar pregunta"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {questionErr && (
+                    <div
+                      style={{
+                        background: "#fee",
+                        border: "1px solid #fcc",
+                        borderRadius: 8,
+                        padding: 8,
+                        whiteSpace: "pre-wrap",
+                        marginTop: 8,
+                        fontSize: 12,
+                      }}
+                    >
+                      Error: {questionErr}
+                    </div>
+                  )}
+                </div>
+
+                {/* LISTA DE PREGUNTAS */}
+                <div
+                  style={{
+                    borderTop: "1px solid #e5e7eb",
+                    marginTop: 12,
+                    paddingTop: 12,
+                  }}
+                >
+                  <h3 style={{ marginTop: 0 }}>
+                    Preguntas creadas ({questions.length})
+                  </h3>
+                  {loadingQuestions && <p>Cargando preguntas…</p>}
+                  {!loadingQuestions && !questions.length && (
+                    <p style={{ fontSize: 13, opacity: 0.7 }}>
+                      No hay preguntas todavía.
+                    </p>
+                  )}
+                  <ol>
+                    {questions.map((q, idx) => (
+                      <li key={q.id} style={{ marginBottom: 12 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 8,
+                            alignItems: "baseline",
+                          }}
+                        >
+                          <b
+                            style={{
+                              fontSize: 12,
+                              background: "#eef",
+                              padding: "2px 6px",
+                              borderRadius: 6,
+                            }}
+                          >
+                            {q.kind}
+                          </b>
+                          <span style={{ fontWeight: 600 }}>{idx + 1}.</span>
+                          <span>{q.stem}</span>
+                          {typeof q.points === "number" && (
+                            <span
+                              style={{
+                                marginLeft: "auto",
+                                fontSize: 12,
+                                opacity: 0.7,
+                              }}
+                            >
+                              Puntos: {q.points}
+                            </span>
+                          )}
+                        </div>
+                        {Array.isArray(q.choices) && q.choices.length > 0 && (
+                          <ul style={{ marginTop: 6 }}>
+                            {q.choices.map((c, i) => (
+                              <li key={i}>{c}</li>
+                            ))}
+                          </ul>
+                        )}
+                        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                          <button
+                            type="button"
+                            onClick={() => startEditQuestion(q)}
+                            style={{ fontSize: 12, cursor: "pointer" }}
+                          >
+                            ✏️ Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteQuestion(q.id)}
+                            style={{
+                              fontSize: 12,
+                              color: "#b91c1c",
+                              cursor: "pointer",
+                            }}
+                          >
+                            🗑 Eliminar
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+
+                  <div style={{ marginTop: 12 }}>
+                    <button
+                      type="button"
+                      onClick={() => setStep(4)}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        background: "#16a34a",
+                        color: "white",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Continuar al tablero →{" "}
                     </button>
                   </div>
                 </div>
+              </section>
+            )}
 
-                {questionErr && (
-                  <div
-                    style={{
-                      background: "#fee",
-                      border: "1px solid #fcc",
-                      borderRadius: 8,
-                      padding: 8,
-                      whiteSpace: "pre-wrap",
-                      marginTop: 8,
-                      fontSize: 12,
-                    }}
-                  >
-                    Error: {questionErr}
-                  </div>
-                )}
-              </div>
-
-              {/* LISTA DE PREGUNTAS */}
-              <div
-                style={{
-                  borderTop: "1px solid #e5e7eb",
-                  marginTop: 12,
-                  paddingTop: 12,
-                }}
-              >
-                <h3 style={{ marginTop: 0 }}>
-                  Preguntas creadas ({questions.length})
-                </h3>
-                {loadingQuestions && <p>Cargando preguntas…</p>}
-                {!loadingQuestions && !questions.length && (
-                  <p style={{ fontSize: 13, opacity: 0.7 }}>
-                    No hay preguntas todavía.
-                  </p>
-                )}
-                <ol>
-                  {questions.map((q, idx) => (
-                    <li key={q.id} style={{ marginBottom: 12 }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 8,
-                          alignItems: "baseline",
-                        }}
-                      >
-                        <b
-                          style={{
-                            fontSize: 12,
-                            background: "#eef",
-                            padding: "2px 6px",
-                            borderRadius: 6,
-                          }}
-                        >
-                          {q.kind}
-                        </b>
-                        <span style={{ fontWeight: 600 }}>{idx + 1}.</span>
-                        <span>{q.stem}</span>
-                        {typeof q.points === "number" && (
-                          <span
-                            style={{
-                              marginLeft: "auto",
-                              fontSize: 12,
-                              opacity: 0.7,
-                            }}
-                          >
-                            Puntos: {q.points}
-                          </span>
-                        )}
-                      </div>
-                      {Array.isArray(q.choices) && q.choices.length > 0 && (
-                        <ul style={{ marginTop: 6 }}>
-                          {q.choices.map((c, i) => (
-                            <li key={i}>{c}</li>
-                          ))}
-                        </ul>
-                      )}
-                      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                        <button
-                          type="button"
-                          onClick={() => startEditQuestion(q)}
-                          style={{ fontSize: 12 }}
-                        >
-                          ✏️ Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteQuestion(q.id)}
-                          style={{ fontSize: 12, color: "#b91c1c" }}
-                        >
-                          🗑 Eliminar
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-
-                <div style={{ marginTop: 12 }}>
-                  <button type="button" onClick={() => setStep(4)}>
-                    Continuar al tablero →{" "}
-                  </button>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {step === 4 && (
-            <section style={cardStyle}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginBottom: 8,
-                }}
-              >
-                <h2 style={{ margin: 0 }}>Paso 4 — Tablero y chat</h2>
-              </div>
-
-
-              {/* link para alumnos */}
-              <div
-                style={{
-                  fontSize: 13,
-                  marginBottom: 10,
-                  padding: 8,
-                  background: "#f9fafb",
-                  borderRadius: 8,
-                  border: "1px solid #e5e7eb",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <div style={{ marginBottom: 0 }}>Link para alumnos:</div>
-                <code
-                  style={{
-                    fontSize: 12,
-                    padding: "4px 6px",
-                    background: "white",
-                    borderRadius: 6,
-                    border: "1px solid #e5e7eb",
-                  }}
-                >
-                  {typeof window !== "undefined"
-                    ? `${window.location.origin}/s/${code}`
-                    : `/s/${code}`}
-                </code>
-                <button
-                  onClick={copyStudentLink}
-                  style={{
-                    marginLeft: "auto",
-                    padding: "4px 10px",
-                    borderRadius: 6,
-                    border: "1px solid #d1d5db",
-                    background: linkCopied ? "#dcfce7" : "white",
-                    color: linkCopied ? "#166534" : "#374151",
-                    fontSize: 12,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                >
-                  {linkCopied ? "¡Copiado!" : "Copiar"}
-                </button>
-              </div>
-              {/* descarga de registro en PDF */}
-              <div
-                style={{
-                  fontSize: 13,
-                  marginBottom: 12,
-                }}
-              >
-                <a
-                  href={`${API}/exams/${code}/activity.pdf`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <button
-                    type="button"
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: 8,
-                      border: "1px solid #e5e7eb",
-                      background: "#eef2ff",
-                      cursor: "pointer",
-                      fontSize: 13,
-                    }}
-                  >
-                    ⬇️ Descargar registro del examen (PDF)
-                  </button>
-                </a>
+            {step === 4 && (
+              <section style={cardStyle}>
                 <div
                   style={{
-                    fontSize: 11,
-                    opacity: 0.6,
-                    marginTop: 4,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 8,
                   }}
                 >
-                  Incluye intentos, antifraude y chat (según lo que definamos en
-                  el backend).
+                  <h2 style={{ margin: 0, fontSize: 18 }}>Tablero y chat</h2>
                 </div>
-              </div>
 
+                {/* link para alumnos */}
+                <div
+                  style={{
+                    fontSize: 13,
+                    marginBottom: 10,
+                    padding: 8,
+                    background: "#f9fafb",
+                    borderRadius: 8,
+                    border: "1px solid #e5e7eb",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ marginBottom: 0 }}>Link para alumnos:</div>
+                  <code
+                    style={{
+                      fontSize: 12,
+                      padding: "4px 6px",
+                      background: "white",
+                      borderRadius: 6,
+                      border: "1px solid #e5e7eb",
+                    }}
+                  >
+                    {typeof window !== "undefined"
+                      ? `${window.location.origin}/s/${code}`
+                      : `/s/${code}`}
+                  </code>
+                  <button
+                    onClick={copyStudentLink}
+                    style={{
+                      marginLeft: "auto",
+                      padding: "4px 10px",
+                      borderRadius: 6,
+                      border: "1px solid #d1d5db",
+                      background: linkCopied ? "#dcfce7" : "white",
+                      color: linkCopied ? "#166534" : "#374151",
+                      fontSize: 12,
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    {linkCopied ? "¡Copiado!" : "Copiar"}
+                  </button>
+                </div>
+                {/* descarga de registro en PDF */}
+                <div
+                  style={{
+                    fontSize: 13,
+                    marginBottom: 12,
+                  }}
+                >
+                  <a
+                    href={`${API}/exams/${code}/activity.pdf`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <button
+                      type="button"
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: 8,
+                        border: "1px solid #e5e7eb",
+                        background: "#eef2ff",
+                        cursor: "pointer",
+                        fontSize: 13,
+                      }}
+                    >
+                      ⬇️ Descargar registro del examen (PDF)
+                    </button>
+                  </a>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      opacity: 0.6,
+                      marginTop: 4,
+                    }}
+                  >
+                    Incluye intentos, antifraude y chat (según lo que definamos
+                    en el backend).
+                  </div>
+                </div>
 
-              <BoardClient code={code} />
+                <BoardClient code={code} />
 
-              <div style={{ marginTop: 16 }}>
-                <ExamChat
-                  code={code}
-                  role="teacher"
-                  defaultName={teacherName || "Docente"}
-                />
-              </div>
-            </section>
-          )}
-        </>
+                <div style={{ marginTop: 16 }}>
+                  <ExamChat
+                    code={code}
+                    role="teacher"
+                    defaultName={teacherName || "Docente"}
+                  />
+                </div>
+              </section>
+            )}
+          </div>
+        </div>
       )}
 
       {err && (

@@ -70,10 +70,7 @@ export async function getTeacherProfile(token: string) {
   return res.json();
 }
 
-export async function updateTeacherProfile(
-  token: string,
-  payload: any
-) {
+export async function updateTeacherProfile(token: string, payload: any) {
   const res = await fetch(`${API}/teacher/profile`, {
     method: "PUT",
     headers: {
@@ -96,7 +93,7 @@ export async function forgotPassword(email: string) {
   });
   if (!res.ok) {
     const txt = await res.text();
-    // No lanzamos error para no revelar si el email existe o no, 
+    // No lanzamos error para no revelar si el email existe o no,
     // pero logueamos y retornamos ok salvo que sea un error 500 grave
     console.warn("Forgot Password Error:", txt);
   }
@@ -136,4 +133,30 @@ export function getAuthToken(): string | null {
 export function clearAuthToken() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+// ⭐ Nueva función para crear examen con auth
+// ⭐ Nueva función para crear examen con auth
+export async function createExam() {
+  const token = getAuthToken();
+  if (!token) throw new Error("No hay sesión. Por favor logueate nuevamente.");
+
+  const res = await fetch(`${API}/exams`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      title: "Examen sin título",
+      lives: 3,
+      durationMins: 60,
+    }),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || "Error al crear examen");
+  }
+
+  return res.json();
 }
