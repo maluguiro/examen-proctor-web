@@ -6,6 +6,7 @@ import { API } from "@/lib/api";
 import { ExamMeta } from "@/lib/types";
 import ExamChat from "@/components/ExamChat";
 import { BoardClient } from "./board/BoardClient";
+import { loadTeacherProfile, type TeacherProfile, type Institution } from "@/lib/teacherProfile";
 
 // ---------- tipos básicos ----------
 
@@ -157,6 +158,10 @@ export default function TeacherExamPage() {
 
   const [linkCopied, setLinkCopied] = React.useState(false);
 
+  // Perfil Docente (para selects)
+  const [profile, setProfile] = React.useState<TeacherProfile | null>(null);
+  const [selectedUniName, setSelectedUniName] = React.useState("");
+
   // ----------------- carga inicial -----------------
 
   const loadExamAndMeta = React.useCallback(async () => {
@@ -229,7 +234,25 @@ export default function TeacherExamPage() {
   React.useEffect(() => {
     if (!code) return;
     loadExamAndMeta();
+    // Cargar perfil
+    const p = loadTeacherProfile();
+    setProfile(p);
   }, [code, loadExamAndMeta]);
+
+  // Intentar deducir la universidad si ya hay materia seleccionada
+  React.useEffect(() => {
+    if (profile?.institutions && subject && !selectedUniName) {
+      // Buscar si alguna universidad tiene esta materia
+      const found = profile.institutions.find(inst =>
+        inst.subjects.some(s => s.name === subject)
+      );
+      if (found) {
+        setSelectedUniName(found.name);
+      } else if (profile.institutions.length > 0) {
+        // Default a la primera si no la encontramos? No, mejor dejar que el usuario elija
+      }
+    }
+  }, [profile, subject, selectedUniName]);
 
   // ----------------- helpers UI -----------------
 
@@ -245,10 +268,11 @@ export default function TeacherExamPage() {
 
 
   const cardStyle: React.CSSProperties = {
-    border: "1px solid #e5e7eb",
-    borderRadius: 12,
-    padding: 16,
-    background: "#fff",
+    background: "white",
+    borderRadius: "20px",
+    padding: "32px",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.02), 0 1px 0 rgba(0,0,0,0.02)",
+    border: "none",
   };
 
   // ----------------- guardar META -----------------
@@ -602,20 +626,77 @@ export default function TeacherExamPage() {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: 13, display: "block" }}>
-                    Materia
+                  <label style={{ fontSize: 13, display: "block", marginBottom: 6, fontWeight: 500 }}>
+                    Materia y Universidad
                   </label>
-                  <input
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    placeholder="Ej: Matemática I"
-                    style={{
-                      padding: 8,
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 8,
-                      width: "100%",
-                    }}
-                  />
+
+                  {/* SELECT UNIVERSIDAD */}
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
+                      Universidad / Institución
+                    </label>
+                    {!profile?.institutions || profile.institutions.length === 0 ? (
+                      <div style={{ padding: 10, background: "#fef2f2", color: "#b91c1c", borderRadius: 8, fontSize: 13 }}>
+                        No tenés universidades configuradas.
+                        <a href="/t/profile" style={{ textDecoration: "underline", marginLeft: 4, color: "#b91c1c", fontWeight: 600 }}>
+                          Configurar en Perfil
+                        </a>
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedUniName}
+                        onChange={(e) => {
+                          setSelectedUniName(e.target.value);
+                          setSubject(""); // Reset subject when uni changes
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: 8,
+                          border: "1px solid #d1d5db",
+                          background: "white",
+                          fontSize: 14,
+                        }}
+                      >
+                        <option value="">-- Seleccioná Universidad --</option>
+                        {profile.institutions.map(inst => (
+                          <option key={inst.id} value={inst.name}>{inst.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* SELECT MATERIA */}
+                  {selectedUniName && profile?.institutions && (
+                    <div style={{ opacity: selectedUniName ? 1 : 0.5 }}>
+                      <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
+                        Materia
+                      </label>
+                      <select
+                        value={subject}
+                        onChange={(e) => setSubject(e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: 8,
+                          border: "1px solid #d1d5db",
+                          background: "white",
+                          fontSize: 14,
+                        }}
+                      >
+                        <option value="">-- Seleccioná Materia --</option>
+                        {profile.institutions
+                          .find(i => i.name === selectedUniName)
+                          ?.subjects.map(s => (
+                            <option key={s.id} value={s.name}>{s.name}</option>
+                          ))
+                        }
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Fallback/Manual Subject display or hidden input if needed to debug */}
+                  {/* We keep syncing 'subject' state, so saveMeta will pick it up */}
                 </div>
 
                 <div>

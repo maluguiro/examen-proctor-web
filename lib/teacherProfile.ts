@@ -1,10 +1,22 @@
 // web/lib/teacherProfile.ts
 
+export type Subject = {
+  id: string;
+  name: string;
+};
+
+export type Institution = {
+  id: string;
+  name: string;
+  subjects: Subject[];
+};
+
 export type TeacherProfile = {
   name: string;
-  subject?: string;
-  institution?: string;
+  subject?: string;     // legacy/optional
+  institution?: string; // legacy/optional
   email?: string;
+  institutions?: Institution[]; // New hierarchical structure
 };
 
 const STORAGE_KEY = "teacherProfile";
