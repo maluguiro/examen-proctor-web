@@ -88,6 +88,37 @@ export async function updateTeacherProfile(
   return res.json();
 }
 
+export async function forgotPassword(email: string) {
+  const res = await fetch(`${API}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    // No lanzamos error para no revelar si el email existe o no, 
+    // pero logueamos y retornamos ok salvo que sea un error 500 grave
+    console.warn("Forgot Password Error:", txt);
+  }
+  // Siempre retornamos éxito genérico
+  return { success: true };
+}
+
+export async function deleteExam(id: string) {
+  const token = getAuthToken();
+  if (!token) throw new Error("UNAUTHORIZED");
+
+  const res = await fetch(`${API}/exams/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("DELETE_FAILED");
+  }
+  return res.json();
+}
+
 // ====== Token Management ======
 
 const AUTH_TOKEN_KEY = "examproctor_token";
