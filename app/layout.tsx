@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Roboto_Mono } from "next/font/google";
+import { Inter, Roboto_Mono, Syne } from "next/font/google"; // [NEW] Syne
 import "./globals.css";
 
 const sansFont = Inter({
@@ -10,6 +10,13 @@ const sansFont = Inter({
 const monoFont = Roboto_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
+});
+
+// [NEW] Syne font for headers
+const festiveFont = Syne({
+  subsets: ["latin"],
+  variable: "--font-festive",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -24,7 +31,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className={`${sansFont.variable} ${monoFont.variable}`}>
+      <body className={`${sansFont.variable} ${monoFont.variable} ${festiveFont.variable}`}>
         {children}
       </body>
     </html>

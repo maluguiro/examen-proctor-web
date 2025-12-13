@@ -591,13 +591,26 @@ export default function TeacherExamPage() {
   };
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} className="bg-noise">
       <style jsx global>{`
           @keyframes superbloom {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
           }
+          @keyframes slideInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .animate-stagger > * {
+            opacity: 0;
+            animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          }
+          .animate-stagger > *:nth-child(1) { animation-delay: 0.1s; }
+          .animate-stagger > *:nth-child(2) { animation-delay: 0.2s; }
+          .animate-stagger > *:nth-child(3) { animation-delay: 0.3s; }
+          .animate-stagger > *:nth-child(4) { animation-delay: 0.4s; }
+          .animate-stagger > *:nth-child(5) { animation-delay: 0.5s; }
         `}</style>
       <div style={styles.wrapper}>
         {/* ENCABEZADO */}
@@ -630,6 +643,7 @@ export default function TeacherExamPage() {
                 fontSize: 16,
                 fontWeight: 700,
                 color: "#1f2937",
+                fontFamily: "var(--font-festive), sans-serif",
               }}
             >
               {title || "Configuración de Examen"}
@@ -686,12 +700,13 @@ export default function TeacherExamPage() {
                       fontSize: 18,
                       borderBottom: "1px solid #f3f4f6",
                       paddingBottom: 12,
+                      fontFamily: "var(--font-festive), sans-serif",
                     }}
                   >
                     Docente y materia
                   </h2>
 
-                  <div style={{ display: "grid", gap: 16 }}>
+                  <div style={{ display: "grid", gap: 16 }} className="animate-stagger">
                     <div>
                       <label
                         style={{
@@ -983,11 +998,11 @@ export default function TeacherExamPage() {
               {/* PASO 2: Configuración básica */}
               {step === 2 && (
                 <section style={styles.card}>
-                  <h2 style={{ marginBottom: 16, fontSize: 18 }}>
+                  <h2 style={{ marginBottom: 16, fontSize: 18, fontFamily: "var(--font-festive), sans-serif" }}>
                     Configuración básica
                   </h2>
 
-                  <div style={{ display: "grid", gap: 16 }}>
+                  <div style={{ display: "grid", gap: 16 }} className="animate-stagger">
                     <div>
                       <label style={{ fontSize: 13, display: "block" }}>
                         Título del examen
@@ -1113,7 +1128,7 @@ export default function TeacherExamPage() {
               {/* PASO 3: Preguntas */}
               {step === 3 && (
                 <section style={styles.card}>
-                  <h2 style={{ marginBottom: 8, fontSize: 18 }}>Preguntas</h2>
+                  <h2 style={{ marginBottom: 8, fontSize: 18, fontFamily: "var(--font-festive), sans-serif" }}>Preguntas</h2>
                   <p style={{ fontSize: 13, color: "#555" }}>
                     Armá las consignas y sus opciones. Para los casilleros,
                     escribí las respuestas correctas entre corchetes y las

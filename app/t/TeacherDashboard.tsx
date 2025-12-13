@@ -188,6 +188,7 @@ export default function TeacherDashboard({
       animation: "superbloom 20s ease infinite",
       fontFamily: "'Inter', sans-serif",
       overflow: "hidden",
+      position: "relative" as const, // For noise overlay
     },
     // Sidebar: Cristal premium
     sidebar: {
@@ -203,13 +204,14 @@ export default function TeacherDashboard({
       zIndex: 50,
     },
     sidebarLogo: {
-      fontSize: "24px",
-      fontWeight: 900,
+      fontSize: "28px",
+      fontFamily: "var(--font-festive), sans-serif", // Syne Font
+      fontWeight: 800,
       background: "linear-gradient(90deg, #1e1b4b, #701a75)",
       WebkitBackgroundClip: "text",
       WebkitTextFillColor: "transparent",
       marginBottom: "48px",
-      letterSpacing: "-0.5px",
+      letterSpacing: "-1px",
       paddingLeft: "12px",
     },
     navItem: (active: boolean) => ({
@@ -669,7 +671,7 @@ export default function TeacherDashboard({
           100% { background-position: 0% 50%; }
         }
       `}</style>
-      <div style={styles.container}>
+      <div style={styles.container} className="bg-noise">
         {/* Sidebar */}
         <aside style={styles.sidebar}>
           <div style={styles.sidebarLogo}>ProctoEtic</div>

@@ -19,7 +19,9 @@ export default function TeacherHomePage() {
   // Auth State
   const [authToken, setAuthToken] = React.useState<string | null>(null);
   const [authChecking, setAuthChecking] = React.useState(true);
-  const [authMode, setAuthMode] = React.useState<"login" | "register" | "forgot">("login");
+  const [authMode, setAuthMode] = React.useState<
+    "login" | "register" | "forgot"
+  >("login");
   const [authLoading, setAuthLoading] = React.useState(false);
   const [authError, setAuthError] = React.useState<string | null>(null);
 
@@ -60,7 +62,6 @@ export default function TeacherHomePage() {
       setProfile(p);
     }
   }, [authToken, profile]);
-
 
   // Auth Actions
   async function handleLogin(e: React.FormEvent) {
@@ -111,7 +112,9 @@ export default function TeacherHomePage() {
       // Importamos dinámicamente o usamos la función del api
       const { forgotPassword } = await import("@/lib/api");
       await forgotPassword(email);
-      alert("Si el correo existe en nuestro sistema, recibirás instrucciones para restablecer tu contraseña.");
+      alert(
+        "Si el correo existe en nuestro sistema, recibirás instrucciones para restablecer tu contraseña."
+      );
       setAuthMode("login");
     } catch (e: any) {
       setAuthError("Ocurrió un error al procesar la solicitud.");
@@ -143,14 +146,26 @@ export default function TeacherHomePage() {
       <>
         <style jsx global>{`
           @keyframes superbloom {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+            0% {
+              background-position: 0% 50%;
+            }
+            50% {
+              background-position: 100% 50%;
+            }
+            100% {
+              background-position: 0% 50%;
+            }
           }
           @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0px); }
+            0% {
+              transform: translateY(0px);
+            }
+            50% {
+              transform: translateY(-10px);
+            }
+            100% {
+              transform: translateY(0px);
+            }
           }
           .input-bloom:focus {
             background: rgba(255, 255, 255, 0.95) !important;
@@ -163,13 +178,15 @@ export default function TeacherHomePage() {
           }
         `}</style>
         <div
+          className="bg-noise"
           style={{
             minHeight: "100vh",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             fontFamily: "'Inter', sans-serif",
-            background: "linear-gradient(-45deg, #ff9a9e, #fad0c4, #fad0c4, #a18cd1, #fbc2eb)",
+            background:
+              "linear-gradient(-45deg, #ff9a9e, #fad0c4, #fad0c4, #a18cd1, #fbc2eb)",
             backgroundSize: "400% 400%",
             animation: "superbloom 15s ease infinite",
             position: "relative",
@@ -177,26 +194,32 @@ export default function TeacherHomePage() {
           }}
         >
           {/* Orbes decorativos de fondo */}
-          <div style={{
-            position: "absolute",
-            top: "20%",
-            left: "15%",
-            width: "300px",
-            height: "300px",
-            background: "radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 70%)",
-            filter: "blur(40px)",
-            animation: "float 6s ease-in-out infinite",
-          }} />
-          <div style={{
-            position: "absolute",
-            bottom: "10%",
-            right: "10%",
-            width: "400px",
-            height: "400px",
-            background: "radial-gradient(circle, rgba(161, 140, 209, 0.4) 0%, rgba(161, 140, 209, 0) 70%)",
-            filter: "blur(60px)",
-            animation: "float 8s ease-in-out infinite reverse",
-          }} />
+          <div
+            style={{
+              position: "absolute",
+              top: "20%",
+              left: "15%",
+              width: "300px",
+              height: "300px",
+              background:
+                "radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 70%)",
+              filter: "blur(40px)",
+              animation: "float 6s ease-in-out infinite",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              bottom: "10%",
+              right: "10%",
+              width: "400px",
+              height: "400px",
+              background:
+                "radial-gradient(circle, rgba(161, 140, 209, 0.4) 0%, rgba(161, 140, 209, 0) 70%)",
+              filter: "blur(60px)",
+              animation: "float 8s ease-in-out infinite reverse",
+            }}
+          />
 
           <main
             style={{
@@ -211,14 +234,16 @@ export default function TeacherHomePage() {
               padding: "48px 40px",
               position: "relative",
               zIndex: 10,
+              animation: "float 1s ease-out", // Simple entrance
             }}
           >
             <div style={{ textAlign: "center", marginBottom: 32 }}>
               <h1
                 style={{
                   margin: 0,
-                  fontSize: 28,
-                  fontWeight: 900,
+                  fontSize: 32,
+                  fontFamily: "var(--font-festive), sans-serif", // Syne Font
+                  fontWeight: 800,
                   background: "linear-gradient(90deg, #ff6b6b, #556270)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
@@ -237,7 +262,7 @@ export default function TeacherHomePage() {
               >
                 {authMode === "forgot"
                   ? "Restaura tu acceso"
-                  : "Experiencias de evaluación seguras"}
+                  : "Crea examenes más seguros"}
               </p>
             </div>
 
@@ -284,7 +309,8 @@ export default function TeacherHomePage() {
                   style={{
                     flex: 1,
                     padding: "10px",
-                    background: authMode === "register" ? "white" : "transparent",
+                    background:
+                      authMode === "register" ? "white" : "transparent",
                     color: authMode === "register" ? "#ff6b6b" : "#888",
                     border: "none",
                     borderRadius: 12,
@@ -326,7 +352,16 @@ export default function TeacherHomePage() {
             {authMode === "forgot" ? (
               <form onSubmit={handleForgot}>
                 <div style={{ marginBottom: 20 }}>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, marginBottom: 8, color: "#495057", marginLeft: 4 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      marginBottom: 8,
+                      color: "#495057",
+                      marginLeft: 4,
+                    }}
+                  >
                     Email de recuperación
                   </label>
                   <input
@@ -358,7 +393,8 @@ export default function TeacherHomePage() {
                     padding: "16px",
                     borderRadius: 16,
                     border: "none",
-                    background: "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)",
+                    background:
+                      "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)",
                     color: "white",
                     fontWeight: 800,
                     cursor: authLoading ? "default" : "pointer",
@@ -391,8 +427,8 @@ export default function TeacherHomePage() {
                     marginTop: 8,
                     transition: "color 0.2s",
                   }}
-                  onMouseOver={(e) => e.currentTarget.style.color = "#ff6b6b"}
-                  onMouseOut={(e) => e.currentTarget.style.color = "#888"}
+                  onMouseOver={(e) => (e.currentTarget.style.color = "#ff6b6b")}
+                  onMouseOut={(e) => (e.currentTarget.style.color = "#888")}
                 >
                   ← Volver al inicio
                 </button>
@@ -403,7 +439,16 @@ export default function TeacherHomePage() {
               >
                 {authMode === "register" && (
                   <div style={{ marginBottom: 20 }}>
-                    <label style={{ display: "block", fontSize: 13, fontWeight: 700, marginBottom: 8, color: "#495057", marginLeft: 4 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        marginBottom: 8,
+                        color: "#495057",
+                        marginLeft: 4,
+                      }}
+                    >
                       Nombre completo
                     </label>
                     <input
@@ -429,7 +474,16 @@ export default function TeacherHomePage() {
                 )}
 
                 <div style={{ marginBottom: 20 }}>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, marginBottom: 8, color: "#495057", marginLeft: 4 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      marginBottom: 8,
+                      color: "#495057",
+                      marginLeft: 4,
+                    }}
+                  >
                     Correo electrónico
                   </label>
                   <input
@@ -454,7 +508,16 @@ export default function TeacherHomePage() {
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: 700, marginBottom: 8, color: "#495057", marginLeft: 4 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      marginBottom: 8,
+                      color: "#495057",
+                      marginLeft: 4,
+                    }}
+                  >
                     Contraseña
                   </label>
                   <input
@@ -505,7 +568,11 @@ export default function TeacherHomePage() {
                         type="checkbox"
                         checked={rememberMe}
                         onChange={(e) => setRememberMe(e.target.checked)}
-                        style={{ accentColor: "#ff9a9e", width: 16, height: 16 }}
+                        style={{
+                          accentColor: "#ff9a9e",
+                          width: 16,
+                          height: 16,
+                        }}
                       />
                       Recordarme
                     </label>
@@ -540,7 +607,8 @@ export default function TeacherHomePage() {
                     padding: "16px",
                     borderRadius: 16,
                     border: "none",
-                    background: "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)",
+                    background:
+                      "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)",
                     color: "white",
                     fontWeight: 800,
                     cursor: authLoading ? "default" : "pointer",
@@ -555,8 +623,8 @@ export default function TeacherHomePage() {
                   {authLoading
                     ? "Conectando..."
                     : authMode === "login"
-                      ? "Comenzar"
-                      : "Crear Cuenta"}
+                    ? "Comenzar"
+                    : "Crear Cuenta"}
                 </button>
               </form>
             )}
@@ -567,10 +635,5 @@ export default function TeacherHomePage() {
   }
 
   // 2) AUTENTICADO -> NUEVO DASHBOARD ProctoEtic
-  return (
-    <TeacherDashboard
-      profile={profile}
-      onLogout={handleLogout}
-    />
-  );
+  return <TeacherDashboard profile={profile} onLogout={handleLogout} />;
 }
