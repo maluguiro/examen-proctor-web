@@ -178,148 +178,185 @@ export default function TeacherDashboard({
     }
   }
 
-  // Estilos
+  // Estilos "Superbloom Aura"
   const styles = {
     container: {
       display: "flex",
       minHeight: "100vh",
-      background: "#f3f4f6",
+      background: "linear-gradient(-45deg, #ff9a9e, #fad0c4, #fad0c4, #a18cd1, #fbc2eb)",
+      backgroundSize: "400% 400%",
+      animation: "superbloom 20s ease infinite",
       fontFamily: "'Inter', sans-serif",
-      overflow: "hidden", // Prevent full page scroll if content scrolls
+      overflow: "hidden",
     },
+    // Sidebar: Cristal premium
     sidebar: {
-      width: "260px",
-      background: "#ffffff",
-      borderRight: "1px solid #e5e7eb",
-      padding: "24px",
+      width: "280px",
+      background: "rgba(255, 255, 255, 0.4)",
+      backdropFilter: "blur(20px)",
+      WebkitBackdropFilter: "blur(20px)",
+      borderRight: "1px solid rgba(255,255,255,0.3)",
+      padding: "32px 24px",
       display: "flex",
       flexDirection: "column" as const,
       flexShrink: 0,
+      zIndex: 50,
     },
     sidebarLogo: {
-      fontSize: "20px",
-      fontWeight: 800,
-      color: "#111",
-      marginBottom: "40px",
+      fontSize: "24px",
+      fontWeight: 900,
+      background: "linear-gradient(90deg, #1e1b4b, #701a75)",
+      WebkitBackgroundClip: "text",
+      WebkitTextFillColor: "transparent",
+      marginBottom: "48px",
       letterSpacing: "-0.5px",
+      paddingLeft: "12px",
     },
     navItem: (active: boolean) => ({
-      padding: "10px 12px",
-      borderRadius: "8px",
-      marginBottom: "4px",
+      padding: "12px 20px",
+      borderRadius: "16px",
+      marginBottom: "8px",
       cursor: "pointer",
-      color: active ? "#111" : "#6b7280",
-      background: active ? "#f3f4f6" : "transparent",
-      fontWeight: active ? 600 : 500,
-      fontSize: "14px",
+      color: active ? "#1e1b4b" : "#64748b",
+      background: active ? "rgba(255, 255, 255, 0.6)" : "transparent",
+      fontWeight: active ? 700 : 500,
+      fontSize: "15px",
       display: "flex",
       alignItems: "center",
-      gap: "10px",
-      transition: "all 0.2s",
+      gap: "12px",
+      transition: "all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
+      border: active ? "1px solid rgba(255,255,255,0.8)" : "1px solid transparent",
+      boxShadow: active ? "0 4px 12px rgba(0,0,0,0.03)" : "none",
     }),
     userSection: {
       marginTop: "auto",
-      paddingTop: "20px",
-      borderTop: "1px solid #e5e7eb",
+      padding: "20px",
+      background: "rgba(255,255,255,0.3)",
+      borderRadius: "20px",
       display: "flex",
       alignItems: "center",
-      gap: "10px",
+      gap: "12px",
+      backdropFilter: "blur(5px)",
+      border: "1px solid rgba(255,255,255,0.4)",
     },
     avatar: {
-      width: "32px",
-      height: "32px",
-      borderRadius: "50%",
-      background: "#111",
+      width: "36px",
+      height: "36px",
+      borderRadius: "12px",
+      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
       color: "white",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      fontSize: "12px",
+      fontSize: "14px",
       fontWeight: 700,
+      boxShadow: "0 4px 6px rgba(118, 75, 162, 0.3)",
     },
     main: {
       flex: 1,
-      padding: "32px 40px",
+      padding: "40px",
       height: "100vh",
       overflowY: "auto" as const,
+      position: "relative" as const,
     },
     topBar: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: "32px",
+      marginBottom: "40px",
     },
     search: {
-      padding: "10px 16px",
-      borderRadius: "99px",
-      border: "1px solid #d1d5db",
-      width: "300px",
+      padding: "12px 24px",
+      borderRadius: "24px",
+      border: "1px solid rgba(255,255,255,0.5)",
+      width: "320px",
       fontSize: "14px",
-      background: "white",
+      background: "rgba(255,255,255,0.45)",
+      backdropFilter: "blur(10px)",
+      transition: "all 0.2s",
+      outline: "none",
+      color: "#1e1b4b",
+      boxShadow: "0 4px 6px rgba(0,0,0,0.02)",
     },
     createBtn: {
-      padding: "10px 20px",
-      borderRadius: "99px",
-      background: "#111",
+      padding: "12px 28px",
+      borderRadius: "24px",
+      background: "#1e1b4b",
       color: "white",
       border: "none",
       fontWeight: 600,
       cursor: "pointer",
-      boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+      boxShadow: "0 10px 20px rgba(30, 27, 75, 0.15)",
+      transition: "transform 0.2s",
     },
     grid: {
       display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-      gap: "24px",
-      gridAutoRows: "minmax(180px, auto)",
+      gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+      gap: "32px",
+      gridAutoRows: "minmax(200px, auto)",
     },
+    // Cards con efecto "Ice"
     card: {
-      background: "white",
-      borderRadius: "20px",
-      padding: "24px",
-      boxShadow: "0 2px 4px rgba(0,0,0,0.02), 0 1px 0 rgba(0,0,0,0.02)",
+      background: "rgba(255, 255, 255, 0.55)",
+      backdropFilter: "blur(24px)",
+      WebkitBackdropFilter: "blur(24px)",
+      borderRadius: "32px",
+      border: "1px solid rgba(255,255,255,0.6)",
+      padding: "32px",
+      boxShadow: "0 10px 40px rgba(31, 38, 135, 0.05)",
       display: "flex",
       flexDirection: "column" as const,
+      transition: "transform 0.3s, box-shadow 0.3s",
     },
     cardTitle: {
-      fontSize: "16px",
-      fontWeight: 700,
-      marginBottom: "16px",
-      color: "#111",
+      fontSize: "18px",
+      fontWeight: 800,
+      marginBottom: "20px",
+      color: "#1e1b4b",
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
     },
     cardList: {
       display: "flex",
       flexDirection: "column" as const,
-      gap: "12px",
+      gap: "16px",
     },
     listItem: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      fontSize: "13px",
+      fontSize: "14px",
       color: "#4b5563",
-      paddingBottom: "8px",
-      borderBottom: "1px solid #f3f4f6",
+      padding: "8px 0",
+      borderBottom: "1px solid rgba(0,0,0,0.05)",
     },
     statusBadge: (status: string) => {
       const isOpen = status.toUpperCase() === "OPEN";
       return {
-        padding: "2px 8px",
+        padding: "4px 12px",
         borderRadius: "99px",
-        fontSize: "10px",
+        fontSize: "11px",
         fontWeight: 700,
-        background: isOpen ? "#dcfce7" : "#f3f4f6",
-        color: isOpen ? "#166534" : "#6b7280",
+        background: isOpen ? "#dcfce7" : "#f1f5f9",
+        color: isOpen ? "#166534" : "#64748b",
+        border: isOpen ? "1px solid #bbf7d0" : "1px solid #e2e8f0",
       };
     },
     deleteBtnSmall: {
-      background: "transparent",
+      background: "rgba(254, 226, 226, 0.5)",
       border: "none",
       color: "#ef4444",
       fontSize: "14px",
       cursor: "pointer",
-      marginLeft: "8px",
-      padding: 0,
+      marginLeft: "12px",
+      width: "28px",
+      height: "28px",
+      borderRadius: "50%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      transition: "background 0.2s",
     },
   };
 
@@ -604,8 +641,8 @@ export default function TeacherDashboard({
                               log.type === "alert"
                                 ? "#ef4444"
                                 : log.type === "success"
-                                ? "#22c55e"
-                                : "#3b82f6",
+                                  ? "#22c55e"
+                                  : "#3b82f6",
                           }}
                         />
                         {log.text}
@@ -624,92 +661,101 @@ export default function TeacherDashboard({
   };
 
   return (
-    <div style={styles.container}>
-      {/* Sidebar */}
-      <aside style={styles.sidebar}>
-        <div style={styles.sidebarLogo}>ProctoEtic</div>
-        <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {navItems.map((item) => (
-            <div
-              key={item.id}
-              style={styles.navItem(
-                activeView === item.id ||
+    <>
+      <style jsx global>{`
+        @keyframes superbloom {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+      `}</style>
+      <div style={styles.container}>
+        {/* Sidebar */}
+        <aside style={styles.sidebar}>
+          <div style={styles.sidebarLogo}>ProctoEtic</div>
+          <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {navItems.map((item) => (
+              <div
+                key={item.id}
+                style={styles.navItem(
+                  activeView === item.id ||
                   (activeView === "profile" && item.id === "profile")
-              )}
-              onClick={() => {
-                if (item.action) {
-                  item.action();
-                } else {
-                  setActiveView(item.id as any);
-                }
-              }}
-            >
-              <span>{item.icon}</span>
-              {item.label}
+                )}
+                onClick={() => {
+                  if (item.action) {
+                    item.action();
+                  } else {
+                    setActiveView(item.id as any);
+                  }
+                }}
+              >
+                <span>{item.icon}</span>
+                {item.label}
+              </div>
+            ))}
+            <div style={styles.navItem(false)} onClick={onLogout}>
+              <span>🚪</span>
+              Cerrar sesión
             </div>
-          ))}
-          <div style={styles.navItem(false)} onClick={onLogout}>
-            <span>🚪</span>
-            Cerrar sesión
-          </div>
-        </nav>
+          </nav>
 
-        <div style={styles.userSection}>
-          <div style={styles.avatar}>
-            {profile?.name?.charAt(0).toUpperCase() || "D"}
-          </div>
-          <div style={{ fontSize: "13px", overflow: "hidden" }}>
-            <div
-              style={{
-                fontWeight: 600,
-                whiteSpace: "nowrap",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {profile?.name || "Docente"}
+          <div style={styles.userSection}>
+            <div style={styles.avatar}>
+              {profile?.name?.charAt(0).toUpperCase() || "D"}
             </div>
-            <div style={{ color: "#6b7280", fontSize: "12px" }}>Dashboard</div>
+            <div style={{ fontSize: "13px", overflow: "hidden" }}>
+              <div
+                style={{
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {profile?.name || "Docente"}
+              </div>
+              <div style={{ color: "#6b7280", fontSize: "12px" }}>Dashboard</div>
+            </div>
           </div>
-        </div>
-      </aside>
+        </aside>
 
-      {/* Main Content */}
-      <main style={styles.main}>
-        {/* Top Bar */}
-        <div style={styles.topBar}>
-          <div>
-            <h1 style={{ fontSize: "24px", fontWeight: 700, margin: 0 }}>
-              {activeView === "dashboard"
-                ? `Hola, ${profile?.name?.split(" ")[0] || "Docente"} 👋`
-                : activeView === "universities"
-                ? "Universidades y Materias"
-                : activeView === "calendar"
-                ? "Calendario Académico"
-                : "Panel"}
-            </h1>
-            <p
-              style={{ margin: "4px 0 0", color: "#6b7280", fontSize: "14px" }}
-            >
-              {activeView === "dashboard"
-                ? "Aquí tienes el resumen de tu actividad hoy."
-                : "Gestiona y organiza tus evaluaciones."}
-            </p>
+        {/* Main Content */}
+        <main style={styles.main}>
+          {/* Top Bar */}
+          <div style={styles.topBar}>
+            <div>
+              <h1 style={{ fontSize: "24px", fontWeight: 700, margin: 0 }}>
+                {activeView === "dashboard"
+                  ? `Hola, ${profile?.name?.split(" ")[0] || "Docente"} 👋`
+                  : activeView === "universities"
+                    ? "Universidades y Materias"
+                    : activeView === "calendar"
+                      ? "Calendario Académico"
+                      : "Panel"}
+              </h1>
+              <p
+                style={{ margin: "4px 0 0", color: "#6b7280", fontSize: "14px" }}
+              >
+                {activeView === "dashboard"
+                  ? "Aquí tienes el resumen de tu actividad hoy."
+                  : "Gestiona y organiza tus evaluaciones."}
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "16px" }}>
+              <input
+                style={styles.search}
+                placeholder="Buscar examen, materia..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <button onClick={handleCreateExam} style={styles.createBtn}>
+                ➕ Crear examen
+              </button>
+            </div>
           </div>
-          <div style={{ display: "flex", gap: "16px" }}>
-            <input
-              style={styles.search}
-              placeholder="Buscar examen, materia..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <button onClick={handleCreateExam} style={styles.createBtn}>
-              ➕ Crear examen
-            </button>
-          </div>
-        </div>
 
-        {renderContent()}
-      </main>
-    </div>
+          {renderContent()}
+        </main>
+      </div>
+    </>
   );
 }
