@@ -107,13 +107,27 @@ export async function deleteExam(id: string) {
 
   const res = await fetch(`${API}/exams/${id}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 
   if (!res.ok) {
-    throw new Error("DELETE_FAILED");
+    // Intentamos leer el cuerpo por si viene un mensaje más específico
+    const text = await res.text().catch(() => "");
+    throw new Error(text || "DELETE_FAILED");
   }
-  return res.json();
+
+  // El backend devuelve { ok: true } o podría devolver 204.
+  if (res.status === 204) {
+    return { ok: true };
+  }
+
+  try {
+    return await res.json();
+  } catch {
+    return { ok: true };
+  }
 }
 
 // ====== Token Management ======

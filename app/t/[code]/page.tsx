@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { API } from "@/lib/api";
 import { ExamMeta } from "@/lib/types";
 import ExamChat from "@/components/ExamChat";
@@ -542,15 +543,61 @@ export default function TeacherExamPage() {
       }}
     >
       {/* ENCABEZADO */}
-      <header>
-        <h1 style={{ fontSize: 24, marginBottom: 4 }}>
-          Crear / configurar examen — {code.toUpperCase()}
-        </h1>
-        <p style={{ fontSize: 14, opacity: 0.8 }}>
-          Paso {step} de 4 · 1) Docente y materia · 2) Configuración básica · 3)
-          Preguntas · 4) Tablero y chat.
-        </p>
-      </header>
+      {/* ENCABEZADO DE RETORNO */}
+      <div
+        style={{
+          background: "white",
+          borderRadius: "20px",
+          padding: "16px 24px",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.02), 0 1px 0 rgba(0,0,0,0.02)",
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+        }}
+      >
+        <Link
+          href="/t"
+          style={{
+            textDecoration: "none",
+            color: "#6b7280",
+            fontWeight: 500,
+            fontSize: 14,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            transition: "color 0.2s",
+          }}
+        >
+          <span style={{ fontSize: 16 }}>←</span> Volver al panel
+        </Link>
+
+        <div style={{ width: 1, height: 24, background: "#e5e7eb" }} />
+
+        <div>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 16,
+              fontWeight: 700,
+              color: "#1f2937",
+            }}
+          >
+            {title || "Configuración de Examen"}
+          </h1>
+          <div
+            style={{
+              fontSize: 11,
+              color: "#9ca3af",
+              fontWeight: 600,
+              marginTop: 2,
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+            }}
+          >
+            Código: {code}
+          </div>
+        </div>
+      </div>
 
       {loading && (
         <div style={cardStyle}>
@@ -651,8 +698,8 @@ export default function TeacherExamPage() {
 
                     {/* MODE 1: SELECTS (If institutions exist AND not manual mode) */}
                     {profile?.institutions &&
-                    profile.institutions.length > 0 &&
-                    !manualSubjectMode ? (
+                      profile.institutions.length > 0 &&
+                      !manualSubjectMode ? (
                       <div
                         style={{
                           background: "#f9fafb",
@@ -1279,8 +1326,8 @@ export default function TeacherExamPage() {
                         {savingQuestion
                           ? "Guardando..."
                           : editingQuestionId
-                          ? "Guardar cambios"
-                          : "Guardar pregunta"}
+                            ? "Guardar cambios"
+                            : "Guardar pregunta"}
                       </button>
                     </div>
                   </div>

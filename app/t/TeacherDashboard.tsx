@@ -43,6 +43,10 @@ export default function TeacherDashboard({
   // Estado local para exámenes
   const [exams, setExams] = React.useState<ExamListItem[]>([]);
   const [loadingExams, setLoadingExams] = React.useState(true);
+  const [lastActionMessage, setLastActionMessage] = React.useState<{
+    text: string;
+    type: "success" | "error";
+  } | null>(null);
 
   // MOCK DATA para Cards
   const fraudStats = {
@@ -118,17 +122,32 @@ export default function TeacherDashboard({
   }
 
   // Borrar Examen
+  // Borrar Examen
   async function handleDeleteExam(id: string) {
+    if (
+      !confirm(
+        "¿Seguro que querés eliminar este examen? Esta acción no se puede deshacer."
+      )
+    ) {
+      return;
+    }
+
     try {
-      const res = await apiDeleteExam(id);
-      if (res.success || res.id) {
-        // Resilient check
-        // Actualizar UI optimista o refetch
-        setExams((prev) => prev.filter((e) => e.id !== id));
-      }
+      await apiDeleteExam(id);
+      // Éxito: Actualización optimista
+      setExams((prev) => prev.filter((e) => e.id !== id));
+      setLastActionMessage({
+        text: "Examen eliminado correctamente.",
+        type: "success",
+      });
+      setTimeout(() => setLastActionMessage(null), 3000);
     } catch (err) {
       console.error(err);
-      alert("No se pudo eliminar el examen. Verifica tu conexión o permisos.");
+      setLastActionMessage({
+        text: "No se pudo eliminar el examen. Intenta nuevamente.",
+        type: "error",
+      });
+      setTimeout(() => setLastActionMessage(null), 4000);
     }
   }
 
@@ -336,220 +355,267 @@ export default function TeacherDashboard({
       default:
         // Vista original Dashboard
         return (
-          <div style={styles.grid}>
-            {/* A: Próximos Exámenes */}
-            <div style={{ ...styles.card, gridColumn: "span 2" }}>
-              <h3 style={styles.cardTitle}>Próximos exámenes</h3>
-              {loadingExams ? (
-                <p>Cargando...</p>
-              ) : exams.length === 0 ? (
-                <div
-                  style={{ textAlign: "center", color: "#9ca3af", padding: 20 }}
-                >
-                  No hay exámenes creados. Crea uno nuevo para empezar.
-                </div>
-              ) : (
-                <div style={styles.cardList}>
-                  {exams.slice(0, 4).map((ex) => (
-                    <div key={ex.id} style={styles.listItem}>
-                      <div
-                        style={{ cursor: "pointer", flex: 1 }}
-                        onClick={() => router.push(`/t/${ex.code}`)}
-                      >
-                        <strong>{ex.title}</strong>
-                        <span style={{ margin: "0 8px", color: "#d1d5db" }}>
-                          |
-                        </span>
-                        {ex.code}
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center" }}>
-                        <span style={styles.statusBadge(ex.status)}>
-                          {ex.status}
-                        </span>
-                        <button
-                          style={styles.deleteBtnSmall}
-                          onClick={() => {
-                            if (confirm("¿Seguro de borrar?"))
-                              handleDeleteExam(ex.id);
-                          }}
-                          title="Borrar"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* B: Calendario Mini (Acceso rápido a vista completa) */}
-            <div
-              style={{
-                ...styles.card,
-                background: "#1f2937",
-                color: "white",
-                cursor: "pointer",
-              }}
-              onClick={() => setActiveView("calendar")}
-            >
-              <h3
-                style={{
-                  ...styles.cardTitle,
-                  color: "white",
-                  display: "flex",
-                  justifyContent: "space-between",
-                }}
-              >
-                Calendario
-                <span style={{ fontSize: 12, opacity: 0.7 }}>
-                  ↗ Ver completo
-                </span>
-              </h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            {lastActionMessage && (
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(7, 1fr)",
-                  gap: "8px",
-                  fontSize: "12px",
-                  marginTop: "auto",
+                  padding: "12px 16px",
+                  borderRadius: "12px",
+                  background:
+                    lastActionMessage.type === "success"
+                      ? "#dcfce7"
+                      : "#fee2e2",
+                  color:
+                    lastActionMessage.type === "success"
+                      ? "#166534"
+                      : "#991b1b",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
                 }}
               >
-                {["L", "M", "M", "J", "V", "S", "D"].map((d, i) => (
-                  <div key={i} style={{ textAlign: "center", opacity: 0.5 }}>
-                    {d}
-                  </div>
-                ))}
-                {Array.from({ length: 30 }).map((_, i) => (
+                {lastActionMessage.type === "success" ? "✅ " : "⚠️ "}
+                {lastActionMessage.text}
+              </div>
+            )}
+
+            <div style={styles.grid}>
+              {/* A: Próximos Exámenes */}
+              <div style={{ ...styles.card, gridColumn: "span 2" }}>
+                <h3 style={styles.cardTitle}>
+                  Próximos exámenes{" "}
+                  <span
+                    style={{
+                      color: "#9ca3af",
+                      fontWeight: 400,
+                      fontSize: "0.9em",
+                      marginLeft: 4,
+                    }}
+                  >
+                    ({exams.length})
+                  </span>
+                </h3>
+                {loadingExams ? (
+                  <p>Cargando...</p>
+                ) : exams.length === 0 ? (
                   <div
-                    key={i}
                     style={{
                       textAlign: "center",
-                      padding: "6px",
-                      borderRadius: "6px",
-                      background: [12, 15, 23].includes(i + 1)
-                        ? "#3b82f6"
-                        : "transparent",
-                      fontWeight: [12, 15, 23].includes(i + 1) ? 700 : 400,
+                      color: "#9ca3af",
+                      padding: 20,
                     }}
                   >
-                    {i + 1}
+                    No hay exámenes creados. Crea uno nuevo para empezar.
                   </div>
-                ))}
+                ) : (
+                  <div style={styles.cardList}>
+                    {exams.slice(0, 4).map((ex) => (
+                      <div key={ex.id} style={styles.listItem}>
+                        <div
+                          style={{ cursor: "pointer", flex: 1 }}
+                          onClick={() => router.push(`/t/${ex.code}`)}
+                        >
+                          <strong>{ex.title}</strong>
+                          <span style={{ margin: "0 8px", color: "#d1d5db" }}>
+                            |
+                          </span>
+                          {ex.code}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <span style={styles.statusBadge(ex.status)}>
+                            {ex.status}
+                          </span>
+                          <button
+                            style={styles.deleteBtnSmall}
+                            onClick={() => {
+                              if (confirm("¿Seguro de borrar?"))
+                                handleDeleteExam(ex.id);
+                            }}
+                            title="Borrar"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
 
-            {/* C: Resumen Antifraude */}
-            <div style={styles.card}>
-              <h3 style={styles.cardTitle}>Resumen Antifraude</h3>
-              <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
-                <div
-                  style={{
-                    flex: 1,
-                    padding: 12,
-                    background: "#f3f4f6",
-                    borderRadius: 12,
-                  }}
-                >
-                  <div style={{ fontSize: 24, fontWeight: 800 }}>
-                    {fraudStats.totalAttempts}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#6b7280" }}>Intentos</div>
-                </div>
-                <div
-                  style={{
-                    flex: 1,
-                    padding: 12,
-                    background: "#dcfce7",
-                    borderRadius: 12,
-                    color: "#166534",
-                  }}
-                >
-                  <div style={{ fontSize: 24, fontWeight: 800 }}>
-                    {fraudStats.clean}%
-                  </div>
-                  <div style={{ fontSize: 12 }}>Limpios</div>
-                </div>
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
-                Top motivos:
-              </div>
-              <ul
+              {/* B: Calendario Mini (Acceso rápido a vista completa) */}
+              <div
                 style={{
-                  margin: 0,
-                  paddingLeft: 20,
-                  fontSize: 13,
-                  color: "#4b5563",
+                  ...styles.card,
+                  background: "#1f2937",
+                  color: "white",
+                  cursor: "pointer",
                 }}
+                onClick={() => setActiveView("calendar")}
               >
-                {fraudStats.topReasons.map((r) => (
-                  <li key={r}>{r}</li>
-                ))}
-              </ul>
-            </div>
-
-            {/* D: Materias Shortcut */}
-            <div style={styles.card}>
-              <h3 style={styles.cardTitle}>Tus Materias</h3>
-              {profile?.institutions?.length ? (
-                <div style={styles.cardList}>
-                  {profile.institutions[0].subjects.slice(0, 3).map((s) => (
-                    <div key={s.id} style={styles.listItem}>
-                      <span>📚 {s.name}</span>
+                <h3
+                  style={{
+                    ...styles.cardTitle,
+                    color: "white",
+                    display: "flex",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  Calendario
+                  <span style={{ fontSize: 12, opacity: 0.7 }}>
+                    ↗ Ver completo
+                  </span>
+                </h3>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(7, 1fr)",
+                    gap: "8px",
+                    fontSize: "12px",
+                    marginTop: "auto",
+                  }}
+                >
+                  {["L", "M", "M", "J", "V", "S", "D"].map((d, i) => (
+                    <div key={i} style={{ textAlign: "center", opacity: 0.5 }}>
+                      {d}
                     </div>
                   ))}
-                  <button
-                    onClick={() => setActiveView("universities")}
+                  {Array.from({ length: 30 }).map((_, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        textAlign: "center",
+                        padding: "6px",
+                        borderRadius: "6px",
+                        background: [12, 15, 23].includes(i + 1)
+                          ? "#3b82f6"
+                          : "transparent",
+                        fontWeight: [12, 15, 23].includes(i + 1) ? 700 : 400,
+                      }}
+                    >
+                      {i + 1}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* C: Resumen Antifraude */}
+              <div style={styles.card}>
+                <h3 style={styles.cardTitle}>Resumen Antifraude</h3>
+                <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+                  <div
                     style={{
-                      marginTop: 8,
-                      border: "none",
-                      background: "transparent",
-                      color: "#2563eb",
-                      fontSize: 13,
-                      cursor: "pointer",
-                      textAlign: "left",
-                      padding: 0,
+                      flex: 1,
+                      padding: 12,
+                      background: "#f3f4f6",
+                      borderRadius: 12,
                     }}
                   >
-                    Ver todas →
-                  </button>
+                    <div style={{ fontSize: 24, fontWeight: 800 }}>
+                      {fraudStats.totalAttempts}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#6b7280" }}>
+                      Intentos
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      flex: 1,
+                      padding: 12,
+                      background: "#dcfce7",
+                      borderRadius: 12,
+                      color: "#166534",
+                    }}
+                  >
+                    <div style={{ fontSize: 24, fontWeight: 800 }}>
+                      {fraudStats.clean}%
+                    </div>
+                    <div style={{ fontSize: 12 }}>Limpios</div>
+                  </div>
                 </div>
-              ) : (
-                <p style={{ fontSize: 13, color: "#9ca3af" }}>
-                  No hay materias configuradas.
-                </p>
-              )}
-            </div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+                  Top motivos:
+                </div>
+                <ul
+                  style={{
+                    margin: 0,
+                    paddingLeft: 20,
+                    fontSize: 13,
+                    color: "#4b5563",
+                  }}
+                >
+                  {fraudStats.topReasons.map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              </div>
 
-            {/* E: Actividad Reciente */}
-            <div style={{ ...styles.card, gridColumn: "span 2" }}>
-              <h3 style={styles.cardTitle}>Actividad Reciente</h3>
-              <div style={styles.cardList}>
-                {activityLog.map((log, i) => (
-                  <div key={i} style={styles.listItem}>
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 8 }}
+              {/* D: Materias Shortcut */}
+              <div style={styles.card}>
+                <h3 style={styles.cardTitle}>Tus Materias</h3>
+                {profile?.institutions?.length ? (
+                  <div style={styles.cardList}>
+                    {profile.institutions[0].subjects.slice(0, 3).map((s) => (
+                      <div key={s.id} style={styles.listItem}>
+                        <span>📚 {s.name}</span>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => setActiveView("universities")}
+                      style={{
+                        marginTop: 8,
+                        border: "none",
+                        background: "transparent",
+                        color: "#2563eb",
+                        fontSize: 13,
+                        cursor: "pointer",
+                        textAlign: "left",
+                        padding: 0,
+                      }}
                     >
+                      Ver todas →
+                    </button>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 13, color: "#9ca3af" }}>
+                    No hay materias configuradas.
+                  </p>
+                )}
+              </div>
+
+              {/* E: Actividad Reciente */}
+              <div style={{ ...styles.card, gridColumn: "span 2" }}>
+                <h3 style={styles.cardTitle}>Actividad Reciente</h3>
+                <div style={styles.cardList}>
+                  {activityLog.map((log, i) => (
+                    <div key={i} style={styles.listItem}>
                       <div
                         style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          background:
-                            log.type === "alert"
-                              ? "#ef4444"
-                              : log.type === "success"
-                              ? "#22c55e"
-                              : "#3b82f6",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
                         }}
-                      />
-                      {log.text}
+                      >
+                        <div
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background:
+                              log.type === "alert"
+                                ? "#ef4444"
+                                : log.type === "success"
+                                ? "#22c55e"
+                                : "#3b82f6",
+                          }}
+                        />
+                        {log.text}
+                      </div>
+                      <span style={{ fontSize: 11, color: "#9ca3af" }}>
+                        {log.time}
+                      </span>
                     </div>
-                    <span style={{ fontSize: 11, color: "#9ca3af" }}>
-                      {log.time}
-                    </span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
           </div>
