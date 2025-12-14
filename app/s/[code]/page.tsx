@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import ExamChat from "@/components/ExamChat";
+import FloatingChatShell from "@/components/FloatingChatShell";
 
 const API = process.env.NEXT_PUBLIC_API_URL!;
 
@@ -119,19 +120,40 @@ export default function StudentPage({ params }: { params: { code: string } }) {
   const [maxScore, setMaxScore] = React.useState<number | null>(null);
 
   // ============================= Header común =============================
+  // ============================= Header común =============================
   const Header = (
     <div
       style={{
-        padding: "8px 0",
-        borderBottom: "1px solid #eee",
-        marginBottom: 12,
+        padding: "16px 24px",
+        background: "rgba(255, 255, 255, 0.6)",
+        backdropFilter: "blur(10px)",
+        borderRadius: "16px",
+        border: "1px solid rgba(255, 255, 255, 0.8)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        marginBottom: 20,
+        boxShadow: "0 4px 6px rgba(0,0,0,0.02)",
       }}
     >
-      <div style={{ fontSize: 13, opacity: 0.7 }}>Alumno · Modo examen</div>
-      <div style={{ fontSize: 18, fontWeight: 600 }}>
+      <div
+        style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: 1 }}
+      >
+        Alumno · Modo examen
+      </div>
+      <div
+        className="font-festive"
+        style={{
+          fontSize: 24,
+          fontWeight: 700,
+          background: "linear-gradient(90deg, #333, #666)",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+        }}
+      >
         {exam?.title || "Examen"}
       </div>
-      <div style={{ fontSize: 12, opacity: 0.6 }}>Código: {exam?.code}</div>
+      <div style={{ fontSize: 13, opacity: 0.6 }}>Código: {exam?.code}</div>
     </div>
   );
 
@@ -464,10 +486,14 @@ export default function StudentPage({ params }: { params: { code: string } }) {
   // ============================ Render preguntas ==========================
   function renderQuestion(q: PaperQuestion, idx: number) {
     const commonBox: React.CSSProperties = {
-      border: "1px solid #e5e7eb",
-      borderRadius: 10,
-      padding: 12,
-      marginBottom: 10,
+      background: "rgba(255, 255, 255, 0.6)",
+      borderRadius: 16,
+      padding: 24,
+      marginBottom: 16,
+      border: "1px solid rgba(255, 255, 255, 0.8)",
+      animation: "fadeSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+      animationDelay: `${idx * 0.1}s`,
+      opacity: 0,
     };
 
     // 👇 muy importante que esté esta línea:
@@ -575,12 +601,16 @@ export default function StudentPage({ params }: { params: { code: string } }) {
             placeholder="Escribe tu respuesta…"
             rows={4}
             maxLength={2000}
+            className="input-bloom"
             style={{
               width: "100%",
-              padding: 10,
-              border: "1px solid #e5e7eb",
-              borderRadius: 8,
+              padding: "14px",
+              border: "1px solid rgba(255, 255, 255, 0.5)",
+              borderRadius: 16,
               resize: "vertical",
+              background: "rgba(255,255,255,0.6)",
+              outline: "none",
+              transition: "all 0.3s",
             }}
           />
 
@@ -664,11 +694,15 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                   onChange={(e) => setAt(p.idx!, e.target.value)}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => handleDropOnBlank(p.idx!, e)}
+                  className="input-bloom"
                   style={{
                     width: 160,
-                    padding: 8,
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 8,
+                    padding: "10px",
+                    border: "1px solid rgba(0,0,0,0.1)",
+                    borderRadius: 12,
+                    background: "rgba(255,255,255,0.8)",
+                    textAlign: "center",
+                    outline: "none",
                   }}
                 />
               )
@@ -739,188 +773,313 @@ export default function StudentPage({ params }: { params: { code: string } }) {
   }
 
   // ================================ Render ================================
+  const pageStyles = {
+    wrapper: {
+      minHeight: "100vh",
+      width: "100%",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "flex-start",
+      paddingTop: "40px",
+      paddingBottom: "40px",
+      position: "relative" as const,
+    },
+    card: {
+      width: "100%",
+      maxWidth: "900px",
+      background: "rgba(255, 255, 255, 0.78)",
+      backdropFilter: "blur(14px)",
+      WebkitBackdropFilter: "blur(14px)",
+      borderRadius: "24px",
+      boxShadow: "0 8px 32px rgba(31, 38, 135, 0.15)",
+      padding: "40px",
+      margin: "20px",
+      animation: "fadeSlideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+      display: "grid",
+      gap: "12px",
+    },
+    gradientLayer: {
+      position: "absolute" as const,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: -1,
+      background:
+        "linear-gradient(135deg, #FFF0F5 0%, #E6E6FA 50%, #F0F8FF 100%)",
+      backgroundSize: "400% 400%",
+    },
+  };
   return (
-    <div
-      style={{
-        padding: 16,
-        maxWidth: 900,
-        margin: "0 auto",
-        display: "grid",
-        gap: 12,
-      }}
-    >
-      {/* Paso: ingresar nombre */}
-      {step === "name" && (
-        <div style={{ display: "grid", gap: 12 }}>
-          <h2>{exam?.title || "Examen"}</h2>
-          <div style={{ fontSize: 14, opacity: 0.8 }}>
-            Ingresá tu nombre para comenzar. El examen requiere pantalla
-            completa.
-          </div>
-          <input
-            value={studentName}
-            onChange={(e) => setStudentName(e.target.value)}
-            placeholder="Tu nombre"
-            style={{
-              padding: 10,
-              border: "1px solid #e5e7eb",
-              borderRadius: 8,
-            }}
-          />
-          <div>
-            <button onClick={startAttempt} style={{ padding: "10px 14px" }}>
-              Empezar
-            </button>
-          </div>
-          {err && (
-            <div
-              style={{
-                background: "#fee",
-                border: "1px solid #fcc",
-                borderRadius: 8,
-                padding: 8,
-              }}
-            >
-              {err}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Paso: examen */}
-      {step === "exam" && (
-        <div style={{ display: "grid", gap: 12 }}>
-          {Header}
-
-          {/* Cabecera info (vidas/timer/título) */}
-          <div
-            style={{
-              padding: 8,
-              borderRadius: 10,
-              border: "1px solid #ddd",
-              background: flash ? "#ffe6e6" : "#f7f7f7",
-              transition: "background 200ms",
-              display: "flex",
-              gap: 16,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <div>
-              <b>{exam?.title || "Examen"}</b>
-            </div>
-            <div>
-              Alumno: <b>{studentName}</b>
-            </div>
-            <div
-              style={{
-                marginLeft: "auto",
-                display: "flex",
-                gap: 16,
-              }}
-            >
-              <div>
-                <b>Vidas:</b> {lives ?? "—"}
-              </div>
-              <div>
-                <b>Tiempo:</b>{" "}
-                {secondsLeft != null
-                  ? (() => {
-                    const m = Math.floor(secondsLeft / 60);
-                    const s = secondsLeft % 60;
-                    const danger = secondsLeft <= 600;
-                    return (
-                      <span style={{ color: danger ? "red" : undefined }}>
-                        {m}:{String(s).padStart(2, "0")}
-                      </span>
-                    );
-                  })()
-                  : "—"}
-              </div>
-            </div>
-          </div>
-
-          {loadingPaper && <div>Cargando examen…</div>}
-
-          {!loadingPaper && questions.map((q, i) => renderQuestion(q, i))}
-
-          {!loadingPaper && (
-            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-              <button
-                onClick={() => submitAttempt("manual")}
-                style={{ padding: "10px 14px" }}
+    <>
+      <style jsx global>{`
+        @keyframes fadeSlideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .input-bloom:focus {
+          background: rgba(255, 255, 255, 0.95) !important;
+          box-shadow: 0 0 0 3px rgba(255, 154, 158, 0.3) !important;
+          border-color: #ff9a9e !important;
+        }
+        .btn-bloom {
+          background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+          color: white;
+          border: none;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 4px 15px rgba(255, 154, 158, 0.4);
+        }
+        .btn-bloom:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(255, 154, 158, 0.6);
+          filter: brightness(1.05);
+        }
+        .btn-bloom:active {
+          transform: translateY(0);
+        }
+      `}</style>
+      <div className="bg-noise" style={pageStyles.wrapper}>
+        <div className="animate-superbloom" style={pageStyles.gradientLayer} />
+        <div style={pageStyles.card}>
+          {/* Paso: ingresar nombre */}
+          {step === "name" && (
+            <div style={{ display: "grid", gap: 20, textAlign: "center" }}>
+              <h2
+                className="font-festive"
+                style={{
+                  fontSize: 32,
+                  margin: 0,
+                  background: "linear-gradient(90deg, #ff6b6b, #556270)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
               >
-                Enviar examen
-              </button>
+                {exam?.title || "Examen"}
+              </h2>
+              <div style={{ fontSize: 15, opacity: 0.8 }}>
+                Ingresá tu nombre para comenzar. El examen requiere pantalla
+                completa.
+              </div>
+              <input
+                className="input-bloom"
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+                placeholder="Tu nombre completo"
+                style={{
+                  padding: "16px",
+                  border: "1px solid rgba(255, 255, 255, 0.5)",
+                  borderRadius: 16,
+                  background: "rgba(255,255,255,0.5)",
+                  fontSize: 16,
+                  outline: "none",
+                  textAlign: "center",
+                }}
+              />
+              <div>
+                <button
+                  className="btn-bloom"
+                  onClick={startAttempt}
+                  style={{
+                    padding: "14px 32px",
+                    borderRadius: 999,
+                    fontSize: 16,
+                  }}
+                >
+                  Empezar Examen
+                </button>
+              </div>
+              {err && (
+                <div
+                  style={{
+                    background: "#fee",
+                    border: "1px solid #fcc",
+                    borderRadius: 8,
+                    padding: 8,
+                  }}
+                >
+                  {err}
+                </div>
+              )}
             </div>
           )}
 
-          {err && (
-            <div
-              style={{
-                background: "#fee",
-                border: "1px solid #fcc",
-                borderRadius: 8,
-                padding: 8,
-              }}
-            >
-              {err}
-            </div>
-          )}
+          {/* Paso: examen */}
+          {step === "exam" && (
+            <div style={{ display: "grid", gap: 12 }}>
+              {Header}
 
-          {/* Chat flotante (alumno) */}
-          <ExamChat
-            code={code}
-            role="student"
-            defaultName={studentName || "Alumno"}
-          />
-        </div>
-      )}
+              {/* Cabecera info (vidas/timer/título) */}
+              <div
+                style={{
+                  padding: 8,
+                  borderRadius: 16,
+                  border: "1px solid white",
+                  background: flash ? "#ffe6e6" : "rgba(255,255,255,0.6)",
+                  transition: "background 200ms",
+                  display: "flex",
+                  gap: 16,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  <b>{exam?.title || "Examen"}</b>
+                </div>
+                <div>
+                  Alumno: <b>{studentName}</b>
+                </div>
+                <div
+                  style={{
+                    marginLeft: "auto",
+                    display: "flex",
+                    gap: 16,
+                  }}
+                >
+                  <div>
+                    <b>Vidas:</b> {lives ?? "—"}
+                  </div>
+                  <div>
+                    <b>Tiempo:</b>{" "}
+                    {secondsLeft != null
+                      ? (() => {
+                        const m = Math.floor(secondsLeft / 60);
+                        const s = secondsLeft % 60;
+                        const danger = secondsLeft <= 600;
+                        return (
+                          <span style={{ color: danger ? "red" : undefined }}>
+                            {m}:{String(s).padStart(2, "0")}
+                          </span>
+                        );
+                      })()
+                      : "—"}
+                  </div>
+                </div>
+              </div>
 
-      {/* Paso: enviando */}
-      {step === "submitting" && (
-        <div>
-          <h3>Enviando tu examen…</h3>
-        </div>
-      )}
+              {loadingPaper && <div>Cargando examen…</div>}
 
-      {/* Paso: enviado */}
-      {step === "submitted" && (
-        <div style={{ display: "grid", gap: 12 }}>
-          {Header}
+              {!loadingPaper && questions.map((q, i) => renderQuestion(q, i))}
 
-
-          {gradingMode === "auto" ? (
-            (() => {
-              // Lógica de visibilidad
-              // Si hay fecha openAt, chequeamos si ya pasó.
-              // Si no hay fecha, se muestra siempre (canViewReview = true).
-              const openDate = exam?.openAt ? new Date(exam.openAt) : null;
-              const now = new Date();
-              const canViewReview = !openDate || now >= openDate;
-
-              if (!canViewReview && openDate) {
-                return (
-                  <div
+              {!loadingPaper && (
+                <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                  <button
+                    className="btn-bloom"
+                    onClick={() => submitAttempt("manual")}
                     style={{
-                      padding: 16,
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 10,
-                      background: "#f9fafb",
+                      padding: "14px 28px",
+                      borderRadius: 999,
+                      fontSize: 15,
+                      width: "100%",
                     }}
                   >
-                    <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                      Tu examen fue enviado.
-                    </div>
-                    <div style={{ fontSize: 14, color: "#4b5563" }}>
-                      La calificación y revisión estarán disponibles a partir del:{" "}
-                      <b>{openDate.toLocaleString()}</b>.
-                    </div>
-                  </div>
-                );
-              }
+                    Enviar examen
+                  </button>
+                </div>
+              )}
 
-              return (
+              {err && (
+                <div
+                  style={{
+                    background: "#fee",
+                    border: "1px solid #fcc",
+                    borderRadius: 8,
+                    padding: 8,
+                  }}
+                >
+                  {err}
+                </div>
+              )}
+
+              {/* Chat flotante (alumno) */}
+              <FloatingChatShell label="Chat con docente">
+                <ExamChat
+                  code={code}
+                  role="student"
+                  defaultName={studentName || "Alumno"}
+                />
+              </FloatingChatShell>
+            </div>
+          )}
+
+          {/* Paso: enviando */}
+          {step === "submitting" && (
+            <div>
+              <h3>Enviando tu examen…</h3>
+            </div>
+          )}
+
+          {/* Paso: enviado */}
+          {step === "submitted" && (
+            <div style={{ display: "grid", gap: 12 }}>
+              {Header}
+
+
+              {gradingMode === "auto" ? (
+                (() => {
+                  // Lógica de visibilidad
+                  // Si hay fecha openAt, chequeamos si ya pasó.
+                  // Si no hay fecha, se muestra siempre (canViewReview = true).
+                  const openDate = exam?.openAt ? new Date(exam.openAt) : null;
+                  const now = new Date();
+                  const canViewReview = !openDate || now >= openDate;
+
+                  if (!canViewReview && openDate) {
+                    return (
+                      <div
+                        style={{
+                          padding: 16,
+                          border: "1px solid #e5e7eb",
+                          borderRadius: 10,
+                          background: "#f9fafb",
+                        }}
+                      >
+                        <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                          Tu examen fue enviado.
+                        </div>
+                        <div style={{ fontSize: 14, color: "#4b5563" }}>
+                          La calificación y revisión estarán disponibles a partir del:{" "}
+                          <b>{openDate.toLocaleString()}</b>.
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      <div
+                        style={{
+                          padding: 10,
+                          border: "1px solid #e5e7eb",
+                          borderRadius: 10,
+                        }}
+                      >
+                        <div>
+                          <b>Tu examen fue enviado.</b>
+                        </div>
+                        <div>
+                          Calificación automática: <b>{score}</b> / <b>{maxScore}</b>
+                        </div>
+                      </div>
+
+                      {attemptId && (
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button onClick={handleDownloadReview}>
+                            🖨️ Ver/Descargar revisión (PDF)
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()
+              ) : (
                 <>
                   <div
                     style={{
@@ -933,182 +1092,159 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                       <b>Tu examen fue enviado.</b>
                     </div>
                     <div>
-                      Calificación automática: <b>{score}</b> / <b>{maxScore}</b>
+                      El docente corregirá y publicará la nota y la revisión.
                     </div>
                   </div>
-
                   {attemptId && (
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button onClick={handleDownloadReview}>
-                        🖨️ Ver/Descargar revisión (PDF)
-                      </button>
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>
+                      Guardá este identificador: <code>{attemptId}</code>
                     </div>
                   )}
                 </>
-              );
-            })()
-          ) : (
-            <>
-              <div
-                style={{
-                  padding: 10,
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 10,
-                }}
-              >
-                <div>
-                  <b>Tu examen fue enviado.</b>
-                </div>
-                <div>
-                  El docente corregirá y publicará la nota y la revisión.
-                </div>
-              </div>
-              {attemptId && (
-                <div style={{ fontSize: 12, opacity: 0.7 }}>
-                  Guardá este identificador: <code>{attemptId}</code>
-                </div>
               )}
-            </>
+
+              {/* Chat flotante (sigue disponible) */}
+              <FloatingChatShell label="Chat con docente">
+                <ExamChat
+                  code={code}
+                  role="student"
+                  defaultName={studentName || "Alumno"}
+                />
+              </FloatingChatShell>
+            </div>
           )}
 
-          {/* Chat flotante (sigue disponible) */}
-          <ExamChat
-            code={code}
-            role="student"
-            defaultName={studentName || "Alumno"}
-          />
-        </div>
-      )}
+          {/* Cartel de infracción antifraude */}
+          {showFullscreenWarning && (
+            <div
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0,0,0,0.6)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 50,
+              }}
+            >
+              <div
+                style={{
+                  background: "white",
+                  borderRadius: 16,
+                  padding: 20,
+                  maxWidth: 420,
+                  width: "90%",
+                  boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+                  textAlign: "center",
+                }}
+              >
+                <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 10 }}>
+                  Atención: infracción antifraude
+                </h2>
+                <p
+                  style={{
+                    fontSize: 14,
+                    marginBottom: 16,
+                    color: "#111",
+                  }}
+                >
+                  {lastViolationType === "fullscreen-exit"
+                    ? "Intentaste salir de la pantalla completa. Este examen requiere pantalla completa por seguridad. Si seguís intentando salir, podés quedarte sin vidas y que el examen se cierre automáticamente."
+                    : "Se detectó una acción no permitida durante el examen (por ejemplo cambiar de pestaña, copiar/pegar, etc.). Estas acciones pueden hacerte perder vidas y cerrar el examen automáticamente."}
+                </p>
+                <button
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 10,
+                    border: "none",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    background: "black",
+                    color: "white",
+                    cursor: "pointer",
+                  }}
+                  onClick={async () => {
+                    setShowFullscreenWarning(false);
+                    try {
+                      if (
+                        lastViolationType === "fullscreen-exit" &&
+                        !document.fullscreenElement
+                      ) {
+                        await document.documentElement.requestFullscreen();
+                      }
+                    } catch (e) {
+                      console.error("requestFullscreen error", e);
+                    }
+                  }}
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          )}
 
-      {/* Cartel de infracción antifraude */}
-      {showFullscreenWarning && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 50,
-          }}
-        >
-          <div
-            style={{
-              background: "white",
-              borderRadius: 16,
-              padding: 20,
-              maxWidth: 420,
-              width: "90%",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
-              textAlign: "center",
-            }}
-          >
-            <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 10 }}>
-              Atención: infracción antifraude
-            </h2>
-            <p
+          {/* Modal de revisión no habilitada */}
+          {reviewModal && (
+            <div
               style={{
-                fontSize: 14,
-                marginBottom: 16,
-                color: "#111",
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0,0,0,0.6)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 60,
               }}
             >
-              {lastViolationType === "fullscreen-exit"
-                ? "Intentaste salir de la pantalla completa. Este examen requiere pantalla completa por seguridad. Si seguís intentando salir, podés quedarte sin vidas y que el examen se cierre automáticamente."
-                : "Se detectó una acción no permitida durante el examen (por ejemplo cambiar de pestaña, copiar/pegar, etc.). Estas acciones pueden hacerte perder vidas y cerrar el examen automáticamente."}
-            </p>
-            <button
-              style={{
-                padding: "8px 14px",
-                borderRadius: 10,
-                border: "none",
-                fontSize: 14,
-                fontWeight: 500,
-                background: "black",
-                color: "white",
-                cursor: "pointer",
-              }}
-              onClick={async () => {
-                setShowFullscreenWarning(false);
-                try {
-                  if (
-                    lastViolationType === "fullscreen-exit" &&
-                    !document.fullscreenElement
-                  ) {
-                    await document.documentElement.requestFullscreen();
-                  }
-                } catch (e) {
-                  console.error("requestFullscreen error", e);
-                }
-              }}
-            >
-              Entendido
-            </button>
-          </div>
+              <div
+                style={{
+                  background: "white",
+                  borderRadius: 16,
+                  padding: 20,
+                  maxWidth: 420,
+                  width: "90%",
+                  boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+                  textAlign: "center",
+                }}
+              >
+                <h2
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 600,
+                    marginBottom: 10,
+                  }}
+                >
+                  {reviewModal.title}
+                </h2>
+                <p
+                  style={{
+                    fontSize: 14,
+                    marginBottom: 16,
+                    color: "#111",
+                  }}
+                >
+                  {reviewModal.body}
+                </p>
+                <button
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 10,
+                    border: "none",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    background: "black",
+                    color: "white",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setReviewModal(null)}
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-
-      {/* Modal de revisión no habilitada */}
-      {reviewModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 60,
-          }}
-        >
-          <div
-            style={{
-              background: "white",
-              borderRadius: 16,
-              padding: 20,
-              maxWidth: 420,
-              width: "90%",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
-              textAlign: "center",
-            }}
-          >
-            <h2
-              style={{
-                fontSize: 18,
-                fontWeight: 600,
-                marginBottom: 10,
-              }}
-            >
-              {reviewModal.title}
-            </h2>
-            <p
-              style={{
-                fontSize: 14,
-                marginBottom: 16,
-                color: "#111",
-              }}
-            >
-              {reviewModal.body}
-            </p>
-            <button
-              style={{
-                padding: "8px 14px",
-                borderRadius: 10,
-                border: "none",
-                fontSize: 14,
-                fontWeight: 500,
-                background: "black",
-                color: "white",
-                cursor: "pointer",
-              }}
-              onClick={() => setReviewModal(null)}
-            >
-              Entendido
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 }

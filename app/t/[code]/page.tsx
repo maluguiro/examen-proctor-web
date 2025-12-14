@@ -532,31 +532,12 @@ export default function TeacherExamPage() {
 
   // ----------------- render -----------------
   const styles = {
-    container: {
-      minHeight: "100vh",
-      background: "linear-gradient(-45deg, #ff9a9e, #fad0c4, #fad0c4, #a18cd1, #fbc2eb)",
-      backgroundSize: "400% 400%",
-      animation: "superbloom 20s ease infinite",
-      fontFamily: "'Inter', sans-serif",
-      padding: "40px 24px",
-      overflowX: "hidden" as const,
-    },
     wrapper: {
       maxWidth: 1000,
       margin: "0 auto",
       display: "flex",
       flexDirection: "column" as const,
       gap: 32,
-    },
-    card: {
-      background: "rgba(255, 255, 255, 0.65)",
-      backdropFilter: "blur(20px)",
-      WebkitBackdropFilter: "blur(20px)",
-      borderRadius: 24,
-      border: "1px solid rgba(255,255,255,0.8)",
-      boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.05)",
-      padding: 32,
-      transition: "all 0.3s ease",
     },
     header: {
       background: "rgba(255, 255, 255, 0.4)",
@@ -591,27 +572,11 @@ export default function TeacherExamPage() {
   };
 
   return (
-    <div style={styles.container} className="bg-noise">
-      <style jsx global>{`
-          @keyframes superbloom {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-          }
-          @keyframes slideInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          .animate-stagger > * {
-            opacity: 0;
-            animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          }
-          .animate-stagger > *:nth-child(1) { animation-delay: 0.1s; }
-          .animate-stagger > *:nth-child(2) { animation-delay: 0.2s; }
-          .animate-stagger > *:nth-child(3) { animation-delay: 0.3s; }
-          .animate-stagger > *:nth-child(4) { animation-delay: 0.4s; }
-          .animate-stagger > *:nth-child(5) { animation-delay: 0.5s; }
-        `}</style>
+    <div className="bg-noise animate-superbloom min-h-screen p-10 overflow-x-hidden font-sans"
+      style={{
+        background: "linear-gradient(-45deg, #ff9a9e, #fad0c4, #fad0c4, #a18cd1, #fbc2eb)",
+        backgroundSize: "400% 400%"
+      }}>
       <div style={styles.wrapper}>
         {/* ENCABEZADO */}
         {/* ENCABEZADO DE RETORNO */}
@@ -664,7 +629,7 @@ export default function TeacherExamPage() {
         </div>
 
         {loading && (
-          <div style={styles.card}>
+          <div className="glass-card p-8">
             <p>Cargando configuración…</p>
           </div>
         )}
@@ -689,11 +654,10 @@ export default function TeacherExamPage() {
               ))}
             </nav>
 
-            {/* CONTENT AREA */}
             <div style={{ flex: 1 }}>
               {/* PASO 1: Docente y materia */}
               {step === 1 && (
-                <section style={styles.card}>
+                <section className="glass-card p-8">
                   <h2
                     style={{
                       marginBottom: 16,
@@ -706,7 +670,7 @@ export default function TeacherExamPage() {
                     Docente y materia
                   </h2>
 
-                  <div style={{ display: "grid", gap: 16 }} className="animate-stagger">
+                  <div style={{ display: "grid", gap: 16 }} className="animate-stagger-container">
                     <div>
                       <label
                         style={{
@@ -997,7 +961,7 @@ export default function TeacherExamPage() {
 
               {/* PASO 2: Configuración básica */}
               {step === 2 && (
-                <section style={styles.card}>
+                <section className="glass-card p-8">
                   <h2 style={{ marginBottom: 16, fontSize: 18, fontFamily: "var(--font-festive), sans-serif" }}>
                     Configuración básica
                   </h2>
@@ -1125,9 +1089,11 @@ export default function TeacherExamPage() {
                 </section>
               )}
 
+              <div style={{ paddingBottom: 20 }}></div>
+
               {/* PASO 3: Preguntas */}
               {step === 3 && (
-                <section style={styles.card}>
+                <section className="glass-card p-8">
                   <h2 style={{ marginBottom: 8, fontSize: 18, fontFamily: "var(--font-festive), sans-serif" }}>Preguntas</h2>
                   <p style={{ fontSize: 13, color: "#555" }}>
                     Armá las consignas y sus opciones. Para los casilleros,
@@ -1500,7 +1466,7 @@ export default function TeacherExamPage() {
               )}
 
               {step === 4 && (
-                <section style={styles.card}>
+                <section className="glass-card p-8">
                   <div
                     style={{
                       display: "flex",
@@ -1607,37 +1573,42 @@ export default function TeacherExamPage() {
                 </section>
               )}
             </div>
-          </div>
-        )}
+          </div >
+        )
+        }
 
-        {err && (
-          <div
-            style={{
-              borderRadius: 8,
-              border: "1px solid #fecaca",
-              background: "#fef2f2",
-              padding: 8,
-              fontSize: 13,
-            }}
-          >
-            {err}
-          </div>
-        )}
+        {
+          err && (
+            <div
+              style={{
+                borderRadius: 8,
+                border: "1px solid #fecaca",
+                background: "#fef2f2",
+                padding: 8,
+                fontSize: 13,
+              }}
+            >
+              {err}
+            </div>
+          )
+        }
 
-        {info && (
-          <div
-            style={{
-              borderRadius: 8,
-              border: "1px solid #bbf7d0",
-              background: "#ecfdf5",
-              padding: 8,
-              fontSize: 13,
-            }}
-          >
-            {info}
-          </div>
-        )}
-      </div>
-    </div>
+        {
+          info && (
+            <div
+              style={{
+                borderRadius: 8,
+                border: "1px solid #bbf7d0",
+                background: "#ecfdf5",
+                padding: 8,
+                fontSize: 13,
+              }}
+            >
+              {info}
+            </div>
+          )
+        }
+      </div >
+    </div >
   );
 }

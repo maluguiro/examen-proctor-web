@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ChatShellContext } from "./FloatingChatShell";
 
 const API = process.env.NEXT_PUBLIC_API_URL!;
 
@@ -20,15 +21,15 @@ type Props = {
 };
 
 export default function ExamChat({ code, role, defaultName }: Props) {
-  const [open, setOpen] = React.useState(false);
+  // Consumimos el contexto del Shell
+  const { setHasNew } = React.useContext(ChatShellContext);
+
   const [name, setName] = React.useState(defaultName || "");
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
   const [asBroadcast, setAsBroadcast] = React.useState(false); // solo docente
-
-  const [hasNew, setHasNew] = React.useState(false); // notificación cuando hay mensajes nuevos
 
   const canBroadcast = role === "teacher";
 
@@ -100,19 +101,12 @@ export default function ExamChat({ code, role, defaultName }: Props) {
     return () => window.clearInterval(id);
   }, [fetchMessages]);
 
-  // Auto-scroll al final cuando hay mensajes nuevos y el chat está abierto
+  // Auto-scroll al final cuando hay mensajes nuevos
   React.useEffect(() => {
-    if (open && listRef.current) {
+    if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
-  }, [open, messages.length]);
-
-  // Al abrir el chat, limpiamos el badge de "nuevo"
-  React.useEffect(() => {
-    if (open) {
-      setHasNew(false);
-    }
-  }, [open]);
+  }, [messages.length]);
 
   async function sendMessage() {
     setErr(null);
@@ -179,248 +173,200 @@ export default function ExamChat({ code, role, defaultName }: Props) {
   if (!code) return null;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        right: 16,
-        bottom: 16,
-        zIndex: 50,
-        fontSize: 14,
-      }}
-    >
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          style={{
-            position: "relative",
-            padding: "8px 12px",
-            borderRadius: 999,
-            border: "1px solid #d1d5db",
-            background: "white",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          💬 Chat
-          {hasNew && (
-            <span
+    <>
+      {/* Header dentro del panel */}
+      <div
+        style={{
+          padding: "16px",
+          borderBottom: "1px solid rgba(0,0,0,0.06)",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          background: "rgba(255,255,255,0.4)",
+        }}
+      >
+        <div style={{ fontWeight: 600, fontSize: 13, color: "#444" }}>
+          Chat del examen
+        </div>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          {canBroadcast && (
+            <label
               style={{
-                width: 10,
-                height: 10,
-                borderRadius: "999px",
-                background: "#ef4444",
-              }}
-            />
-          )}
-        </button>
-      )}
-
-      {open && (
-        <div
-          style={{
-            width: 320,
-            maxHeight: 420,
-            background: "white",
-            borderRadius: 12,
-            border: "1px solid #d1d5db",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
-          {/* Header */}
-          <div
-            style={{
-              padding: "8px 10px",
-              borderBottom: "1px solid #e5e7eb",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <div style={{ fontWeight: 600, fontSize: 13 }}>Chat del examen</div>
-            <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-              {canBroadcast && (
-                <label
-                  style={{
-                    fontSize: 11,
-                    display: "flex",
-                    gap: 4,
-                    alignItems: "center",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={asBroadcast}
-                    onChange={(e) => setAsBroadcast(e.target.checked)}
-                  />
-                  Broadcast
-                </label>
-              )}
-              <button
-                onClick={() => setOpen(false)}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  fontSize: 16,
-                  lineHeight: 1,
-                }}
-              >
-                ×
-              </button>
-            </div>
-          </div>
-
-          {/* Mensajes */}
-          <div
-            ref={listRef}
-            style={{
-              flex: 1,
-              padding: 8,
-              overflowY: "auto",
-              background: "#f9fafb",
-            }}
-          >
-            {messages.length === 0 && (
-              <div
-                style={{
-                  fontSize: 12,
-                  opacity: 0.7,
-                  textAlign: "center",
-                  marginTop: 10,
-                }}
-              >
-                No hay mensajes aún.
-              </div>
-            )}
-
-            {messages.map((m) => (
-              <div
-                key={m.id}
-                style={{
-                  marginBottom: 6,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems:
-                    m.fromRole === "teacher" ? "flex-end" : "flex-start",
-                }}
-              >
-                <div
-                  style={{
-                    maxWidth: "90%",
-                    padding: "6px 8px",
-                    borderRadius: 8,
-                    background: badgeColor(m),
-                    border: "1px solid #d1d5db",
-                    fontSize: 12,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 10,
-                      opacity: 0.7,
-                      marginBottom: 2,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 6,
-                    }}
-                  >
-                    <span>
-                      {m.authorName ||
-                        (m.fromRole === "teacher" ? "Docente" : "Alumno")}
-                    </span>
-                    <span>
-                      {m.broadcast
-                        ? "📢 Broadcast"
-                        : m.fromRole === "teacher"
-                        ? "Docente"
-                        : "Alumno"}
-                    </span>
-                  </div>
-                  <div>{m.message}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Nombre + input */}
-          <div
-            style={{
-              borderTop: "1px solid #e5e7eb",
-              padding: 8,
-              display: "grid",
-              gap: 6,
-            }}
-          >
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Tu nombre"
-              style={{
-                padding: "6px 8px",
-                borderRadius: 6,
-                border: "1px solid #d1d5db",
-                fontSize: 12,
-              }}
-            />
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKey}
-              placeholder="Escribí tu mensaje… (Enter para enviar)"
-              rows={2}
-              style={{
-                resize: "none",
-                padding: "6px 8px",
-                borderRadius: 6,
-                border: "1px solid #d1d5db",
-                fontSize: 12,
-              }}
-            />
-            <div
-              style={{
+                fontSize: 11,
                 display: "flex",
-                justifyContent: "space-between",
+                gap: 4,
                 alignItems: "center",
-                gap: 6,
+                color: "#666",
+                cursor: "pointer",
               }}
             >
-              {err && (
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: "#b91c1c",
-                    maxWidth: 180,
-                  }}
-                >
-                  {err}
-                </div>
-              )}
-              <button
-                onClick={sendMessage}
-                disabled={sending}
+              <input
+                type="checkbox"
+                checked={asBroadcast}
+                onChange={(e) => setAsBroadcast(e.target.checked)}
+                style={{ accentColor: "#ff4757" }}
+              />
+              Broadcast
+            </label>
+          )}
+        </div>
+      </div>
+
+      {/* Mensajes */}
+      <div
+        ref={listRef}
+        style={{
+          flex: 1,
+          padding: 12,
+          overflowY: "auto",
+          background: "transparent",
+        }}
+      >
+        {messages.length === 0 && (
+          <div
+            style={{
+              fontSize: 13,
+              opacity: 0.6,
+              textAlign: "center",
+              marginTop: 20,
+            }}
+          >
+            No hay mensajes aún.
+          </div>
+        )}
+
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            style={{
+              marginBottom: 10,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: m.fromRole === "teacher" ? "flex-end" : "flex-start",
+            }}
+          >
+            <div
+              style={{
+                maxWidth: "85%",
+                padding: "8px 12px",
+                borderRadius: 12,
+                background:
+                  m.fromRole === "teacher"
+                    ? "rgba(255, 255, 255, 0.9)"
+                    : "rgba(255, 255, 255, 0.6)",
+                border: "1px solid rgba(0,0,0,0.05)",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                fontSize: 13,
+              }}
+            >
+              <div
                 style={{
-                  marginLeft: "auto",
-                  padding: "6px 10px",
-                  borderRadius: 999,
-                  border: "none",
-                  background: sending ? "#9ca3af" : "#2563eb",
-                  color: "white",
-                  fontSize: 12,
-                  cursor: sending ? "default" : "pointer",
+                  fontSize: 10,
+                  opacity: 0.6,
+                  marginBottom: 2,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
                 }}
               >
-                {sending ? "Enviando..." : "Enviar"}
-              </button>
+                <span>
+                  {m.authorName ||
+                    (m.fromRole === "teacher" ? "Docente" : "Alumno")}
+                </span>
+                <span>
+                  {m.broadcast
+                    ? "📢 Broadcast"
+                    : m.fromRole === "teacher"
+                      ? "Proctor"
+                      : "Alumno"}
+                </span>
+              </div>
+              <div style={{ wordBreak: "break-word", lineHeight: 1.4 }}>
+                {m.message}
+              </div>
             </div>
           </div>
+        ))}
+      </div>
+
+      {/* Nombre + input */}
+      <div
+        style={{
+          borderTop: "1px solid rgba(0,0,0,0.06)",
+          padding: 12,
+          display: "grid",
+          gap: 8,
+          background: "rgba(255,255,255,0.4)",
+        }}
+      >
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Tu nombre (para el chat)"
+          style={{
+            padding: "8px 12px",
+            borderRadius: 8,
+            border: "1px solid rgba(0,0,0,0.1)",
+            fontSize: 12,
+            background: "rgba(255,255,255,0.7)",
+            outline: "none",
+          }}
+        />
+        <div style={{ display: "flex", gap: 6 }}>
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Escribí tu mensaje…"
+            rows={1}
+            style={{
+              flex: 1,
+              resize: "none",
+              padding: "8px 12px",
+              borderRadius: 20,
+              border: "1px solid rgba(0,0,0,0.1)",
+              fontSize: 13,
+              background: "rgba(255,255,255,0.7)",
+              outline: "none",
+              minHeight: 36,
+            }}
+          />
+          <button
+            onClick={sendMessage}
+            disabled={sending}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              border: "none",
+              background: sending ? "#ccc" : "#333",
+              color: "white",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: sending ? "default" : "pointer",
+              transition: "transform 0.1s",
+            }}
+            onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.9)")}
+            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          >
+            ➤
+          </button>
         </div>
-      )}
-    </div>
+        {err && (
+          <div
+            style={{
+              fontSize: 11,
+              color: "#e11d48",
+              textAlign: "center",
+            }}
+          >
+            {err}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
