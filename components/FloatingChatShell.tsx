@@ -59,12 +59,12 @@ export default function FloatingChatShell({
                         width: 340,
                         maxHeight: "65vh",
                         marginBottom: 16,
-                        background: "rgba(255, 255, 255, 0.85)",
-                        backdropFilter: "blur(12px)",
-                        WebkitBackdropFilter: "blur(12px)",
-                        borderRadius: 20,
-                        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.12)",
-                        border: "1px solid rgba(255, 255, 255, 0.6)",
+                        background: "rgba(255, 255, 255, 0.75)",
+                        backdropFilter: "blur(20px)",
+                        WebkitBackdropFilter: "blur(20px)",
+                        borderRadius: 24,
+                        boxShadow: "0 20px 40px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0,0,0,0.05)",
+                        border: "1px solid rgba(255, 255, 255, 0.8)",
                         overflow: "hidden",
                         display: "flex",
                         flexDirection: "column",
@@ -86,20 +86,21 @@ export default function FloatingChatShell({
                     style={{
                         height: 56,
                         minWidth: 56,
-                        padding: "0 20px",
-                        borderRadius: 28,
-                        background: "white",
-                        border: "1px solid rgba(0,0,0,0.05)",
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                        padding: "0 24px",
+                        borderRadius: 999,
+                        background: "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)",
+                        border: "1px solid rgba(255,255,255,0.4)",
+                        boxShadow: "0 8px 20px rgba(161, 140, 209, 0.4)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: 10,
+                        gap: 12,
                         cursor: "pointer",
                         fontSize: 15,
-                        fontWeight: 600,
-                        color: "#333",
-                        transition: "transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                        fontWeight: 700,
+                        color: "white",
+                        letterSpacing: "0.5px",
+                        transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
                     }}
                     onMouseEnter={(e) => {
                         e.currentTarget.style.transform = "scale(1.05)";
@@ -108,7 +109,7 @@ export default function FloatingChatShell({
                         e.currentTarget.style.transform = "scale(1)";
                     }}
                 >
-                    <span style={{ fontSize: 22, lineHeight: 1 }}>
+                    <span style={{ fontSize: 20, lineHeight: 1 }}>
                         {isOpen ? "✕" : "💬"}
                     </span>
                     {!isOpen && <span>{label}</span>}

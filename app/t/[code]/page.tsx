@@ -6,6 +6,7 @@ import Link from "next/link";
 import { API } from "@/lib/api";
 import { ExamMeta } from "@/lib/types";
 import ExamChat from "@/components/ExamChat";
+import FloatingChatShell from "@/components/FloatingChatShell";
 import { BoardClient } from "./board/BoardClient";
 import {
   loadTeacherProfile,
@@ -1563,13 +1564,7 @@ export default function TeacherExamPage() {
 
                   <BoardClient code={code} />
 
-                  <div style={{ marginTop: 16 }}>
-                    <ExamChat
-                      code={code}
-                      role="teacher"
-                      defaultName={teacherName || "Docente"}
-                    />
-                  </div>
+
                 </section>
               )}
             </div>
@@ -1609,6 +1604,14 @@ export default function TeacherExamPage() {
           )
         }
       </div >
+
+      <FloatingChatShell label="Chat con alumnos">
+        <ExamChat
+          code={code}
+          role="teacher"
+          defaultName={teacherName || "Docente"}
+        />
+      </FloatingChatShell>
     </div >
   );
 }

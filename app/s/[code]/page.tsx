@@ -998,14 +998,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                 </div>
               )}
 
-              {/* Chat flotante (alumno) */}
-              <FloatingChatShell label="Chat con docente">
-                <ExamChat
-                  code={code}
-                  role="student"
-                  defaultName={studentName || "Alumno"}
-                />
-              </FloatingChatShell>
             </div>
           )}
 
@@ -1103,14 +1095,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                 </>
               )}
 
-              {/* Chat flotante (sigue disponible) */}
-              <FloatingChatShell label="Chat con docente">
-                <ExamChat
-                  code={code}
-                  role="student"
-                  defaultName={studentName || "Alumno"}
-                />
-              </FloatingChatShell>
             </div>
           )}
 
@@ -1245,6 +1229,14 @@ export default function StudentPage({ params }: { params: { code: string } }) {
           )}
         </div>
       </div>
+      {/* Chat flotante MOVIDO AQUÍ (root level) */}
+      <FloatingChatShell label="Chat con docente">
+        <ExamChat
+          code={code}
+          role="student"
+          defaultName={studentName || "Alumno"}
+        />
+      </FloatingChatShell>
     </>
   );
 }

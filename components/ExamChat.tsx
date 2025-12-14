@@ -178,14 +178,22 @@ export default function ExamChat({ code, role, defaultName }: Props) {
       <div
         style={{
           padding: "16px",
-          borderBottom: "1px solid rgba(0,0,0,0.06)",
+          borderBottom: "1px solid rgba(0,0,0,0.04)",
           display: "flex",
           alignItems: "center",
           gap: 8,
-          background: "rgba(255,255,255,0.4)",
+          background: "rgba(255,255,255,0.5)",
+          backdropFilter: "blur(4px)",
         }}
       >
-        <div style={{ fontWeight: 600, fontSize: 13, color: "#444" }}>
+        <div
+          style={{
+            fontWeight: 700,
+            fontSize: 13,
+            color: "#333",
+            letterSpacing: -0.2,
+          }}
+        >
           Chat del examen
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
@@ -193,18 +201,22 @@ export default function ExamChat({ code, role, defaultName }: Props) {
             <label
               style={{
                 fontSize: 11,
+                fontWeight: 500,
                 display: "flex",
                 gap: 4,
                 alignItems: "center",
-                color: "#666",
+                color: "#555",
                 cursor: "pointer",
+                background: "rgba(0,0,0,0.05)",
+                padding: "2px 8px",
+                borderRadius: 99,
               }}
             >
               <input
                 type="checkbox"
                 checked={asBroadcast}
                 onChange={(e) => setAsBroadcast(e.target.checked)}
-                style={{ accentColor: "#ff4757" }}
+                style={{ accentColor: "#ff9a9e" }}
               />
               Broadcast
             </label>
@@ -239,7 +251,7 @@ export default function ExamChat({ code, role, defaultName }: Props) {
           <div
             key={m.id}
             style={{
-              marginBottom: 10,
+              marginBottom: 12,
               display: "flex",
               flexDirection: "column",
               alignItems: m.fromRole === "teacher" ? "flex-end" : "flex-start",
@@ -248,27 +260,32 @@ export default function ExamChat({ code, role, defaultName }: Props) {
             <div
               style={{
                 maxWidth: "85%",
-                padding: "8px 12px",
-                borderRadius: 12,
+                padding: "10px 14px",
+                borderRadius:
+                  m.fromRole === "teacher"
+                    ? "20px 20px 4px 20px"
+                    : "20px 20px 20px 4px",
                 background:
                   m.fromRole === "teacher"
-                    ? "rgba(255, 255, 255, 0.9)"
-                    : "rgba(255, 255, 255, 0.6)",
-                border: "1px solid rgba(0,0,0,0.05)",
-                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                    ? "linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)"
+                    : "rgba(255, 255, 255, 0.7)",
+                color: m.fromRole === "teacher" ? "#1e1b4b" : "#1f2937",
+                border: "1px solid rgba(255,255,255,0.6)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
                 fontSize: 13,
               }}
             >
               <div
                 style={{
-                  fontSize: 10,
-                  opacity: 0.6,
-                  marginBottom: 2,
+                  fontSize: 11,
+                  opacity: 0.7,
+                  marginBottom: 4,
                   display: "flex",
                   justifyContent: "space-between",
                   gap: 8,
-                  fontWeight: 600,
+                  fontWeight: 700,
                   textTransform: "uppercase",
+                  letterSpacing: "0.5px",
                 }}
               >
                 <span>
@@ -279,8 +296,8 @@ export default function ExamChat({ code, role, defaultName }: Props) {
                   {m.broadcast
                     ? "📢 Broadcast"
                     : m.fromRole === "teacher"
-                      ? "Proctor"
-                      : "Alumno"}
+                    ? "Docente"
+                    : "Alumno"}
                 </span>
               </div>
               <div style={{ wordBreak: "break-word", lineHeight: 1.4 }}>
@@ -294,11 +311,11 @@ export default function ExamChat({ code, role, defaultName }: Props) {
       {/* Nombre + input */}
       <div
         style={{
-          borderTop: "1px solid rgba(0,0,0,0.06)",
+          borderTop: "1px solid rgba(0,0,0,0.04)",
           padding: 12,
           display: "grid",
-          gap: 8,
-          background: "rgba(255,255,255,0.4)",
+          gap: 10,
+          background: "rgba(255,255,255,0.5)",
         }}
       >
         <input
@@ -307,14 +324,15 @@ export default function ExamChat({ code, role, defaultName }: Props) {
           placeholder="Tu nombre (para el chat)"
           style={{
             padding: "8px 12px",
-            borderRadius: 8,
-            border: "1px solid rgba(0,0,0,0.1)",
+            borderRadius: 10,
+            border: "1px solid rgba(0,0,0,0.08)",
             fontSize: 12,
-            background: "rgba(255,255,255,0.7)",
+            background: "rgba(255,255,255,0.6)",
             outline: "none",
+            width: "100%",
           }}
         />
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 8 }}>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -324,32 +342,38 @@ export default function ExamChat({ code, role, defaultName }: Props) {
             style={{
               flex: 1,
               resize: "none",
-              padding: "8px 12px",
+              padding: "10px 14px",
               borderRadius: 20,
-              border: "1px solid rgba(0,0,0,0.1)",
+              border: "1px solid rgba(0,0,0,0.08)",
               fontSize: 13,
-              background: "rgba(255,255,255,0.7)",
+              background: "rgba(255,255,255,0.8)",
               outline: "none",
-              minHeight: 36,
+              minHeight: 40,
+              boxShadow: "inner 0 1px 2px rgba(0,0,0,0.02)",
             }}
           />
           <button
             onClick={sendMessage}
             disabled={sending}
             style={{
-              width: 36,
-              height: 36,
+              width: 40,
+              height: 40,
               borderRadius: "50%",
               border: "none",
-              background: sending ? "#ccc" : "#333",
+              background: sending
+                ? "#ccc"
+                : "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)",
               color: "white",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: sending ? "default" : "pointer",
-              transition: "transform 0.1s",
+              transition: "all 0.2s",
+              boxShadow: "0 2px 8px rgba(161, 140, 209, 0.4)",
             }}
-            onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.9)")}
+            onMouseDown={(e) =>
+              (e.currentTarget.style.transform = "scale(0.9)")
+            }
             onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
           >
             ➤
