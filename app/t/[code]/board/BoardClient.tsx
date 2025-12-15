@@ -6,6 +6,7 @@ import type {
     AttemptSummary,
     ExamStatus,
 } from "@/lib/types";
+import { getAuthToken } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL!;
 
@@ -46,22 +47,45 @@ export function BoardClient({ code }: { code: string }) {
         action: "pause" | "resume" | "forgive_life" | "add_time",
         seconds?: number
     ) {
+        const token = getAuthToken();
+        if (!token) {
+            alert("Sesión expirada. Volvé a iniciar sesión.");
+            return;
+        }
+
         try {
-            await fetch(`${API}/attempts/${id}/mod`, {
+            const r = await fetch(`${API}/attempts/${id}/mod`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
                 body: JSON.stringify(
                     action === "add_time"
                         ? { action, seconds: seconds ?? 300 }
                         : { action }
                 ),
             });
+
+            if (!r.ok) {
+                const txt = await r.text();
+                // Manejo de errores específicos para debug
+                if (r.status === 401 || r.status === 403) {
+                    alert(`Error ${r.status}: Sesión inválida. Recargá la página.`);
+                } else if (r.status === 404) {
+                    alert(`Error 404: No se encontró el intento.`);
+                } else {
+                    alert(`Error al realizar acción (${r.status}): ${txt}`);
+                }
+                return;
+            }
+
             await load();
             setInfo("Acción realizada con éxito.");
             setTimeout(() => setInfo(null), 3000);
-        } catch {
-            setErr("Error al realizar la acción.");
-            setTimeout(() => setErr(null), 3000);
+        } catch (e: any) {
+            console.error(e);
+            alert("Hubo un error de conexión al intentar la acción. Revisá tu internet o recargá.");
         }
     }
 
@@ -347,6 +371,15 @@ export function BoardClient({ code }: { code: string }) {
                                 </th>
                                 <th
                                     style={{
+                                        textAlign: "left",
+                                        padding: 8,
+                                        borderBottom: "1px solid #ddd",
+                                    }}
+                                >
+                                    Tiempo (inicio / fin)
+                                </th>
+                                <th
+                                    style={{
                                         textAlign: "center",
                                         padding: 8,
                                         borderBottom: "1px solid #ddd",
@@ -378,7 +411,7 @@ export function BoardClient({ code }: { code: string }) {
                             {finalAttempts.length === 0 ? (
                                 <tr>
                                     <td
-                                        colSpan={6}
+                                        colSpan={7}
                                         style={{
                                             padding: 24,
                                             textAlign: "center",
@@ -409,6 +442,31 @@ export function BoardClient({ code }: { code: string }) {
                                         scoreText = "—";
                                     }
 
+                                    const violations = a.violationsCount ?? 0;
+                                    const hasFraud = violations > 0;
+                                    const isSubmitted = a.status === "submitted";
+                                    const isFraudSubmitted = isSubmitted && hasFraud && livesRemaining === 0;
+
+                                    // Formato de hora
+                                    const fmtTime = (iso?: string) => {
+                                        if (!iso) return "—";
+                                        const d = new Date(iso);
+                                        if (isNaN(d.getTime())) return "—";
+                                        return d.toLocaleTimeString("es-AR", {
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                        });
+                                    };
+
+                                    const startStr = fmtTime(a.startedAt);
+                                    const endStr = fmtTime(a.finishedAt);
+                                    const timeLabel = (
+                                        <div style={{ fontSize: 12, lineHeight: 1.4 }}>
+                                            <div style={{ color: "#444" }}>Inicio: {startStr}</div>
+                                            <div style={{ color: "#888" }}>Fin: {endStr}</div>
+                                        </div>
+                                    );
+
                                     return (
                                         <tr key={a.id}>
                                             <td
@@ -419,6 +477,18 @@ export function BoardClient({ code }: { code: string }) {
                                             >
                                                 {a.studentName || (
                                                     <span style={{ color: "#999" }}>(sin nombre)</span>
+                                                )}
+                                                {isFraudSubmitted && (
+                                                    <span
+                                                        title="Examen enviado automáticamente por antifraude (sin vidas)"
+                                                        style={{
+                                                            marginLeft: 8,
+                                                            fontSize: 16,
+                                                            cursor: "help",
+                                                        }}
+                                                    >
+                                                        🚨
+                                                    </span>
                                                 )}
                                             </td>
                                             <td
@@ -443,6 +513,14 @@ export function BoardClient({ code }: { code: string }) {
                                                 style={{
                                                     padding: 8,
                                                     borderBottom: "1px solid #f0f0f0",
+                                                }}
+                                            >
+                                                {timeLabel}
+                                            </td>
+                                            <td
+                                                style={{
+                                                    padding: 8,
+                                                    borderBottom: "1px solid #f0f0f0",
                                                     textAlign: "center",
                                                 }}
                                             >
@@ -458,7 +536,7 @@ export function BoardClient({ code }: { code: string }) {
                                                         onClick={() => modAttempt(a.id, "forgive_life")}
                                                         style={{ padding: "4px 8px", fontSize: 11 }}
                                                     >
-                                                        Perdonar
+                                                        +1 Vida ❤️
                                                     </button>
                                                     <button
                                                         onClick={() => modAttempt(a.id, "add_time", 300)}
@@ -489,7 +567,75 @@ export function BoardClient({ code }: { code: string }) {
                                                     borderBottom: "1px solid #f0f0f0",
                                                 }}
                                             >
-                                                {renderAttemptStatus(a.status, a.paused ?? false)}
+                                                {/* STATUS COLUMN */}
+                                                {(() => {
+                                                    if (a.paused) {
+                                                        return (
+                                                            <span
+                                                                style={{
+                                                                    background: "#fff7ed",
+                                                                    color: "#c2410c",
+                                                                    padding: "2px 6px",
+                                                                    borderRadius: 4,
+                                                                    fontSize: 11,
+                                                                    fontWeight: 600,
+                                                                    border: "1px solid #ffedd5",
+                                                                }}
+                                                            >
+                                                                PAUSADO
+                                                            </span>
+                                                        );
+                                                    }
+                                                    if (isFraudSubmitted) {
+                                                        return (
+                                                            <span
+                                                                style={{
+                                                                    background: "#fef2f2",
+                                                                    color: "#b91c1c",
+                                                                    padding: "2px 6px",
+                                                                    borderRadius: 4,
+                                                                    fontSize: 11,
+                                                                    fontWeight: 600,
+                                                                    border: "1px solid #fee2e2",
+                                                                }}
+                                                            >
+                                                                ENVIADO (FRAUDE)
+                                                            </span>
+                                                        );
+                                                    }
+                                                    if (isSubmitted) {
+                                                        return (
+                                                            <span
+                                                                style={{
+                                                                    background: "#f0fdf4",
+                                                                    color: "#15803d",
+                                                                    padding: "2px 6px",
+                                                                    borderRadius: 4,
+                                                                    fontSize: 11,
+                                                                    fontWeight: 600,
+                                                                    border: "1px solid #bbf7d0",
+                                                                }}
+                                                            >
+                                                                ENVIADO
+                                                            </span>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <span
+                                                            style={{
+                                                                background: "#eff6ff",
+                                                                color: "#1d4ed8",
+                                                                padding: "2px 6px",
+                                                                borderRadius: 4,
+                                                                fontSize: 11,
+                                                                fontWeight: 600,
+                                                                border: "1px solid #dbeafe",
+                                                            }}
+                                                        >
+                                                            EN CURSO
+                                                        </span>
+                                                    );
+                                                })()}
                                             </td>
                                             <td
                                                 style={{

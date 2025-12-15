@@ -46,6 +46,7 @@ export default function TeacherHomePage() {
     // Remember Me
     if (typeof window !== "undefined") {
       const savedEmail = window.localStorage.getItem("teacher_email_remember");
+      console.log("Check RememberMe:", savedEmail);
       if (savedEmail && !token) {
         setEmail(savedEmail);
         setRememberMe(true);
@@ -74,8 +75,10 @@ export default function TeacherHomePage() {
       // Handle Remember Me
       if (typeof window !== "undefined") {
         if (rememberMe) {
+          console.log("Saving RememberMe:", email);
           window.localStorage.setItem("teacher_email_remember", email);
         } else {
+          console.log("Removing RememberMe");
           window.localStorage.removeItem("teacher_email_remember");
         }
       }
@@ -623,8 +626,8 @@ export default function TeacherHomePage() {
                   {authLoading
                     ? "Conectando..."
                     : authMode === "login"
-                    ? "Comenzar"
-                    : "Crear Cuenta"}
+                      ? "Comenzar"
+                      : "Crear Cuenta"}
                 </button>
               </form>
             )}

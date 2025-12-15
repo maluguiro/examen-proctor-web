@@ -5,14 +5,10 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { API } from "@/lib/api";
 import { ExamMeta } from "@/lib/types";
-import ExamChat from "@/components/ExamChat";
-import FloatingChatShell from "@/components/FloatingChatShell";
+import { loadTeacherProfile, type TeacherProfile } from "@/lib/teacherProfile";
 import { BoardClient } from "./board/BoardClient";
-import {
-  loadTeacherProfile,
-  type TeacherProfile,
-  type Institution,
-} from "@/lib/teacherProfile";
+import FloatingChatShell from "@/components/FloatingChatShell";
+import ExamChat from "@/components/ExamChat";
 
 // ---------- tipos básicos ----------
 
@@ -45,7 +41,6 @@ type QuestionLite = {
 
 // ---------- helpers FILL_IN ----------
 
-// extrae [respuestas] del texto raw del docente
 function extractFillAnswersFromStem(raw: string): string[] {
   if (!raw) return [];
   const regex = /\[(.+?)\]/g;
@@ -57,7 +52,6 @@ function extractFillAnswersFromStem(raw: string): string[] {
   return out;
 }
 
-// docente escribe con [respuestas], alumno verá [[1]], [[2]]...
 function buildStudentStemFromRaw(raw: string): {
   stem: string;
   answers: string[];
@@ -87,7 +81,6 @@ function buildStudentStemFromRaw(raw: string): {
   return { stem: result, answers };
 }
 
-// inverso: del stem alumno ([[1]]...) + answers => texto con [respuestas]
 function buildRawFromStudentStem(stem: string, answers: string[]): string {
   let out = stem || "";
   answers.forEach((ans, idx) => {
@@ -129,7 +122,7 @@ export default function TeacherExamPage() {
     "auto"
   );
   const [maxScore, setMaxScore] = React.useState<string | number>("");
-  const [openAt, setOpenAt] = React.useState(""); // datetime-local
+  const [openAt, setOpenAt] = React.useState("");
 
   // preguntas
   const [questions, setQuestions] = React.useState<QuestionLite[]>([]);
@@ -141,7 +134,7 @@ export default function TeacherExamPage() {
   >(null);
 
   const [qKind, setQKind] = React.useState<QuestionKind>("MCQ");
-  const [qStem, setQStem] = React.useState(""); // texto raw con [respuestas]
+  const [qStem, setQStem] = React.useState("");
   const [qPoints, setQPoints] = React.useState(1);
 
   const [mcqChoices, setMcqChoices] = React.useState<string[]>([
@@ -153,15 +146,12 @@ export default function TeacherExamPage() {
   const [tfCorrect, setTfCorrect] = React.useState(true);
   const [shortAnswer, setShortAnswer] = React.useState("");
 
-  // palabras distractoras de FILL_IN (texto, separadas por coma)
+  // palabras distractoras de FILL_IN
   const [fillDistractorsText, setFillDistractorsText] = React.useState("");
 
   const [linkCopied, setLinkCopied] = React.useState(false);
-  // TODO: reconstruir lógica real de casilleros FILL_IN.
-  // Por ahora evitamos que explote el render si no está implementado.
-  const fillAnswersPreview: string[] = [];
 
-  // Perfil Docente (para selects)
+  // Perfil Docente
   const [profile, setProfile] = React.useState<TeacherProfile | null>(null);
   const [selectedUniName, setSelectedUniName] = React.useState("");
   const [manualSubjectMode, setManualSubjectMode] = React.useState(false);
@@ -180,7 +170,6 @@ export default function TeacherExamPage() {
         fetch(`${API}/exams/${code}/questions`, { cache: "no-store" }),
       ]);
 
-      // EXAM
       if (!examRes.ok) {
         throw new Error(await examRes.text());
       }
@@ -195,7 +184,6 @@ export default function TeacherExamPage() {
       );
       setLives(typeof e.lives === "number" ? e.lives : "");
 
-      // META
       if (metaRes.ok) {
         const m: ExamMeta = await metaRes.json();
 
@@ -212,13 +200,12 @@ export default function TeacherExamPage() {
         if (m.openAt) {
           const d = new Date(m.openAt);
           if (!isNaN(d.getTime())) {
-            const iso = d.toISOString().slice(0, 16); // yyyy-MM-ddTHH:mm
+            const iso = d.toISOString().slice(0, 16);
             setOpenAt(iso);
           }
         }
       }
 
-      // QUESTIONS
       if (questionsRes.ok) {
         const qData = await questionsRes.json();
         setQuestions(qData.items ?? []);
@@ -234,22 +221,17 @@ export default function TeacherExamPage() {
   React.useEffect(() => {
     if (!code) return;
     loadExamAndMeta();
-    // Cargar perfil
     const p = loadTeacherProfile();
     setProfile(p);
   }, [code, loadExamAndMeta]);
 
-  // Intentar deducir la universidad si ya hay materia seleccionada
   React.useEffect(() => {
     if (profile?.institutions && subject && !selectedUniName) {
-      // Buscar si alguna universidad tiene esta materia
       const found = profile.institutions.find((inst) =>
         inst.subjects.some((s) => s.name === subject)
       );
       if (found) {
         setSelectedUniName(found.name);
-      } else if (profile.institutions.length > 0) {
-        // Default a la primera si no la encontramos? Dejar que usuario elija
       }
     }
   }, [profile, subject, selectedUniName]);
@@ -262,14 +244,6 @@ export default function TeacherExamPage() {
     { id: 3, label: "Preguntas" },
     { id: 4, label: "Tablero y chat" },
   ];
-
-  const cardStyle: React.CSSProperties = {
-    background: "white",
-    borderRadius: "20px",
-    padding: "32px",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.02), 0 1px 0 rgba(0,0,0,0.02)",
-    border: "none",
-  };
 
   // ----------------- guardar META -----------------
 
@@ -459,13 +433,7 @@ export default function TeacherExamPage() {
     } catch (e: any) {
       console.error(e);
       const msg = e.message || String(e);
-      try {
-        const parsed = JSON.parse(msg);
-        if (parsed?.error) setQuestionErr(parsed.error);
-        else setQuestionErr(msg);
-      } catch {
-        setQuestionErr(msg);
-      }
+      setQuestionErr(msg);
     } finally {
       setSavingQuestion(false);
     }
@@ -532,57 +500,30 @@ export default function TeacherExamPage() {
   }
 
   // ----------------- render -----------------
-  const styles = {
-    wrapper: {
-      maxWidth: 1000,
-      margin: "0 auto",
-      display: "flex",
-      flexDirection: "column" as const,
-      gap: 32,
-    },
-    header: {
-      background: "rgba(255, 255, 255, 0.4)",
-      backdropFilter: "blur(12px)",
-      borderRadius: 20,
-      padding: "16px 24px",
-      border: "1px solid rgba(255,255,255,0.6)",
-      display: "flex",
-      alignItems: "center",
-      gap: 16,
-    },
-    nav: {
-      width: 240,
-      flexShrink: 0,
-      display: "flex",
-      flexDirection: "column" as const,
-      gap: 8,
-    },
-    navItem: (active: boolean) => ({
-      padding: "12px 16px",
-      borderRadius: 12,
-      textAlign: "left" as const,
-      border: active ? "1px solid rgba(255,255,255,0.8)" : "1px solid transparent",
-      background: active ? "rgba(255,255,255,0.8)" : "transparent",
-      color: active ? "#1e1b4b" : "#4b5563",
-      fontSize: 14,
-      fontWeight: active ? 700 : 500,
-      cursor: "pointer",
-      transition: "all 0.2s",
-      boxShadow: active ? "0 4px 12px rgba(0,0,0,0.03)" : "none",
-    }),
-  };
-
   return (
-    <div className="bg-noise animate-superbloom min-h-screen p-10 overflow-x-hidden font-sans"
-      style={{
-        background: "linear-gradient(-45deg, #ff9a9e, #fad0c4, #fad0c4, #a18cd1, #fbc2eb)",
-        backgroundSize: "400% 400%"
-      }}>
-      <div style={styles.wrapper}>
-        {/* ENCABEZADO */}
-        {/* ENCABEZADO DE RETORNO */}
+    <div
+      className="min-h-screen p-10 overflow-x-hidden font-sans"
+      style={{ background: "transparent" }}
+    >
+      <div
+        style={{
+          maxWidth: 1000,
+          margin: "0 auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: 32,
+        }}
+      >
+        {/* ENCABEZADO DE RETORNO (Glass Panel) */}
         <div
-          style={styles.header}
+          className="glass-panel"
+          style={{
+            borderRadius: 20,
+            padding: "16px 24px",
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+          }}
         >
           <Link
             href="/t"
@@ -600,16 +541,15 @@ export default function TeacherExamPage() {
             <span style={{ fontSize: 16 }}>←</span> Volver al panel
           </Link>
 
-          <div style={{ width: 1, height: 24, background: "#e5e7eb" }} />
+          <div style={{ width: 1, height: 24, background: "#cbd5e1" }} />
 
           <div>
             <h1
+              className="text-gradient-aurora font-festive"
               style={{
                 margin: 0,
-                fontSize: 16,
+                fontSize: 24,
                 fontWeight: 700,
-                color: "#1f2937",
-                fontFamily: "var(--font-festive), sans-serif",
               }}
             >
               {title || "Configuración de Examen"}
@@ -617,7 +557,7 @@ export default function TeacherExamPage() {
             <div
               style={{
                 fontSize: 11,
-                color: "#9ca3af",
+                color: "#6b7280",
                 fontWeight: 600,
                 marginTop: 2,
                 textTransform: "uppercase",
@@ -627,11 +567,51 @@ export default function TeacherExamPage() {
               Código: {code}
             </div>
           </div>
+
+          <div style={{ marginLeft: "auto" }}>
+            {!loading &&
+              (isOpen ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    alert(
+                      "Esta acción se conectará al backend para cerrar el examen (bloquear nuevos intentos)."
+                    )
+                  }
+                  className="glass-panel"
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    background: "rgba(254, 226, 226, 0.5)",
+                    color: "#b91c1c",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    border: "1px solid rgba(252, 165, 165, 0.5)",
+                  }}
+                >
+                  Cerrar examen
+                </button>
+              ) : (
+                <div
+                  className="glass-panel"
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    color: "#6b7280",
+                    fontSize: 13,
+                    fontWeight: 500,
+                  }}
+                >
+                  Examen cerrado
+                </div>
+              ))}
+          </div>
         </div>
 
         {loading && (
-          <div className="glass-card p-8">
-            <p>Cargando configuración…</p>
+          <div className="glass-panel p-8 rounded-3xl text-center">
+            <p className="text-gray-500">Cargando configuración…</p>
           </div>
         )}
 
@@ -639,64 +619,58 @@ export default function TeacherExamPage() {
           <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
             {/* SIDEBAR NAVIGATION */}
             <nav
-              style={styles.nav}
+              style={{
+                width: 240,
+                flexShrink: 0,
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
             >
-              {steps.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setStep(s.id)}
-                  disabled={loading}
-                  style={styles.navItem(step === s.id)}
-                >
-                  <span style={{ marginRight: 8, opacity: 0.7 }}>{s.id}.</span>
-                  {s.label}
-                </button>
-              ))}
+              {steps.map((s) => {
+                const active = step === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setStep(s.id)}
+                    disabled={loading}
+                    className={active ? "glass-panel" : ""}
+                    style={{
+                      padding: "12px 16px",
+                      borderRadius: 12,
+                      textAlign: "left",
+                      border: active
+                        ? "1px solid rgba(255,255,255,0.8)"
+                        : "1px solid transparent",
+                      background: active
+                        ? "rgba(255,255,255,0.6)"
+                        : "transparent",
+                      color: active ? "#1e1b4b" : "#4b5563",
+                      fontSize: 14,
+                      fontWeight: active ? 700 : 500,
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    <span style={{ marginRight: 8, opacity: 0.7 }}>
+                      {s.id}.
+                    </span>
+                    {s.label}
+                  </button>
+                );
+              })}
             </nav>
 
             <div style={{ flex: 1 }}>
               {/* PASO 1: Docente y materia */}
               {step === 1 && (
-                <section className="glass-card p-8">
-                  <h2
-                    style={{
-                      marginBottom: 16,
-                      fontSize: 18,
-                      borderBottom: "1px solid #f3f4f6",
-                      paddingBottom: 12,
-                      fontFamily: "var(--font-festive), sans-serif",
-                    }}
-                  >
-                    Docente y materia
+                <section className="glass-panel p-8 rounded-3xl animate-slide-up">
+                  <h2 className="font-festive text-gradient-aurora text-2xl mb-6">
+                    Examen
                   </h2>
 
-                  <div style={{ display: "grid", gap: 16 }} className="animate-stagger-container">
-                    <div>
-                      <label
-                        style={{
-                          fontSize: 13,
-                          display: "block",
-                          marginBottom: 4,
-                        }}
-                      >
-                        Nombre del docente
-                      </label>
-                      <input
-                        value={teacherName}
-                        onChange={(e) => setTeacherName(e.target.value)}
-                        placeholder="Ej: Prof. Gómez"
-                        style={{
-                          padding: "10px",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: 8,
-                          width: "100%",
-                          fontSize: 14,
-                        }}
-                      />
-                    </div>
-
-                    {/* LOGIC FOR SUBJECT SELECTION */}
+                  <div style={{ display: "grid", gap: 20 }}>
                     <div>
                       <label
                         style={{
@@ -704,33 +678,39 @@ export default function TeacherExamPage() {
                           display: "block",
                           marginBottom: 6,
                           fontWeight: 500,
+                          color: "#4b5563",
+                        }}
+                      >
+                        Nombre del docente
+                      </label>
+                      <input
+                        className="input-aurora w-full p-3 rounded-xl"
+                        value={teacherName}
+                        onChange={(e) => setTeacherName(e.target.value)}
+                        placeholder="Ej: Prof. Gómez"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        style={{
+                          fontSize: 13,
+                          display: "block",
+                          marginBottom: 6,
+                          fontWeight: 500,
+                          color: "#4b5563",
                         }}
                       >
                         Asignatura
                       </label>
 
-                      {/* MODE 1: SELECTS (If institutions exist AND not manual mode) */}
                       {profile?.institutions &&
                         profile.institutions.length > 0 &&
                         !manualSubjectMode ? (
-                        <div
-                          style={{
-                            background: "#f9fafb",
-                            padding: 16,
-                            borderRadius: 12,
-                          }}
-                        >
-                          {/* Uni Select */}
+                        <div className="bg-white/40 p-4 rounded-xl border border-white/50">
                           <div style={{ marginBottom: 12 }}>
-                            <label
-                              style={{
-                                fontSize: 12,
-                                color: "#6b7280",
-                                display: "block",
-                                marginBottom: 4,
-                              }}
-                            >
-                              Universidad / Institución
+                            <label className="text-xs text-gray-500 mb-1 block">
+                              Universidad
                             </label>
                             <select
                               value={selectedUniName}
@@ -738,13 +718,7 @@ export default function TeacherExamPage() {
                                 setSelectedUniName(e.target.value);
                                 setSubject("");
                               }}
-                              style={{
-                                width: "100%",
-                                padding: "10px",
-                                borderRadius: 8,
-                                border: "1px solid #d1d5db",
-                                fontSize: 14,
-                              }}
+                              className="input-aurora w-full p-2 rounded-lg"
                             >
                               <option value="">-- Seleccionar --</option>
                               {profile.institutions.map((inst) => (
@@ -755,32 +729,16 @@ export default function TeacherExamPage() {
                             </select>
                           </div>
 
-                          {/* Subject Select */}
                           <div>
-                            <label
-                              style={{
-                                fontSize: 12,
-                                color: "#6b7280",
-                                display: "block",
-                                marginBottom: 4,
-                              }}
-                            >
+                            <label className="text-xs text-gray-500 mb-1 block">
                               Materia
                             </label>
                             <select
                               value={subject}
                               onChange={(e) => setSubject(e.target.value)}
-                              disabled={!selectedUniName}
-                              style={{
-                                width: "100%",
-                                padding: "10px",
-                                borderRadius: 8,
-                                border: "1px solid #d1d5db",
-                                fontSize: 14,
-                                opacity: selectedUniName ? 1 : 0.6,
-                              }}
+                              className="input-aurora w-full p-2 rounded-lg"
                             >
-                              <option value="">-- Seleccionar materia --</option>
+                              <option value="">-- Seleccionar --</option>
                               {profile.institutions
                                 .find((i) => i.name === selectedUniName)
                                 ?.subjects.map((s) => (
@@ -790,828 +748,538 @@ export default function TeacherExamPage() {
                                 ))}
                             </select>
                           </div>
-
-                          <button
-                            onClick={() => setManualSubjectMode(true)}
-                            style={{
-                              marginTop: 12,
-                              background: "none",
-                              border: "none",
-                              color: "#6b7280",
-                              fontSize: 12,
-                              textDecoration: "underline",
-                              cursor: "pointer",
-                              padding: 0,
-                            }}
-                          >
-                            ¿No encuentras tu materia? Escribir manualmente
-                          </button>
+                          <div className="text-right mt-2">
+                            <button
+                              onClick={() => setManualSubjectMode(true)}
+                              className="text-xs text-blue-600 underline"
+                            >
+                              No encuentro mi materia
+                            </button>
+                          </div>
                         </div>
                       ) : (
-                        /* MODE 2: MANUAL INPUT */
-                        <div
-                          style={{
-                            background: "#f9fafb",
-                            padding: 16,
-                            borderRadius: 12,
-                          }}
-                        >
+                        <div className="flex gap-2">
                           <input
+                            className="input-aurora w-full p-3 rounded-xl"
                             value={subject}
                             onChange={(e) => setSubject(e.target.value)}
-                            placeholder="Ej: Matemática I"
-                            style={{
-                              width: "100%",
-                              padding: "10px",
-                              border: "1px solid #d1d5db",
-                              borderRadius: 8,
-                              fontSize: 14,
-                            }}
+                            placeholder="Ej: Introducción a la Física"
                           />
-                          {profile?.institutions &&
-                            profile.institutions.length > 0 && (
-                              <button
-                                onClick={() => setManualSubjectMode(false)}
-                                style={{
-                                  marginTop: 8,
-                                  background: "none",
-                                  border: "none",
-                                  color: "#2563eb",
-                                  fontSize: 12,
-                                  cursor: "pointer",
-                                  padding: 0,
-                                }}
-                              >
-                                ← Volver a seleccionar de mis listas
-                              </button>
-                            )}
+                          {profile?.institutions?.length ? (
+                            <button
+                              onClick={() => setManualSubjectMode(false)}
+                              className="text-xs text-blue-600 underline whitespace-nowrap"
+                            >
+                              Volver a lista
+                            </button>
+                          ) : null}
                         </div>
                       )}
                     </div>
 
                     <div>
-                      <label style={{ fontSize: 13, display: "block" }}>
+                      <label
+                        style={{
+                          fontSize: 13,
+                          display: "block",
+                          marginBottom: 6,
+                          fontWeight: 500,
+                          color: "#4b5563",
+                        }}
+                      >
                         Modo de corrección
                       </label>
-                      <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
-                        <label style={{ fontSize: 13 }}>
-                          <input
-                            type="radio"
-                            checked={gradingMode === "auto"}
-                            onChange={() => setGradingMode("auto")}
-                          />{" "}
-                          Instantánea (automática)
+                      <select
+                        className="input-aurora w-full p-3 rounded-xl"
+                        value={gradingMode}
+                        onChange={(e) => setGradingMode(e.target.value as any)}
+                      >
+                        <option value="auto">
+                          Automático (Feedback inmediato)
+                        </option>
+                        <option value="manual">
+                          Manual (Requiere revisión)
+                        </option>
+                      </select>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 16,
+                      }}
+                    >
+                      <div>
+                        <label
+                          style={{
+                            fontSize: 13,
+                            display: "block",
+                            marginBottom: 6,
+                            fontWeight: 500,
+                            color: "#4b5563",
+                          }}
+                        >
+                          Puntaje Máximo (opcional)
                         </label>
-                        <label style={{ fontSize: 13 }}>
-                          <input
-                            type="radio"
-                            checked={gradingMode === "manual"}
-                            onChange={() => setGradingMode("manual")}
-                          />{" "}
-                          Manual
+                        <input
+                          type="number"
+                          className="input-aurora w-full p-3 rounded-xl"
+                          value={maxScore}
+                          onChange={(e) => setMaxScore(e.target.value)}
+                          placeholder="Ej: 100"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          style={{
+                            fontSize: 13,
+                            display: "block",
+                            marginBottom: 6,
+                            fontWeight: 500,
+                            color: "#4b5563",
+                          }}
+                        >
+                          Apertura de revisión (opcional)
                         </label>
+                        <input
+                          type="datetime-local"
+                          className="input-aurora w-full p-3 rounded-xl"
+                          value={openAt}
+                          onChange={(e) => setOpenAt(e.target.value)}
+                        />
                       </div>
                     </div>
 
-                    <div>
-                      <label style={{ fontSize: 13, display: "block" }}>
-                        Nota máxima del examen
-                      </label>
-                      <input
-                        type="number"
-                        value={maxScore}
-                        onChange={(e) =>
-                          setMaxScore(
-                            e.target.value === "" ? "" : Number(e.target.value)
-                          )
-                        }
-                        placeholder="Ej: 10"
-                        style={{
-                          padding: "10px",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: 8,
-                          width: "100%",
-                          fontSize: 14,
-                        }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: 13, display: "block" }}>
-                        Hora programada para la revisión (opcional)
-                      </label>
-                      <input
-                        type="datetime-local"
-                        value={openAt}
-                        onChange={(e) => setOpenAt(e.target.value)}
-                        style={{
-                          padding: "10px",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: 8,
-                          width: "100%",
-                          fontSize: 14,
-                        }}
-                      />
-                      <p
-                        style={{
-                          fontSize: 11,
-                          opacity: 0.7,
-                          marginTop: 4,
-                        }}
-                      >
-                        Define desde cuándo los alumnos pueden ver la revisión. Si
-                        está vacío, se habilita al terminar el examen.
-                      </p>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                      <button
-                        onClick={() => onSaveMeta(false)}
-                        disabled={savingMeta}
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: 8,
-                          border: "none",
-                          background: savingMeta ? "#9ca3af" : "#2563eb",
-                          color: "white",
-                          cursor: savingMeta ? "default" : "pointer",
-                          fontSize: 14,
-                        }}
-                      >
-                        {savingMeta ? "Guardando…" : "Guardar"}
-                      </button>
+                    <div className="mt-4 flex justify-end">
                       <button
                         onClick={() => onSaveMeta(true)}
                         disabled={savingMeta}
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: 8,
-                          border: "none",
-                          background: savingMeta ? "#9ca3af" : "#16a34a",
-                          color: "white",
-                          cursor: savingMeta ? "default" : "pointer",
-                          fontSize: 14,
-                        }}
+                        className="btn-aurora-primary py-3 px-8 rounded-xl font-bold"
                       >
-                        {savingMeta ? "Guardando…" : "Guardar y continuar →"}
+                        {savingMeta ? "Guardando..." : "Guardar y Continuar →"}
                       </button>
                     </div>
+                    {info && (
+                      <div className="text-green-600 bg-green-50 p-3 rounded-lg text-sm text-center">
+                        {info}
+                      </div>
+                    )}
+                    {err && (
+                      <div className="text-red-600 bg-red-50 p-3 rounded-lg text-sm text-center">
+                        {err}
+                      </div>
+                    )}
                   </div>
                 </section>
               )}
 
-              {/* PASO 2: Configuración básica */}
+              {/* PASO 2: Config básica */}
               {step === 2 && (
-                <section className="glass-card p-8">
-                  <h2 style={{ marginBottom: 16, fontSize: 18, fontFamily: "var(--font-festive), sans-serif" }}>
-                    Configuración básica
+                <section className="glass-panel p-8 rounded-3xl animate-slide-up">
+                  <h2 className="font-festive text-gradient-aurora text-2xl mb-6">
+                    Reglas del Juego
                   </h2>
-
-                  <div style={{ display: "grid", gap: 16 }} className="animate-stagger">
+                  <div style={{ display: "grid", gap: 20 }}>
                     <div>
-                      <label style={{ fontSize: 13, display: "block" }}>
+                      <label
+                        style={{
+                          fontSize: 13,
+                          display: "block",
+                          marginBottom: 6,
+                          fontWeight: 500,
+                          color: "#4b5563",
+                        }}
+                      >
                         Título del examen
                       </label>
                       <input
+                        className="input-aurora w-full p-3 rounded-xl"
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        placeholder="Ej: Parcial 1 - Unidad 1"
-                        style={{
-                          padding: "10px",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: 8,
-                          width: "100%",
-                          fontSize: 14,
-                        }}
+                        placeholder="Ej: Final de Historia 2024"
                       />
                     </div>
-
-                    <div>
-                      <label style={{ fontSize: 13, display: "block" }}>
-                        Estado
-                      </label>
-                      <p style={{ marginTop: 4, fontSize: 14 }}>
-                        <b>{isOpen ? "Abierto" : "Cerrado"}</b> · Se abrirá al
-                        guardar la configuración.
-                      </p>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 16,
+                      }}
+                    >
+                      <div>
+                        <label
+                          style={{
+                            fontSize: 13,
+                            display: "block",
+                            marginBottom: 6,
+                            fontWeight: 500,
+                            color: "#4b5563",
+                          }}
+                        >
+                          Duración (minutos)
+                        </label>
+                        <input
+                          type="number"
+                          className="input-aurora w-full p-3 rounded-xl"
+                          value={durationMinutes}
+                          onChange={(e) => setDurationMinutes(e.target.value)}
+                          placeholder="Ej: 60"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          style={{
+                            fontSize: 13,
+                            display: "block",
+                            marginBottom: 6,
+                            fontWeight: 500,
+                            color: "#4b5563",
+                          }}
+                        >
+                          Vidas (opcional)
+                        </label>
+                        <input
+                          type="number"
+                          className="input-aurora w-full p-3 rounded-xl"
+                          value={lives}
+                          onChange={(e) => setLives(e.target.value)}
+                          placeholder="Ej: 3"
+                        />
+                      </div>
                     </div>
 
-                    <div>
-                      <label style={{ fontSize: 13, display: "block" }}>
-                        Duración del examen (minutos)
-                      </label>
-                      <input
-                        type="number"
-                        value={durationMinutes}
-                        onChange={(e) =>
-                          setDurationMinutes(
-                            e.target.value === "" ? "" : Number(e.target.value)
-                          )
-                        }
-                        placeholder="Ej: 60"
-                        style={{
-                          padding: "10px",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: 8,
-                          width: "100%",
-                          fontSize: 14,
-                        }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: 13, display: "block" }}>
-                        Vidas del examen (0, 1, 3, 6…)
-                      </label>
-                      <input
-                        type="number"
-                        value={lives}
-                        onChange={(e) =>
-                          setLives(
-                            e.target.value === "" ? "" : Number(e.target.value)
-                          )
-                        }
-                        placeholder="Ej: 3"
-                        style={{
-                          padding: "10px",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: 8,
-                          width: "100%",
-                          fontSize: 14,
-                        }}
-                      />
-                      <p
-                        style={{
-                          fontSize: 11,
-                          opacity: 0.7,
-                          marginTop: 4,
-                        }}
-                      >
-                        Cada vez que se detecta fraude, se pierde 1 vida. Al
-                        llegar a 0, el examen se cierra para ese alumno.
-                      </p>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                      <button
-                        onClick={() => saveAndOpenExam(false)}
-                        disabled={savingExam}
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: 8,
-                          border: "none",
-                          background: savingExam ? "#9ca3af" : "#2563eb",
-                          color: "white",
-                          cursor: savingExam ? "default" : "pointer",
-                          fontSize: 14,
-                        }}
-                      >
-                        {savingExam ? "Guardando…" : "Guardar configuración"}
-                      </button>
+                    <div className="mt-4 flex justify-end">
                       <button
                         onClick={() => saveAndOpenExam(true)}
                         disabled={savingExam}
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: 8,
-                          border: "none",
-                          background: savingExam ? "#9ca3af" : "#16a34a",
-                          color: "white",
-                          cursor: savingExam ? "default" : "pointer",
-                          fontSize: 14,
-                        }}
+                        className="btn-aurora-primary py-3 px-8 rounded-xl font-bold"
                       >
                         {savingExam
-                          ? "Guardando…"
-                          : "Guardar y continuar a preguntas →"}
+                          ? "Guardando..."
+                          : "Guardar y Abrir Examen →"}
                       </button>
                     </div>
+                    {info && (
+                      <div className="text-green-600 bg-green-50 p-3 rounded-lg text-sm text-center">
+                        {info}
+                      </div>
+                    )}
+                    {err && (
+                      <div className="text-red-600 bg-red-50 p-3 rounded-lg text-sm text-center">
+                        {err}
+                      </div>
+                    )}
                   </div>
                 </section>
               )}
 
-              <div style={{ paddingBottom: 20 }}></div>
-
               {/* PASO 3: Preguntas */}
               {step === 3 && (
-                <section className="glass-card p-8">
-                  <h2 style={{ marginBottom: 8, fontSize: 18, fontFamily: "var(--font-festive), sans-serif" }}>Preguntas</h2>
-                  <p style={{ fontSize: 13, color: "#555" }}>
-                    Armá las consignas y sus opciones. Para los casilleros,
-                    escribí las respuestas correctas entre corchetes y las
-                    palabras distractoras separadas por comas.
-                  </p>
+                <div className="animate-slide-up space-y-6">
+                  {/* Formulario de Pregunta */}
+                  <section className="glass-panel p-8 rounded-3xl border-2 border-white/50">
+                    <h2 className="font-festive text-gradient-aurora text-2xl mb-6">
+                      {editingQuestionId ? "Editar Desafío" : "Nuevo Desafío"}
+                    </h2>
 
-                  <div style={{ display: "grid", gap: 12, marginBottom: 16 }}>
-                    {/* Tipo */}
-                    <div>
-                      <label>Tipo de pregunta:</label>
-                      <select
-                        value={qKind}
-                        onChange={(e) => setQKind(e.target.value as QuestionKind)}
-                        style={{ marginLeft: 8, padding: 4 }}
-                      >
-                        <option value="MCQ">Opción múltiple</option>
-                        <option value="TRUE_FALSE">Verdadero / Falso</option>
-                        <option value="SHORT_TEXT">Texto breve</option>
-                        <option value="FILL_IN">Relleno de casilleros</option>
-                      </select>
-                      {editingQuestionId && (
-                        <span
-                          style={{
-                            marginLeft: 8,
-                            fontSize: 12,
-                            color: "#2563eb",
-                          }}
+                    <div className="space-y-4">
+                      <div className="flex gap-4">
+                        <select
+                          className="input-aurora p-3 rounded-xl flex-1"
+                          value={qKind}
+                          onChange={(e) =>
+                            setQKind(e.target.value as QuestionKind)
+                          }
                         >
-                          Editando pregunta existente
-                        </span>
-                      )}
-                    </div>
+                          <option value="MCQ">Opción Múltiple</option>
+                          <option value="TRUE_FALSE">Verdadero / Falso</option>
+                          <option value="SHORT_TEXT">Texto Corto</option>
+                          <option value="FILL_IN">Completar Espacios</option>
+                        </select>
+                        <input
+                          type="number"
+                          className="input-aurora p-3 rounded-xl w-24 text-center"
+                          placeholder="Pts"
+                          value={qPoints}
+                          onChange={(e) => setQPoints(Number(e.target.value))}
+                        />
+                      </div>
 
-                    {/* Enunciado */}
-                    <div>
-                      <label>Enunciado / consigna</label>
                       <textarea
-                        value={qStem}
-                        onChange={(e) => setQStem(e.target.value)}
+                        className="input-aurora w-full p-4 rounded-xl"
                         rows={3}
                         placeholder={
                           qKind === "FILL_IN"
-                            ? "Ej: El perro es un [animal] doméstico y muy [fiel]."
-                            : "Escribí la consigna de la pregunta…"
+                            ? "El [cielo] es azul."
+                            : "Escribe la consigna aquí..."
                         }
-                        style={{ width: "100%", marginTop: 4, padding: 8 }}
+                        value={qStem}
+                        onChange={(e) => setQStem(e.target.value)}
                       />
-                      {qKind === "FILL_IN" && (
-                        <div
-                          style={{
-                            fontSize: 12,
-                            opacity: 0.8,
-                            marginTop: 4,
-                          }}
-                        >
-                          Escribí el texto completo con las respuestas correctas
-                          entre corchetes. Ejemplo:{" "}
-                          <code>
-                            El perro es un [animal] doméstico que suele ser muy
-                            [fiel].
-                          </code>
-                          <br />
-                          Detectamos <b>{fillAnswersPreview.length}</b>{" "}
-                          casillero(s):{" "}
-                          {fillAnswersPreview.length > 0 &&
-                            fillAnswersPreview.join(" · ")}
-                        </div>
-                      )}
-                    </div>
 
-                    {/* Campos por tipo */}
-                    {qKind === "MCQ" && (
-                      <div style={{ display: "grid", gap: 10 }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 8,
-                            alignItems: "center",
-                          }}
-                        >
-                          <b>Opciones</b>
+                      {/* Lógica específica por tipo */}
+                      {qKind === "MCQ" && (
+                        <div className="space-y-2 pl-4 border-l-2 border-purple-200">
+                          <label className="text-xs font-bold text-purple-600 uppercase">
+                            Opciones (marca la correcta)
+                          </label>
+                          {mcqChoices.map((c, i) => (
+                            <div key={i} className="flex gap-2 items-center">
+                              <input
+                                type="radio"
+                                name="mcq_correct"
+                                checked={mcqCorrect === i}
+                                onChange={() => setMcqCorrect(i)}
+                                className="accent-pink-600 w-5 h-5"
+                              />
+                              <input
+                                className="input-aurora flex-1 p-2 rounded-lg"
+                                value={c}
+                                onChange={(e) => {
+                                  const copy = [...mcqChoices];
+                                  copy[i] = e.target.value;
+                                  setMcqChoices(copy);
+                                }}
+                                placeholder={`Opción ${i + 1}`}
+                              />
+                              <button
+                                onClick={() => {
+                                  const copy = mcqChoices.filter(
+                                    (_, idx) => idx !== i
+                                  );
+                                  setMcqChoices(copy);
+                                  if (mcqCorrect >= copy.length)
+                                    setMcqCorrect(Math.max(0, copy.length - 1));
+                                }}
+                                className="text-red-400 hover:text-red-600 p-1"
+                              >
+                                ✖
+                              </button>
+                            </div>
+                          ))}
                           <button
-                            type="button"
-                            onClick={() =>
-                              setMcqChoices((prev) => [
-                                ...prev,
-                                `Opción ${prev.length + 1}`,
-                              ])
-                            }
+                            onClick={() => setMcqChoices([...mcqChoices, ""])}
+                            className="text-sm text-purple-600 font-bold hover:underline mt-2"
                           >
                             + Agregar opción
                           </button>
                         </div>
-                        {mcqChoices.map((c, idx) => (
-                          <div
-                            key={idx}
-                            style={{
-                              display: "flex",
-                              gap: 8,
-                              alignItems: "center",
-                            }}
+                      )}
+
+                      {qKind === "TRUE_FALSE" && (
+                        <div className="flex gap-4 pl-4">
+                          <label
+                            className={`cursor-pointer px-4 py-2 rounded-lg border transition-all ${tfCorrect
+                              ? "bg-green-100 border-green-300 text-green-700"
+                              : "bg-white border-gray-200"
+                              }`}
                           >
                             <input
                               type="radio"
-                              name="mcqCorrect"
-                              checked={mcqCorrect === idx}
-                              onChange={() => setMcqCorrect(idx)}
-                              title="Correcta"
+                              className="hidden"
+                              checked={tfCorrect}
+                              onChange={() => setTfCorrect(true)}
                             />
+                            Verdadero
+                          </label>
+                          <label
+                            className={`cursor-pointer px-4 py-2 rounded-lg border transition-all ${!tfCorrect
+                              ? "bg-red-100 border-red-300 text-red-700"
+                              : "bg-white border-gray-200"
+                              }`}
+                          >
                             <input
-                              value={c}
-                              onChange={(e) =>
-                                setMcqChoices((prev) =>
-                                  prev.map((cc, i) =>
-                                    i === idx ? e.target.value : cc
-                                  )
-                                )
-                              }
-                              style={{ flex: 1, padding: 4 }}
+                              type="radio"
+                              className="hidden"
+                              checked={!tfCorrect}
+                              onChange={() => setTfCorrect(false)}
                             />
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setMcqChoices((prev) =>
-                                  prev.filter((_, i) => i !== idx)
-                                )
-                              }
-                              disabled={mcqChoices.length <= 2}
-                            >
-                              🗑
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {qKind === "TRUE_FALSE" && (
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 12,
-                          alignItems: "center",
-                        }}
-                      >
-                        <label>Respuesta correcta:</label>
-                        <label>
-                          <input
-                            type="radio"
-                            name="tf"
-                            checked={tfCorrect === true}
-                            onChange={() => setTfCorrect(true)}
-                          />{" "}
-                          Verdadero
-                        </label>
-                        <label>
-                          <input
-                            type="radio"
-                            name="tf"
-                            checked={tfCorrect === false}
-                            onChange={() => setTfCorrect(false)}
-                          />{" "}
-                          Falso
-                        </label>
-                      </div>
-                    )}
-
-                    {qKind === "SHORT_TEXT" && (
-                      <div style={{ display: "grid", gap: 6 }}>
-                        <label>Respuesta de referencia (opcional)</label>
-                        <input
-                          value={shortAnswer}
-                          onChange={(e) => setShortAnswer(e.target.value)}
-                          placeholder="Respuesta esperada (opcional)"
-                          style={{ padding: 4 }}
-                        />
-                      </div>
-                    )}
-
-                    {qKind === "FILL_IN" && (
-                      <div style={{ display: "grid", gap: 6 }}>
-                        <label>Palabras distractoras</label>
-                        <input
-                          value={fillDistractorsText}
-                          onChange={(e) => setFillDistractorsText(e.target.value)}
-                          placeholder="insecto, peludo, rudo"
-                          style={{ padding: 4 }}
-                        />
-                        <div
-                          style={{
-                            fontSize: 12,
-                            opacity: 0.8,
-                          }}
-                        >
-                          Estas palabras se mezclarán con las respuestas correctas
-                          en el banco que ve el alumno. Separalas con <b>comas</b>
-                          .
+                            Falso
+                          </label>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Puntos + botones */}
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 12,
-                        alignItems: "center",
-                        marginTop: 4,
-                      }}
-                    >
-                      <label>Puntos</label>
-                      <input
-                        type="number"
-                        value={qPoints}
-                        onChange={(e) =>
-                          setQPoints(parseInt(e.target.value, 10) || 1)
-                        }
-                        style={{ width: 120, padding: 4 }}
-                      />
-                      <div
-                        style={{ marginLeft: "auto", display: "flex", gap: 8 }}
-                      >
+                      {qKind === "FILL_IN" && (
+                        <div className="pl-4">
+                          <label className="text-xs text-gray-500 mb-1 block">
+                            Palabras Distractoras (opcional, separadas por coma)
+                          </label>
+                          <input
+                            className="input-aurora w-full p-3 rounded-lg"
+                            placeholder="Ej: rojo, verde, mar"
+                            value={fillDistractorsText}
+                            onChange={(e) =>
+                              setFillDistractorsText(e.target.value)
+                            }
+                          />
+                          <p className="text-xs text-gray-400 mt-2">
+                            Tip: Escribe las respuestas correctas entre
+                            corchetes en el enunciado. Ej: "La capital de
+                            Francia es [París]".
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="flex justify-end gap-3 mt-6 border-t pt-4 border-white/20">
                         {editingQuestionId && (
                           <button
-                            type="button"
                             onClick={resetQuestionForm}
-                            disabled={savingQuestion}
+                            className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg"
                           >
-                            Cancelar edición
+                            Cancelar
                           </button>
                         )}
                         <button
-                          disabled={savingQuestion || !qStem.trim()}
                           onClick={saveQuestion}
-                          style={{
-                            padding: "6px 12px",
-                            borderRadius: 6,
-                            background: "#2563eb",
-                            color: "white",
-                            border: "none",
-                            cursor: "pointer",
-                          }}
+                          disabled={savingQuestion}
+                          className="btn-aurora-primary py-2 px-6 rounded-lg font-bold shadow-lg"
                         >
                           {savingQuestion
                             ? "Guardando..."
                             : editingQuestionId
-                              ? "Guardar cambios"
-                              : "Guardar pregunta"}
+                              ? "Actualizar Pregunta"
+                              : "Agregar Pregunta"}
                         </button>
                       </div>
+                      {questionErr && (
+                        <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded">
+                          {questionErr}
+                        </div>
+                      )}
                     </div>
+                  </section>
 
-                    {questionErr && (
-                      <div
-                        style={{
-                          background: "#fee",
-                          border: "1px solid #fcc",
-                          borderRadius: 8,
-                          padding: 8,
-                          whiteSpace: "pre-wrap",
-                          marginTop: 8,
-                          fontSize: 12,
-                        }}
-                      >
-                        Error: {questionErr}
+                  {/* Listado de Preguntas */}
+                  <section>
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 pl-2">
+                      Preguntas Cargadas ({questions.length})
+                    </h3>
+                    {loadingQuestions ? (
+                      <div className="glass-panel p-4 text-center">
+                        Cargando...
+                      </div>
+                    ) : questions.length === 0 ? (
+                      <div className="text-gray-400 italic pl-2">
+                        Aún no hay preguntas. ¡Agregá la primera arriba!
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {questions.map((q, i) => (
+                          <div
+                            key={q.id}
+                            className="glass-panel p-4 rounded-xl flex justify-between items-start hover:bg-white/40 transition-colors"
+                          >
+                            <div>
+                              <div className="text-xs font-bold text-purple-600 mb-1">
+                                {i + 1}. {q.kind} ({q.points} pts)
+                              </div>
+                              <div className="text-gray-800 font-medium">
+                                {q.stem}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => startEditQuestion(q)}
+                                className="p-2 hover:bg-blue-100 rounded-full text-blue-600"
+                                title="Editar"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => deleteQuestion(q.id)}
+                                className="p-2 hover:bg-red-100 rounded-full text-red-600"
+                                title="Borrar"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
-                  </div>
+                  </section>
 
-                  {/* LISTA DE PREGUNTAS */}
-                  <div
-                    style={{
-                      borderTop: "1px solid #e5e7eb",
-                      marginTop: 12,
-                      paddingTop: 12,
-                    }}
-                  >
-                    <h3 style={{ marginTop: 0 }}>
-                      Preguntas creadas ({questions.length})
-                    </h3>
-                    {loadingQuestions && <p>Cargando preguntas…</p>}
-                    {!loadingQuestions && !questions.length && (
-                      <p style={{ fontSize: 13, opacity: 0.7 }}>
-                        No hay preguntas todavía.
-                      </p>
-                    )}
-                    <ol>
-                      {questions.map((q, idx) => (
-                        <li key={q.id} style={{ marginBottom: 12 }}>
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: 8,
-                              alignItems: "baseline",
-                            }}
-                          >
-                            <b
-                              style={{
-                                fontSize: 12,
-                                background: "#eef",
-                                padding: "2px 6px",
-                                borderRadius: 6,
-                              }}
-                            >
-                              {q.kind}
-                            </b>
-                            <span style={{ fontWeight: 600 }}>{idx + 1}.</span>
-                            <span>{q.stem}</span>
-                            {typeof q.points === "number" && (
-                              <span
-                                style={{
-                                  marginLeft: "auto",
-                                  fontSize: 12,
-                                  opacity: 0.7,
-                                }}
-                              >
-                                Puntos: {q.points}
-                              </span>
-                            )}
-                          </div>
-                          {Array.isArray(q.choices) && q.choices.length > 0 && (
-                            <ul style={{ marginTop: 6 }}>
-                              {q.choices.map((c, i) => (
-                                <li key={i}>{c}</li>
-                              ))}
-                            </ul>
-                          )}
-                          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                            <button
-                              type="button"
-                              onClick={() => startEditQuestion(q)}
-                              style={{ fontSize: 12, cursor: "pointer" }}
-                            >
-                              ✏️ Editar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => deleteQuestion(q.id)}
-                              style={{
-                                fontSize: 12,
-                                color: "#b91c1c",
-                                cursor: "pointer",
-                              }}
-                            >
-                              🗑 Eliminar
-                            </button>
-                          </div>
-                        </li>
-                      ))}
-                    </ol>
-
-                    <div style={{ marginTop: 12 }}>
-                      <button
-                        type="button"
-                        onClick={() => setStep(4)}
-                        style={{
-                          padding: "6px 12px",
-                          borderRadius: 6,
-                          background: "#16a34a",
-                          color: "white",
-                          border: "none",
-                          cursor: "pointer",
-                        }}
-                      >
-                        Continuar al tablero →{" "}
-                      </button>
-                    </div>
-                  </div>
-                </section>
-              )}
-
-              {step === 4 && (
-                <section className="glass-card p-8">
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 8,
-                    }}
-                  >
-                    <h2 style={{ margin: 0, fontSize: 18 }}>Tablero y chat</h2>
-                  </div>
-
-                  {/* link para alumnos */}
-                  <div
-                    style={{
-                      fontSize: 13,
-                      marginBottom: 10,
-                      padding: 8,
-                      background: "#f9fafb",
-                      borderRadius: 8,
-                      border: "1px solid #e5e7eb",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                  >
-                    <div style={{ marginBottom: 0 }}>Link para alumnos:</div>
-                    <code
-                      style={{
-                        fontSize: 12,
-                        padding: "4px 6px",
-                        background: "white",
-                        borderRadius: 6,
-                        border: "1px solid #e5e7eb",
-                      }}
-                    >
-                      {typeof window !== "undefined"
-                        ? `${window.location.origin}/s/${code}`
-                        : `/s/${code}`}
-                    </code>
+                  <div className="border-t border-white/30 pt-4 flex justify-end">
                     <button
-                      onClick={copyStudentLink}
-                      style={{
-                        marginLeft: "auto",
-                        padding: "4px 10px",
-                        borderRadius: 6,
-                        border: "1px solid #d1d5db",
-                        background: linkCopied ? "#dcfce7" : "white",
-                        color: linkCopied ? "#166534" : "#374151",
-                        fontSize: 12,
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                      }}
+                      onClick={() => setStep(4)}
+                      className="btn-aurora px-6 py-3 rounded-xl"
                     >
-                      {linkCopied ? "¡Copiado!" : "Copiar"}
+                      Ir al Tablero →
                     </button>
                   </div>
-                  {/* descarga de registro en PDF */}
-                  <div
-                    style={{
-                      fontSize: 13,
-                      marginBottom: 12,
-                    }}
-                  >
-                    <a
-                      href={`${API}/exams/${code}/activity.pdf`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <button
-                        type="button"
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 8,
-                          border: "1px solid #e5e7eb",
-                          background: "#eef2ff",
-                          cursor: "pointer",
-                          fontSize: 13,
-                        }}
-                      >
-                        ⬇️ Descargar registro del examen (PDF)
-                      </button>
-                    </a>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        opacity: 0.6,
-                        marginTop: 4,
-                      }}
-                    >
-                      Incluye intentos, antifraude y chat (según lo que definamos
-                      en el backend).
+                </div>
+              )}
+
+              {/* PASO 4: Tablero */}
+              {step === 4 && (
+                <>
+                  <div className="animate-slide-up space-y-6">
+                    <div className="glass-panel p-0 rounded-3xl overflow-hidden flex flex-col min-h-[600px]">
+                      <div className="p-4 bg-white/40 font-bold text-gray-700 border-b border-white/20">
+                        Monitoreo en Vivo
+                      </div>
+                      <div className="flex-1 overflow-auto bg-white/30">
+                        <BoardClient code={code} />
+                      </div>
                     </div>
                   </div>
 
-                  <BoardClient code={code} />
+                  {/* Floating Exam Link - Top Right (Moved outside animation) */}
+                  <button
+                    onClick={copyStudentLink}
+                    style={{
+                      position: "fixed",
+                      top: 96,
+                      right: 24,
+                      zIndex: 9999,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px 12px",
+                      borderRadius: 999,
+                      cursor: "pointer",
+                      background: "rgba(255, 255, 255, 0.75)",
+                      backdropFilter: "blur(20px)",
+                      border: "1px solid rgba(255,255,255,0.8)",
+                      boxShadow: "0 4px 16px rgba(31, 38, 135, 0.1)",
+                      transition: "all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
+                      transform: linkCopied ? "scale(1.05)" : "scale(1)"
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!linkCopied) e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.9)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.75)";
+                    }}
+                  >
+                    <span className="text-lg">{linkCopied ? "✅" : "🔗"}</span>
+                    <div className="flex flex-col items-start leading-none">
+                      <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-0.5">
+                        Link Examen
+                      </span>
+                      <span className={`text-xs font-mono font-bold text-[#1e1b4b] transition-colors ${linkCopied ? "text-green-600" : ""}`}>
+                        {linkCopied ? "¡Copiado!" : code}
+                      </span>
+                    </div>
+                  </button>
 
-
-                </section>
+                  {/* Move outside of animate-slide-up to avoid transform trapping position:fixed */}
+                  <FloatingChatShell label="Chat">
+                    <ExamChat
+                      code={code}
+                      role="teacher"
+                      defaultName="Docente"
+                    />
+                  </FloatingChatShell>
+                </>
               )}
             </div>
-          </div >
-        )
-        }
-
-        {
-          err && (
-            <div
-              style={{
-                borderRadius: 8,
-                border: "1px solid #fecaca",
-                background: "#fef2f2",
-                padding: 8,
-                fontSize: 13,
-              }}
-            >
-              {err}
-            </div>
-          )
-        }
-
-        {
-          info && (
-            <div
-              style={{
-                borderRadius: 8,
-                border: "1px solid #bbf7d0",
-                background: "#ecfdf5",
-                padding: 8,
-                fontSize: 13,
-              }}
-            >
-              {info}
-            </div>
-          )
-        }
-      </div >
-
-      <FloatingChatShell label="Chat con alumnos">
-        <ExamChat
-          code={code}
-          role="teacher"
-          defaultName={teacherName || "Docente"}
-        />
-      </FloatingChatShell>
-    </div >
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

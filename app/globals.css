@@ -109,27 +109,205 @@ body {
 }
 
 /* Premium UI Utilities */
-.glass-card {
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
-  transition: all 0.3s ease;
+
+/* Fluid Aurora Theme Animations */
+@keyframes aurora-1 {
+
+  0%,
+  100% {
+    top: 0;
+    right: 0;
+  }
+
+  50% {
+    top: 20%;
+    right: 20%;
+  }
 }
 
-.btn-premium {
+@keyframes aurora-2 {
+
+  0%,
+  100% {
+    bottom: 0;
+    left: 0;
+  }
+
+  50% {
+    bottom: 20%;
+    left: 20%;
+  }
+}
+
+@keyframes aurora-3 {
+
+  0%,
+  100% {
+    bottom: 0;
+    right: 0;
+  }
+
+  50% {
+    bottom: 20%;
+    right: 20%;
+  }
+}
+
+@keyframes float-slow {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+
+  33% {
+    transform: translate(30px, -50px) rotate(10deg);
+  }
+
+  66% {
+    transform: translate(-20px, 20px) rotate(-5deg);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+@keyframes float-medium {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate(-40px, 40px) scale(1.1);
+  }
+
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes morph {
+  0% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+  }
+
+  50% {
+    border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+  }
+
+  100% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+  }
+}
+
+.animate-aurora-1 {
+  animation: aurora-1 20s infinite alternate linear;
+}
+
+.animate-aurora-2 {
+  animation: aurora-2 25s infinite alternate linear;
+}
+
+.animate-aurora-3 {
+  animation: aurora-3 30s infinite alternate linear;
+}
+
+.animate-float-slow {
+  animation: float-slow 15s ease-in-out infinite;
+}
+
+.animate-float-medium {
+  animation: float-medium 12s ease-in-out infinite;
+}
+
+.animate-morph {
+  animation: morph 10s ease-in-out infinite;
+}
+
+/* Aurora Blobs */
+.aurora-blob {
+  position: absolute;
+  filter: blur(80px);
+  opacity: 0.8;
+  border-radius: 50%;
+  animation: morph 20s infinite;
+}
+
+/* Premium Glass & Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.02),
+    0 2px 4px -1px rgba(0, 0, 0, 0.02),
+    inset 0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+.text-gradient-aurora {
+  background: linear-gradient(135deg, #7928CA 0%, #FF0080 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.btn-aurora {
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  color: #1a1a1a;
+  font-weight: 600;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
   position: relative;
   overflow: hidden;
 }
 
-.btn-premium:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px -10px rgba(0, 0, 0, 0.1);
-  filter: brightness(1.05);
+.btn-aurora::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(121, 40, 202, 0.1), rgba(255, 0, 128, 0.1));
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
-.btn-premium:active {
-  transform: translateY(0);
+.btn-aurora:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(121, 40, 202, 0.15);
+  border-color: #fff;
+}
+
+.btn-aurora:hover::before {
+  opacity: 1;
+}
+
+.btn-aurora-primary {
+  background: linear-gradient(135deg, #7928CA 0%, #FF0080 100%);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 15px rgba(255, 0, 128, 0.3);
+}
+
+.btn-aurora-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(255, 0, 128, 0.5);
+  filter: brightness(1.1);
+}
+
+.input-aurora {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.input-aurora:focus {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: #FF0080;
+  box-shadow: 0 0 0 3px rgba(255, 0, 128, 0.1);
+  outline: none;
 }

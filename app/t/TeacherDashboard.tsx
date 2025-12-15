@@ -178,190 +178,6 @@ export default function TeacherDashboard({
     }
   }
 
-  // Estilos "Superbloom Aura"
-  const styles = {
-    container: {
-      display: "flex",
-      minHeight: "100vh",
-      background: "linear-gradient(-45deg, #ff9a9e, #fad0c4, #fad0c4, #a18cd1, #fbc2eb)",
-      backgroundSize: "400% 400%",
-      animation: "superbloom 20s ease infinite",
-      fontFamily: "'Inter', sans-serif",
-      overflow: "hidden",
-      position: "relative" as const, // For noise overlay
-    },
-    // Sidebar: Cristal premium
-    sidebar: {
-      width: "280px",
-      background: "rgba(255, 255, 255, 0.4)",
-      backdropFilter: "blur(20px)",
-      WebkitBackdropFilter: "blur(20px)",
-      borderRight: "1px solid rgba(255,255,255,0.3)",
-      padding: "32px 24px",
-      display: "flex",
-      flexDirection: "column" as const,
-      flexShrink: 0,
-      zIndex: 50,
-    },
-    sidebarLogo: {
-      fontSize: "28px",
-      fontFamily: "var(--font-festive), sans-serif", // Syne Font
-      fontWeight: 800,
-      background: "linear-gradient(90deg, #1e1b4b, #701a75)",
-      WebkitBackgroundClip: "text",
-      WebkitTextFillColor: "transparent",
-      marginBottom: "48px",
-      letterSpacing: "-1px",
-      paddingLeft: "12px",
-    },
-    navItem: (active: boolean) => ({
-      padding: "12px 20px",
-      borderRadius: "16px",
-      marginBottom: "8px",
-      cursor: "pointer",
-      color: active ? "#1e1b4b" : "#64748b",
-      background: active ? "rgba(255, 255, 255, 0.6)" : "transparent",
-      fontWeight: active ? 700 : 500,
-      fontSize: "15px",
-      display: "flex",
-      alignItems: "center",
-      gap: "12px",
-      transition: "all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
-      border: active ? "1px solid rgba(255,255,255,0.8)" : "1px solid transparent",
-      boxShadow: active ? "0 4px 12px rgba(0,0,0,0.03)" : "none",
-    }),
-    userSection: {
-      marginTop: "auto",
-      padding: "20px",
-      background: "rgba(255,255,255,0.3)",
-      borderRadius: "20px",
-      display: "flex",
-      alignItems: "center",
-      gap: "12px",
-      backdropFilter: "blur(5px)",
-      border: "1px solid rgba(255,255,255,0.4)",
-    },
-    avatar: {
-      width: "36px",
-      height: "36px",
-      borderRadius: "12px",
-      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-      color: "white",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: "14px",
-      fontWeight: 700,
-      boxShadow: "0 4px 6px rgba(118, 75, 162, 0.3)",
-    },
-    main: {
-      flex: 1,
-      padding: "40px",
-      height: "100vh",
-      overflowY: "auto" as const,
-      position: "relative" as const,
-    },
-    topBar: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: "40px",
-    },
-    search: {
-      padding: "12px 24px",
-      borderRadius: "24px",
-      border: "1px solid rgba(255,255,255,0.5)",
-      width: "320px",
-      fontSize: "14px",
-      background: "rgba(255,255,255,0.45)",
-      backdropFilter: "blur(10px)",
-      transition: "all 0.2s",
-      outline: "none",
-      color: "#1e1b4b",
-      boxShadow: "0 4px 6px rgba(0,0,0,0.02)",
-    },
-    createBtn: {
-      padding: "12px 28px",
-      borderRadius: "24px",
-      background: "#1e1b4b",
-      color: "white",
-      border: "none",
-      fontWeight: 600,
-      cursor: "pointer",
-      boxShadow: "0 10px 20px rgba(30, 27, 75, 0.15)",
-      transition: "transform 0.2s",
-    },
-    grid: {
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-      gap: "32px",
-      gridAutoRows: "minmax(200px, auto)",
-    },
-    // Cards con efecto "Ice"
-    card: {
-      background: "rgba(255, 255, 255, 0.55)",
-      backdropFilter: "blur(24px)",
-      WebkitBackdropFilter: "blur(24px)",
-      borderRadius: "32px",
-      border: "1px solid rgba(255,255,255,0.6)",
-      padding: "32px",
-      boxShadow: "0 10px 40px rgba(31, 38, 135, 0.05)",
-      display: "flex",
-      flexDirection: "column" as const,
-      transition: "transform 0.3s, box-shadow 0.3s",
-    },
-    cardTitle: {
-      fontSize: "18px",
-      fontWeight: 800,
-      marginBottom: "20px",
-      color: "#1e1b4b",
-      display: "flex",
-      alignItems: "center",
-      gap: "8px",
-    },
-    cardList: {
-      display: "flex",
-      flexDirection: "column" as const,
-      gap: "16px",
-    },
-    listItem: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      fontSize: "14px",
-      color: "#4b5563",
-      padding: "8px 0",
-      borderBottom: "1px solid rgba(0,0,0,0.05)",
-    },
-    statusBadge: (status: string) => {
-      const isOpen = status.toUpperCase() === "OPEN";
-      return {
-        padding: "4px 12px",
-        borderRadius: "99px",
-        fontSize: "11px",
-        fontWeight: 700,
-        background: isOpen ? "#dcfce7" : "#f1f5f9",
-        color: isOpen ? "#166534" : "#64748b",
-        border: isOpen ? "1px solid #bbf7d0" : "1px solid #e2e8f0",
-      };
-    },
-    deleteBtnSmall: {
-      background: "rgba(254, 226, 226, 0.5)",
-      border: "none",
-      color: "#ef4444",
-      fontSize: "14px",
-      cursor: "pointer",
-      marginLeft: "12px",
-      width: "28px",
-      height: "28px",
-      borderRadius: "50%",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      transition: "background 0.2s",
-    },
-  };
-
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: "📊" },
     { id: "universities", label: "Universidades", icon: "🏛️" },
@@ -418,10 +234,17 @@ export default function TeacherDashboard({
               </div>
             )}
 
-            <div style={styles.grid}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                gap: "32px",
+                gridAutoRows: "minmax(200px, auto)",
+              }}
+            >
               {/* A: Próximos Exámenes */}
-              <div style={{ ...styles.card, gridColumn: "span 2" }}>
-                <h3 style={styles.cardTitle}>
+              <div className="glass-panel" style={{ padding: 32, gridColumn: "span 2", borderRadius: 32 }}>
+                <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 20, color: "#1e1b4b" }}>
                   Próximos exámenes{" "}
                   <span
                     style={{
@@ -447,11 +270,11 @@ export default function TeacherDashboard({
                     No hay exámenes creados. Crea uno nuevo para empezar.
                   </div>
                 ) : (
-                  <div style={styles.cardList}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     {exams.slice(0, 4).map((ex) => (
-                      <div key={ex.id} style={styles.listItem}>
+                      <div key={ex.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
                         <div
-                          style={{ cursor: "pointer", flex: 1 }}
+                          style={{ cursor: "pointer", flex: 1, color: '#4b5563' }}
                           onClick={() => router.push(`/t/${ex.code}`)}
                         >
                           <strong>{ex.title}</strong>
@@ -460,17 +283,32 @@ export default function TeacherDashboard({
                           </span>
                           {ex.code}
                         </div>
-                        <div style={{ display: "flex", alignItems: "center" }}>
-                          <span style={styles.statusBadge(ex.status)}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span
+                            style={{
+                              padding: "4px 12px",
+                              borderRadius: "99px",
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              background: ex.status.toUpperCase() === "OPEN" ? "#dcfce7" : "#f1f5f9",
+                              color: ex.status.toUpperCase() === "OPEN" ? "#166534" : "#64748b",
+                              border: ex.status.toUpperCase() === "OPEN" ? "1px solid #bbf7d0" : "1px solid #e2e8f0",
+                            }}
+                          >
                             {ex.status}
                           </span>
                           <button
-                            style={styles.deleteBtnSmall}
                             onClick={() => {
                               if (confirm("¿Seguro de borrar?"))
                                 handleDeleteExam(ex.id);
                             }}
                             title="Borrar"
+                            className="btn-aurora"
+                            style={{
+                              width: 28, height: 28, borderRadius: '50%',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              color: '#ef4444', border: 'none'
+                            }}
                           >
                             🗑️
                           </button>
@@ -483,17 +321,20 @@ export default function TeacherDashboard({
 
               {/* B: Calendario Mini (Acceso rápido a vista completa) */}
               <div
+                className="glass-panel"
                 style={{
-                  ...styles.card,
-                  background: "#1f2937",
+                  padding: 32, borderRadius: 32,
+                  background: "rgba(31, 41, 55, 0.95)", // Dark override
                   color: "white",
                   cursor: "pointer",
+                  display: "flex",
+                  flexDirection: "column"
                 }}
                 onClick={() => setActiveView("calendar")}
               >
                 <h3
                   style={{
-                    ...styles.cardTitle,
+                    fontSize: 18, fontWeight: 800, marginBottom: 20,
                     color: "white",
                     display: "flex",
                     justifyContent: "space-between",
@@ -501,7 +342,7 @@ export default function TeacherDashboard({
                 >
                   Calendario
                   <span style={{ fontSize: 12, opacity: 0.7 }}>
-                    ↗ Ver completo
+                    ↗ Ver
                   </span>
                 </h3>
                 <div
@@ -538,14 +379,14 @@ export default function TeacherDashboard({
               </div>
 
               {/* C: Resumen Antifraude */}
-              <div style={styles.card}>
-                <h3 style={styles.cardTitle}>Resumen Antifraude</h3>
+              <div className="glass-panel" style={{ padding: 32, borderRadius: 32 }}>
+                <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 20, color: '#1e1b4b' }}>Resumen Antifraude</h3>
                 <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
                   <div
                     style={{
                       flex: 1,
                       padding: 12,
-                      background: "#f3f4f6",
+                      background: "rgba(255,255,255,0.5)",
                       borderRadius: 12,
                     }}
                   >
@@ -560,7 +401,7 @@ export default function TeacherDashboard({
                     style={{
                       flex: 1,
                       padding: 12,
-                      background: "#dcfce7",
+                      background: "#dcfce7", // Keep green for success
                       borderRadius: 12,
                       color: "#166534",
                     }}
@@ -589,12 +430,12 @@ export default function TeacherDashboard({
               </div>
 
               {/* D: Materias Shortcut */}
-              <div style={styles.card}>
-                <h3 style={styles.cardTitle}>Tus Materias</h3>
+              <div className="glass-panel" style={{ padding: 32, borderRadius: 32 }}>
+                <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 20, color: '#1e1b4b' }}>Tus Materias</h3>
                 {profile?.institutions?.length ? (
-                  <div style={styles.cardList}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {profile.institutions[0].subjects.slice(0, 3).map((s) => (
-                      <div key={s.id} style={styles.listItem}>
+                      <div key={s.id} style={{ padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,0.05)', color: '#4b5563', fontSize: 14 }}>
                         <span>📚 {s.name}</span>
                       </div>
                     ))}
@@ -622,11 +463,11 @@ export default function TeacherDashboard({
               </div>
 
               {/* E: Actividad Reciente */}
-              <div style={{ ...styles.card, gridColumn: "span 2" }}>
-                <h3 style={styles.cardTitle}>Actividad Reciente</h3>
-                <div style={styles.cardList}>
+              <div className="glass-panel" style={{ padding: 32, gridColumn: "span 2", borderRadius: 32 }}>
+                <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 20, color: '#1e1b4b' }}>Actividad Reciente</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {activityLog.map((log, i) => (
-                    <div key={i} style={styles.listItem}>
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,0.05)', fontSize: 14, color: '#4b5563' }}>
                       <div
                         style={{
                           display: "flex",
@@ -663,26 +504,39 @@ export default function TeacherDashboard({
   };
 
   return (
-    <>
-      <style jsx global>{`
-        @keyframes superbloom {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-      `}</style>
-      <div style={styles.container} className="bg-noise">
-        {/* Sidebar */}
-        <aside style={styles.sidebar}>
-          <div style={styles.sidebarLogo}>ProctoEtic</div>
-          <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {navItems.map((item) => (
+    <div style={{ display: "flex", minHeight: "100vh", position: 'relative', overflow: 'hidden' }}>
+
+      {/* Sidebar - Ahora es Glass Panel */}
+      <aside
+        className="glass-panel"
+        style={{
+          width: "280px",
+          borderRight: "1px solid rgba(255,255,255,0.4)",
+          padding: "32px 24px",
+          display: "flex",
+          flexDirection: "column",
+          flexShrink: 0,
+          zIndex: 50,
+        }}
+      >
+        <div
+          className="font-festive text-gradient-aurora"
+          style={{
+            fontSize: "28px",
+            fontWeight: 800,
+            marginBottom: "48px",
+            letterSpacing: "-1px",
+            paddingLeft: "12px",
+          }}
+        >
+          ProctoEtic
+        </div>
+        <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {navItems.map((item) => {
+            const active = activeView === item.id || (activeView === "profile" && item.id === "profile");
+            return (
               <div
                 key={item.id}
-                style={styles.navItem(
-                  activeView === item.id ||
-                  (activeView === "profile" && item.id === "profile")
-                )}
                 onClick={() => {
                   if (item.action) {
                     item.action();
@@ -690,74 +544,138 @@ export default function TeacherDashboard({
                     setActiveView(item.id as any);
                   }
                 }}
+                className={active ? "glass-panel" : ""}
+                style={{
+                  padding: "12px 20px",
+                  borderRadius: "16px",
+                  marginBottom: "8px",
+                  cursor: "pointer",
+                  color: active ? "#1e1b4b" : "#64748b",
+                  background: active ? "rgba(255, 255, 255, 0.5)" : "transparent",
+                  fontWeight: active ? 700 : 500,
+                  fontSize: "15px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  transition: "all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
+                  border: active ? "1px solid rgba(255,255,255,0.8)" : "1px solid transparent",
+                }}
               >
                 <span>{item.icon}</span>
                 {item.label}
               </div>
-            ))}
-            <div style={styles.navItem(false)} onClick={onLogout}>
-              <span>🚪</span>
-              Cerrar sesión
-            </div>
-          </nav>
-
-          <div style={styles.userSection}>
-            <div style={styles.avatar}>
-              {profile?.name?.charAt(0).toUpperCase() || "D"}
-            </div>
-            <div style={{ fontSize: "13px", overflow: "hidden" }}>
-              <div
-                style={{
-                  fontWeight: 600,
-                  whiteSpace: "nowrap",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {profile?.name || "Docente"}
-              </div>
-              <div style={{ color: "#6b7280", fontSize: "12px" }}>Dashboard</div>
-            </div>
+            );
+          })}
+          <div
+            onClick={onLogout}
+            style={{
+              padding: "12px 20px",
+              borderRadius: "16px",
+              marginTop: "20px",
+              cursor: "pointer",
+              color: "#ef4444",
+              fontWeight: 600,
+              fontSize: "15px",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+            }}
+          >
+            <span>🚪</span>
+            Cerrar sesión
           </div>
-        </aside>
+        </nav>
 
-        {/* Main Content */}
-        <main style={styles.main}>
-          {/* Top Bar */}
-          <div style={styles.topBar}>
-            <div>
-              <h1 style={{ fontSize: "24px", fontWeight: 700, margin: 0 }}>
-                {activeView === "dashboard"
-                  ? `Hola, ${profile?.name?.split(" ")[0] || "Docente"} 👋`
-                  : activeView === "universities"
-                    ? "Universidades y Materias"
-                    : activeView === "calendar"
-                      ? "Calendario Académico"
-                      : "Panel"}
-              </h1>
-              <p
-                style={{ margin: "4px 0 0", color: "#6b7280", fontSize: "14px" }}
-              >
-                {activeView === "dashboard"
-                  ? "Aquí tienes el resumen de tu actividad hoy."
-                  : "Gestiona y organiza tus evaluaciones."}
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: "16px" }}>
-              <input
-                style={styles.search}
-                placeholder="Buscar examen, materia..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <button onClick={handleCreateExam} style={styles.createBtn}>
-                ➕ Crear examen
-              </button>
-            </div>
+        <div style={{
+          marginTop: "auto",
+          padding: "16px",
+          background: "rgba(255,255,255,0.3)",
+          borderRadius: "20px",
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          backdropFilter: "blur(5px)",
+          border: "1px solid rgba(255,255,255,0.4)",
+        }}>
+          <div style={{
+            width: "36px",
+            height: "36px",
+            borderRadius: "12px",
+            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "14px",
+            fontWeight: 700,
+            boxShadow: "0 4px 6px rgba(118, 75, 162, 0.3)",
+          }}>
+            {profile?.name?.charAt(0).toUpperCase() || "D"}
           </div>
+          <div style={{ fontSize: "13px", overflow: "hidden" }}>
+            <div
+              style={{
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {profile?.name || "Docente"}
+            </div>
+            <div style={{ color: "#6b7280", fontSize: "12px" }}>Dashboard</div>
+          </div>
+        </div>
+      </aside>
 
-          {renderContent()}
-        </main>
-      </div>
-    </>
+      {/* Main Content */}
+      <main style={{
+        flex: 1,
+        padding: "40px",
+        height: "100vh",
+        overflowY: "auto",
+        position: "relative",
+      }}>
+        {/* Top Bar */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "40px" }}>
+          <div>
+            <h1 className="text-gradient-aurora font-festive" style={{ fontSize: "32px", fontWeight: 700, margin: 0 }}>
+              {activeView === "dashboard"
+                ? `Hola, ${profile?.name?.split(" ")[0] || "Docente"} 👋`
+                : activeView === "universities"
+                  ? "Universidades"
+                  : activeView === "calendar"
+                    ? "Calendario"
+                    : "Panel"}
+            </h1>
+            <p
+              style={{ margin: "4px 0 0", color: "#6b7280", fontSize: "14px" }}
+            >
+              {activeView === "dashboard"
+                ? "Resumen de tu actividad académica hoy."
+                : "Gestión de evaluaciones."}
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: "16px" }}>
+            <input
+              className="input-aurora"
+              style={{
+                padding: "12px 24px",
+                borderRadius: "24px",
+                width: "320px",
+                fontSize: "14px",
+              }}
+              placeholder="Buscar examen, materia..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <button onClick={handleCreateExam} className="btn-aurora-primary" style={{ padding: "12px 28px", borderRadius: "24px", fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+              ➕ Crear examen
+            </button>
+          </div>
+        </div>
+
+        {renderContent()}
+      </main>
+    </div>
   );
 }

@@ -110,7 +110,7 @@ export default function FloatingChatShell({
                     }}
                 >
                     <span style={{ fontSize: 20, lineHeight: 1 }}>
-                        {isOpen ? "✕" : "💬"}
+                        {isOpen ? "✕" : "✨"}
                     </span>
                     {!isOpen && <span>{label}</span>}
 
