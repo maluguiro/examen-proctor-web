@@ -200,8 +200,11 @@ export default function TeacherExamPage() {
         if (m.openAt) {
           const d = new Date(m.openAt);
           if (!isNaN(d.getTime())) {
-            const iso = d.toISOString().slice(0, 16);
-            setOpenAt(iso);
+            // Construimos manualmente el string local para datetime-local
+            // evitando conversiones automáticas de zona horaria
+            const pad = (n: number) => n.toString().padStart(2, "0");
+            const localIso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            setOpenAt(localIso);
           }
         }
       }
@@ -404,7 +407,7 @@ export default function TeacherExamPage() {
           .map((s) => s.trim())
           .filter(Boolean);
 
-        const bank = [...answers, ...distractors];
+        const bank = [...answers, ...distractors.filter(d => !answers.includes(d))];
 
         body.stem = studentStem;
         body.answer = { answers, blanks: answers.length };
@@ -1103,7 +1106,7 @@ export default function TeacherExamPage() {
                       {qKind === "FILL_IN" && (
                         <div className="pl-4">
                           <label className="text-xs text-gray-500 mb-1 block">
-                            Palabras Distractoras (opcional, separadas por coma)
+                            Palabras Distractoras (NO escribas las correctas aquí)
                           </label>
                           <input
                             className="input-aurora w-full p-3 rounded-lg"
@@ -1114,9 +1117,8 @@ export default function TeacherExamPage() {
                             }
                           />
                           <p className="text-xs text-gray-400 mt-2">
-                            Tip: Escribe las respuestas correctas entre
-                            corchetes en el enunciado. Ej: "La capital de
-                            Francia es [París]".
+                            Tip: Escribí las respuestas correctas entre corchetes en el enunciado.
+                            En este campo agregá SOLO opciones falsas para confundir.
                           </p>
                         </div>
                       )}

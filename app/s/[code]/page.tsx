@@ -97,6 +97,38 @@ export default function StudentPage({ params }: { params: { code: string } }) {
   const [score, setScore] = React.useState<number | null>(null);
   const [maxScore, setMaxScore] = React.useState<number | null>(null);
 
+  // Lógica de visibilidad de revisión
+  const canViewReview = React.useMemo(() => {
+    const hasScore =
+      gradingMode === "auto" || (gradingMode === "manual" && score !== null);
+    const openAtTime = exam?.openAt ? new Date(exam.openAt).getTime() : 0;
+    // Si no hay fecha (null) o es 0, asumimos disponible
+    const isTimeReached = openAtTime === 0 || Date.now() >= openAtTime;
+    return hasScore && isTimeReached;
+  }, [gradingMode, score, exam?.openAt]);
+
+  // Guardia: Si estamos en "review" pero no se puede ver, volver a "submitted"
+  React.useEffect(() => {
+    if (step === "review" && !canViewReview) {
+      setStep("submitted");
+    }
+  }, [step, canViewReview]);
+
+  function formatReviewDate(openAt?: string | null) {
+    if (!openAt) return "Próximamente";
+    const d = new Date(openAt);
+    return (
+      d.toLocaleString("es-AR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).replace(",", " · ") + " hs"
+    );
+  }
+
   // ============================= Header común =============================
   const Header = (
     <div
@@ -673,9 +705,8 @@ export default function StudentPage({ params }: { params: { code: string } }) {
 
               {/* Status Bar */}
               <div
-                className={`glass-panel p-3 rounded-2xl flex items-center justify-between transition-colors ${
-                  flash ? "bg-red-100/50" : ""
-                }`}
+                className={`glass-panel p-3 rounded-2xl flex items-center justify-between transition-colors ${flash ? "bg-red-100/50" : ""
+                  }`}
               >
                 <div className="flex gap-4 px-2">
                   <div>
@@ -690,8 +721,8 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                     ⏳{" "}
                     {secondsLeft != null
                       ? `${Math.floor(secondsLeft / 60)}:${String(
-                          secondsLeft % 60
-                        ).padStart(2, "0")}`
+                        secondsLeft % 60
+                      ).padStart(2, "0")}`
                       : "—"}
                   </div>
                 </div>
@@ -737,7 +768,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
           {/* STEP: SUBMITTED */}
           {step === "submitted" && (
             <div className="glass-panel p-10 rounded-3xl text-center max-w-md mx-auto mt-20 animate-slide-up">
-              <div className="text-6xl mb-4">🚀</div>
+              <div className="text-6xl mb-4">🧠</div>
               <h2 className="text-3xl font-bold mb-2 text-gradient-aurora">
                 ¡Examen Enviado!
               </h2>
@@ -745,25 +776,37 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                 Tus respuestas han sido registradas exitosamente.
               </p>
 
-              {gradingMode === "auto" ? (
-                <div className="bg-white/40 p-6 rounded-2xl mb-6">
-                  <div className="text-sm uppercase tracking-wider opacity-60">
-                    Tu Calificación
-                  </div>
-                  <div className="text-5xl font-bold mt-2 text-gray-800">
-                    {score}{" "}
-                    <span className="text-2xl text-gray-500">/ {maxScore}</span>
-                  </div>
-                </div>
+              {canViewReview ? (
+                <>
+                  {gradingMode === "auto" ? (
+                    <div className="bg-white/40 p-6 rounded-2xl mb-6">
+                      <div className="text-sm uppercase tracking-wider opacity-60">
+                        Tu Calificación
+                      </div>
+                      <div className="text-5xl font-bold mt-2 text-gray-800">
+                        {score}{" "}
+                        <span className="text-2xl text-gray-500">
+                          / {maxScore}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-white/40 p-6 rounded-2xl mb-6">
+                      <p>El docente revisará tu examen pronto.</p>
+                    </div>
+                  )}
+
+                  {/* Aquí podría ir el botón de 'Ver Revisión' si se implementa */}
+                </>
               ) : (
-                <div className="bg-white/40 p-6 rounded-2xl mb-6">
-                  <p>El docente revisará tu examen pronto.</p>
+                <div className="bg-white/40 p-6 rounded-2xl mb-6 border border-white/50">
+                  <p className="text-sm opacity-80 mb-1">Revisión programada</p>
+                  <p className="font-semibold text-lg">
+                    La revisión detallada estará disponible el: <br />
+                    {formatReviewDate(exam?.openAt)}
+                  </p>
                 </div>
               )}
-
-              <div className="text-xs opacity-50 font-mono">
-                ID: {attemptId}
-              </div>
             </div>
           )}
         </div>
@@ -800,7 +843,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                   ) {
                     try {
                       await document.documentElement.requestFullscreen();
-                    } catch (e) {}
+                    } catch (e) { }
                   }
                 }}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold hover:brightness-110 transition-all"

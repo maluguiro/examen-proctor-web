@@ -181,46 +181,31 @@ export default function TeacherHomePage() {
           }
         `}</style>
         <div
-          className="bg-noise"
           style={{
             minHeight: "100vh",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             fontFamily: "'Inter', sans-serif",
-            background:
-              "linear-gradient(-45deg, #ff9a9e, #fad0c4, #fad0c4, #a18cd1, #fbc2eb)",
-            backgroundSize: "400% 400%",
-            animation: "superbloom 15s ease infinite",
+            // Removed inline background to let .app-background show through
             position: "relative",
             overflow: "hidden",
           }}
         >
-          {/* Orbes decorativos de fondo */}
+          {/* Orbes decorativos de fondo (Opcional: Mantenerlos o no. 
+              El plan decía integrar con el nuevo fondo. 
+              Los orbes "aurora" siguen siendo consistentes con el estilo pastel. 
+              Los dejaré pero con menos desenfoque para que se mezclen mejor con el grain) */}
           <div
+            className="aurora-blob animate-float-slow"
             style={{
               position: "absolute",
-              top: "20%",
-              left: "15%",
-              width: "300px",
-              height: "300px",
-              background:
-                "radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 70%)",
-              filter: "blur(40px)",
-              animation: "float 6s ease-in-out infinite",
-            }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              bottom: "10%",
-              right: "10%",
-              width: "400px",
-              height: "400px",
-              background:
-                "radial-gradient(circle, rgba(161, 140, 209, 0.4) 0%, rgba(161, 140, 209, 0) 70%)",
-              filter: "blur(60px)",
-              animation: "float 8s ease-in-out infinite reverse",
+              top: "15%",
+              left: "10%",
+              width: "40vw",
+              height: "40vw",
+              background: "radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 70%)",
+              zIndex: 0
             }}
           />
 

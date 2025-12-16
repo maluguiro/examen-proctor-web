@@ -367,7 +367,7 @@ export function BoardClient({ code }: { code: string }) {
                                         borderBottom: "1px solid #ddd",
                                     }}
                                 >
-                                    Puntaje
+                                    Nota / Puntaje
                                 </th>
                                 <th
                                     style={{
@@ -458,8 +458,8 @@ export function BoardClient({ code }: { code: string }) {
                                         });
                                     };
 
-                                    const startStr = fmtTime(a.startedAt);
-                                    const endStr = fmtTime(a.finishedAt);
+                                    const startStr = fmtTime(a.startedAt || undefined);
+                                    const endStr = fmtTime(a.finishedAt || undefined);
                                     const timeLabel = (
                                         <div style={{ fontSize: 12, lineHeight: 1.4 }}>
                                             <div style={{ color: "#444" }}>Inicio: {startStr}</div>

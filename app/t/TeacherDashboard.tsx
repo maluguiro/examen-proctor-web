@@ -634,6 +634,7 @@ export default function TeacherDashboard({
         height: "100vh",
         overflowY: "auto",
         position: "relative",
+        // Transparency is default, fits Phase 2 plan.
       }}>
         {/* Top Bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "40px" }}>
