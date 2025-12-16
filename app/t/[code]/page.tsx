@@ -407,11 +407,14 @@ export default function TeacherExamPage() {
           .map((s) => s.trim())
           .filter(Boolean);
 
-        const bank = [...answers, ...distractors.filter(d => !answers.includes(d))];
+        // Estrategia: Combinar respuestas + distractores en un Set para eliminar duplicados de texto.
+        // El backend guardará el banco completo en 'choices'.
+        const combined = [...answers, ...distractors];
+        const uniqueBank = Array.from(new Set(combined));
 
         body.stem = studentStem;
         body.answer = { answers, blanks: answers.length };
-        body.choices = bank;
+        body.choices = uniqueBank;
       }
 
       const url = editingQuestionId
@@ -1106,7 +1109,7 @@ export default function TeacherExamPage() {
                       {qKind === "FILL_IN" && (
                         <div className="pl-4">
                           <label className="text-xs text-gray-500 mb-1 block">
-                            Palabras Distractoras (NO escribas las correctas aquí)
+                            Palabras Distractoras (Opcional)
                           </label>
                           <input
                             className="input-aurora w-full p-3 rounded-lg"
@@ -1117,8 +1120,9 @@ export default function TeacherExamPage() {
                             }
                           />
                           <p className="text-xs text-gray-400 mt-2">
-                            Tip: Escribí las respuestas correctas entre corchetes en el enunciado.
-                            En este campo agregá SOLO opciones falsas para confundir.
+                            En el enunciado escribí las respuestas correctas entre [corchetes].
+                            <br />
+                            En esta lista agregá SOLO palabras distractoras; el sistema va a sumar automáticamente las respuestas correctas.
                           </p>
                         </div>
                       )}

@@ -59,6 +59,39 @@ function fibParseToParts(stem: string) {
   return parts;
 }
 
+// Helper simple para mezclar arrays
+function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function shuffleArrayWithSeed<T>(items: T[], seedString: string): T[] {
+  const arr = [...items];
+
+  // Convertir el seedString (q.id) en un número semilla
+  let seed = 0;
+  for (let i = 0; i < seedString.length; i++) {
+    seed = (seed * 31 + seedString.charCodeAt(i)) >>> 0;
+  }
+
+  // LCG simple para pseudo-aleatoriedad determinística
+  function random() {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0xffffffff;
+  }
+
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+
+  return arr;
+}
+
 export default function StudentPage({ params }: { params: { code: string } }) {
   const { code } = params;
 
@@ -538,9 +571,13 @@ export default function StudentPage({ params }: { params: { code: string } }) {
         setAnswers({ ...answers, [q.id]: next });
       };
 
-      const bank: string[] = Array.isArray(q.choices)
+      // Construcción del banco de opciones (Fixed: sin hooks, orden estable)
+      const rawChoices = Array.isArray(q.choices)
         ? q.choices.filter((w) => typeof w === "string" && w.trim().length > 0)
         : [];
+
+      const unique = Array.from(new Set(rawChoices));
+      const bank = shuffleArrayWithSeed(unique, q.id);
 
       return (
         <div
