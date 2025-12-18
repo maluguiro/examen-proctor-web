@@ -474,7 +474,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                 name={`tf-${q.id}`}
                 checked={v === "true"}
                 onChange={() => setAnswers({ ...answers, [q.id]: "true" })}
-                className="accent-pink-600 w-4 h-4"
+                className="accent-emerald-500 w-4 h-4"
               />
               Verdadero
             </label>
@@ -484,7 +484,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                 name={`tf-${q.id}`}
                 checked={v === "false"}
                 onChange={() => setAnswers({ ...answers, [q.id]: "false" })}
-                className="accent-pink-600 w-4 h-4"
+                className="accent-emerald-500 w-4 h-4"
               />
               Falso
             </label>
@@ -519,7 +519,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                   name={`mcq-${q.id}`}
                   checked={v === i}
                   onChange={() => setAnswers({ ...answers, [q.id]: i })}
-                  className="accent-pink-600 w-4 h-4"
+                  className="accent-emerald-500 w-4 h-4"
                 />
                 {c}
               </label>
@@ -656,6 +656,9 @@ export default function StudentPage({ params }: { params: { code: string } }) {
         color: "#1a1a1a",
       }}
     >
+      {/* Fondo específico del alumno: mimosa + rayos de sol */}
+      <div className="bg-student-exam" aria-hidden="true" />
+
       {/* --- FLUID AURORA BACKGROUND SYSTEM REMOVED to show global body background --- */}
 
       {/* Main Container */}\n
@@ -706,7 +709,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                   </div>
                 </div>
                 <div className="flex gap-6 px-2">
-                  <div className="text-pink-600 font-bold">
+                  <div className="text-emerald-600 font-bold">
                     ❤️ {lives ?? "—"}
                   </div>
                   <div className="font-mono text-lg">
@@ -753,7 +756,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
               <h2 className="text-2xl font-bold mb-4">
                 Enviando respuestas...
               </h2>
-              <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto" />
+              <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
             </div>
           )}
 

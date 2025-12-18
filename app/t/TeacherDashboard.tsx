@@ -187,12 +187,6 @@ export default function TeacherDashboard({
     { id: "calendar", label: "Calendario", icon: "📅" },
     // Exams tab could be redundant with new views, keeping as placeholder logic or simple list
     // { id: "exams", label: "Exámenes", icon: "📝" },
-    {
-      id: "profile",
-      label: "Perfil",
-      icon: "👤",
-      action: () => router.push("/t/profile"),
-    },
   ];
 
   // --- Contenido según ViewState ---
@@ -409,16 +403,20 @@ export default function TeacherDashboard({
                           </div>
 
                           <div>
-                            <div className="font-semibold text-gray-800 group-hover:text-indigo-700 transition-colors text-sm md:text-base">
+                            <div className="font-bold text-gray-800 group-hover:text-indigo-700 transition-colors text-sm md:text-base">
                               {exam.title || "Sin título"}
                             </div>
-                            <div className="text-[11px] md:text-xs text-gray-500 flex flex-wrap items-center gap-2 mt-0.5">
-                              <span className="font-mono bg-white/60 px-1.5 py-0.5 rounded border border-gray-100">
-                                {exam.code}
-                              </span>
-                              <span className="font-medium">
-                                • {exam.subject || "Sin materia"}
-                              </span>
+
+                            <div className="text-[11px] md:text-xs text-gray-500 mt-0.5 flex items-center gap-1 flex-wrap">
+                              {/* Universidad (si en el futuro la agregás al tipo ExamListItem) */}
+                              {exam.university && (
+                                <>
+                                  <span className="font-semibold">
+                                    {exam.university}
+                                  </span>
+                                  <span>·</span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>

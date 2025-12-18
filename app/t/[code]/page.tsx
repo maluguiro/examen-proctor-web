@@ -541,7 +541,7 @@ export default function TeacherExamPage() {
     <div className="relative z-10 w-full min-h-screen flex flex-col md:flex-row p-4 md:p-6 gap-6">
       {/* SIDEBAR (Desktop) */}
       <aside className="hidden md:flex flex-col w-72 glass-panel p-6 rounded-3xl h-[calc(100vh-3rem)] sticky top-6">
-        <div className="mb-8 pl-2">
+        <div className="mb-8">
           <Link
             href="/t"
             className="text-xs font-bold text-gray-500 hover:text-indigo-600 mb-3 transition-colors flex items-center gap-1 group"
@@ -551,15 +551,20 @@ export default function TeacherExamPage() {
             </span>{" "}
             Volver
           </Link>
-          <h1 className="font-festive text-gradient-aurora text-3xl font-bold leading-none mb-1">
+
+          <h1
+            className="font-festive text-gradient-aurora 
+             text-2xl md:text-2,5xl 
+             font-bold 
+             leading-tight 
+             mt-4 
+             text-center 
+             w-full px-2,5"
+          >
             Configuración
           </h1>
-          <div
-            className="text-xs text-gray-400 font-mono font-bold tracking-wider"
-            title={examId || ""}
-          >
-            ID: {code}
-          </div>
+
+          {/* ID del examen oculto a pedido del usuario */}
         </div>
 
         <nav className="flex flex-col gap-2">
