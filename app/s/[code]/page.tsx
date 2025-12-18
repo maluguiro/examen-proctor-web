@@ -656,54 +656,9 @@ export default function StudentPage({ params }: { params: { code: string } }) {
         color: "#1a1a1a",
       }}
     >
-      {/* --- FLUID AURORA BACKGROUND SYSTEM (Igual que Teacher) --- */}
-      <div
-        className="aurora-blob animate-float-slow"
-        style={{
-          top: "-10%",
-          left: "-10%",
-          width: "50vw",
-          height: "50vw",
-          background:
-            "radial-gradient(circle, rgba(121,40,202,0.4) 0%, rgba(121,40,202,0) 70%)",
-        }}
-      />
-      <div
-        className="aurora-blob animate-float-medium"
-        style={{
-          top: "20%",
-          right: "-10%",
-          width: "40vw",
-          height: "40vw",
-          background:
-            "radial-gradient(circle, rgba(255,0,128,0.35) 0%, rgba(255,0,128,0) 70%)",
-          animationDelay: "2s",
-        }}
-      />
-      <div
-        className="aurora-blob animate-float-slow"
-        style={{
-          bottom: "-10%",
-          left: "20%",
-          width: "45vw",
-          height: "45vw",
-          background:
-            "radial-gradient(circle, rgba(0,223,216,0.3) 0%, rgba(0,223,216,0) 70%)",
-          animationDelay: "5s",
-        }}
-      />
-      <div
-        className="bg-noise"
-        style={{
-          position: "absolute",
-          inset: 0,
-          zIndex: 0,
-          opacity: 0.4,
-          pointerEvents: "none",
-        }}
-      />
+      {/* --- FLUID AURORA BACKGROUND SYSTEM REMOVED to show global body background --- */}
 
-      {/* Main Container */}
+      {/* Main Container */}\n
       <div className="relative z-10 w-full min-h-screen flex justify-center p-6 md:p-10">
         <div className="w-full max-w-4xl">
           {/* STEP: NAME */}

@@ -37,6 +37,8 @@ type QuestionLite = {
   choices: string[] | null;
   answer: any;
   points: number;
+  // Temporary FE only field for editing
+  // ...
 };
 
 // ---------- helpers FILL_IN ----------
@@ -203,7 +205,9 @@ export default function TeacherExamPage() {
             // Construimos manualmente el string local para datetime-local
             // evitando conversiones automáticas de zona horaria
             const pad = (n: number) => n.toString().padStart(2, "0");
-            const localIso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            const localIso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
+              d.getDate()
+            )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
             setOpenAt(localIso);
           }
         }
@@ -506,493 +510,495 @@ export default function TeacherExamPage() {
   }
 
   // ----------------- render -----------------
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center text-xl font-festive text-gradient-aurora animate-pulse gap-4">
+        <div className="w-12 h-12 rounded-full border-4 border-t-transparent border-indigo-400 animate-spin" />
+        Cargando examen...
+      </div>
+    );
+  }
+
+  if (err)
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 p-4">
+        <div className="glass-panel p-8 rounded-3xl text-center max-w-md">
+          <div className="text-4xl mb-4">⚠️</div>
+          <h2 className="text-xl font-bold text-red-500 mb-2">Error</h2>
+          <p className="text-gray-600 mb-6">{err}</p>
+          <button
+            onClick={() => (window.location.href = "/t")}
+            className="btn-aurora w-full py-3 rounded-xl font-bold"
+          >
+            Volver al Dashboard
+          </button>
+        </div>
+      </div>
+    );
+
   return (
-    <div
-      className="min-h-screen p-10 overflow-x-hidden font-sans"
-      style={{ background: "transparent" }}
-    >
-      <div
-        style={{
-          maxWidth: 1000,
-          margin: "0 auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: 32,
-        }}
-      >
-        {/* ENCABEZADO DE RETORNO (Glass Panel) */}
-        <div
-          className="glass-panel"
-          style={{
-            borderRadius: 20,
-            padding: "16px 24px",
-            display: "flex",
-            alignItems: "center",
-            gap: 16,
-          }}
-        >
+    <div className="relative z-10 w-full min-h-screen flex flex-col md:flex-row p-4 md:p-6 gap-6">
+      {/* SIDEBAR (Desktop) */}
+      <aside className="hidden md:flex flex-col w-72 glass-panel p-6 rounded-3xl h-[calc(100vh-3rem)] sticky top-6">
+        <div className="mb-8 pl-2">
           <Link
             href="/t"
-            style={{
-              textDecoration: "none",
-              color: "#6b7280",
-              fontWeight: 500,
-              fontSize: 14,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              transition: "color 0.2s",
-            }}
+            className="text-xs font-bold text-gray-500 hover:text-indigo-600 mb-3 transition-colors flex items-center gap-1 group"
           >
-            <span style={{ fontSize: 16 }}>←</span> Volver al panel
+            <span className="group-hover:-translate-x-1 transition-transform">
+              ←
+            </span>{" "}
+            Volver
           </Link>
-
-          <div style={{ width: 1, height: 24, background: "#cbd5e1" }} />
-
-          <div>
-            <h1
-              className="text-gradient-aurora font-festive"
-              style={{
-                margin: 0,
-                fontSize: 24,
-                fontWeight: 700,
-              }}
-            >
-              {title || "Configuración de Examen"}
-            </h1>
-            <div
-              style={{
-                fontSize: 11,
-                color: "#6b7280",
-                fontWeight: 600,
-                marginTop: 2,
-                textTransform: "uppercase",
-                letterSpacing: "0.5px",
-              }}
-            >
-              Código: {code}
-            </div>
-          </div>
-
-          <div style={{ marginLeft: "auto" }}>
-            {!loading &&
-              (isOpen ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    alert(
-                      "Esta acción se conectará al backend para cerrar el examen (bloquear nuevos intentos)."
-                    )
-                  }
-                  className="glass-panel"
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: 8,
-                    background: "rgba(254, 226, 226, 0.5)",
-                    color: "#b91c1c",
-                    fontSize: 13,
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    border: "1px solid rgba(252, 165, 165, 0.5)",
-                  }}
-                >
-                  Cerrar examen
-                </button>
-              ) : (
-                <div
-                  className="glass-panel"
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: 8,
-                    color: "#6b7280",
-                    fontSize: 13,
-                    fontWeight: 500,
-                  }}
-                >
-                  Examen cerrado
-                </div>
-              ))}
+          <h1 className="font-festive text-gradient-aurora text-3xl font-bold leading-none mb-1">
+            Configuración
+          </h1>
+          <div
+            className="text-xs text-gray-400 font-mono font-bold tracking-wider"
+            title={examId || ""}
+          >
+            ID: {code}
           </div>
         </div>
 
-        {loading && (
-          <div className="glass-panel p-8 rounded-3xl text-center">
-            <p className="text-gray-500">Cargando configuración…</p>
+        <nav className="flex flex-col gap-2">
+          {steps.map((s) => {
+            const isActive = step === s.id;
+            return (
+              <button
+                key={s.id}
+                onClick={() => setStep(s.id)}
+                className={`text-left px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-3 ${
+                  isActive
+                    ? "bg-white/50 text-indigo-900 shadow-sm border border-white/60"
+                    : "text-gray-500 hover:bg-white/20 hover:text-gray-700 hover:pl-5"
+                }`}
+              >
+                <div
+                  className={`w-2 h-2 rounded-full transition-colors ${
+                    isActive ? "bg-indigo-500" : "bg-gray-300"
+                  }`}
+                />
+                {s.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="mt-auto pt-6 border-t border-gray-200/50">
+          <div className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider">
+            Estado del Examen
           </div>
-        )}
+          <div
+            className={`px-4 py-3 rounded-xl text-center font-bold text-xs shadow-sm flex items-center justify-center gap-2 ${
+              isOpen
+                ? "bg-emerald-100/80 text-emerald-800 border border-emerald-200"
+                : "bg-slate-100/80 text-slate-600 border border-slate-200"
+            }`}
+          >
+            {isOpen ? (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
+                PUBLICADO
+              </>
+            ) : (
+              "⚫ BORRADOR"
+            )}
+          </div>
+        </div>
+      </aside>
 
-        {!loading && (
-          <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
-            {/* SIDEBAR NAVIGATION */}
-            <nav
-              style={{
-                width: 240,
-                flexShrink: 0,
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-              }}
+      {/* MOBILE HEADER */}
+      <div className="md:hidden glass-panel p-4 rounded-2xl flex items-center justify-between sticky top-0 z-50">
+        <span className="font-festive text-xl font-bold text-gradient-aurora">
+          Configuración
+        </span>
+        <button
+          onClick={() => (window.location.href = "/t")}
+          className="text-xs font-bold text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg bg-white/50"
+        >
+          Salir
+        </button>
+      </div>
+
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 w-full max-w-5xl mx-auto h-[calc(100vh-3rem)] overflow-y-auto scrollbar-hide pb-20 md:pb-0">
+        <div className="glass-panel p-6 md:p-10 rounded-3xl min-h-full animate-slide-up">
+          {/* ERROR / INFO TOASTS */}
+          {(info || err) && (
+            <div
+              className={`mb-6 p-4 rounded-xl text-sm font-bold flex items-center gap-3 shadow-sm ${
+                err
+                  ? "bg-red-50 text-red-600 border border-red-100"
+                  : "bg-emerald-50 text-emerald-600 border border-emerald-100"
+              }`}
             >
-              {steps.map((s) => {
-                const active = step === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setStep(s.id)}
-                    disabled={loading}
-                    className={active ? "glass-panel" : ""}
-                    style={{
-                      padding: "12px 16px",
-                      borderRadius: 12,
-                      textAlign: "left",
-                      border: active
-                        ? "1px solid rgba(255,255,255,0.8)"
-                        : "1px solid transparent",
-                      background: active
-                        ? "rgba(255,255,255,0.6)"
-                        : "transparent",
-                      color: active ? "#1e1b4b" : "#4b5563",
-                      fontSize: 14,
-                      fontWeight: active ? 700 : 500,
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    <span style={{ marginRight: 8, opacity: 0.7 }}>
-                      {s.id}.
-                    </span>
-                    {s.label}
-                  </button>
-                );
-              })}
-            </nav>
+              <span>{err ? "⚠️" : "✅"}</span>
+              {err || info}
+            </div>
+          )}
 
-            <div style={{ flex: 1 }}>
-              {/* PASO 1: Docente y materia */}
-              {step === 1 && (
-                <section className="glass-panel p-8 rounded-3xl animate-slide-up">
-                  <h2 className="font-festive text-gradient-aurora text-2xl mb-6">
-                    Examen
-                  </h2>
+          {/* STEP 1: DOCENTE Y MATERIA */}
+          {step === 1 && (
+            <div className="space-y-8 max-w-2xl">
+              <div>
+                <h2 className="font-festive text-4xl text-gradient-aurora mb-2">
+                  Docente y Materia
+                </h2>
+                <p className="text-gray-500 font-medium">
+                  Información institucional básica.
+                </p>
+              </div>
 
-                  <div style={{ display: "grid", gap: 20 }}>
-                    <div>
-                      <label
-                        style={{
-                          fontSize: 13,
-                          display: "block",
-                          marginBottom: 6,
-                          fontWeight: 500,
-                          color: "#4b5563",
-                        }}
+              <div className="space-y-5">
+                {selectedUniName && (
+                  <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 text-indigo-800 text-sm font-medium flex items-center gap-2">
+                    🏛️ <span className="font-bold">Institución:</span>{" "}
+                    {selectedUniName}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 ml-1">
+                    Nombre del Docente
+                  </label>
+                  <input
+                    className="input-aurora w-full p-4 rounded-2xl"
+                    value={teacherName}
+                    onChange={(e) => setTeacherName(e.target.value)}
+                    placeholder="Tu nombre completo"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 ml-1">
+                    Materia / Asignatura
+                  </label>
+
+                  {profile?.institutions &&
+                  profile.institutions.length > 0 &&
+                  !manualSubjectMode ? (
+                    <div className="bg-white/50 p-4 rounded-2xl border border-white/60 space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-500 ml-1">
+                          Universidad
+                        </label>
+                        <select
+                          className="input-aurora w-full p-3 rounded-xl text-sm"
+                          value={selectedUniName}
+                          onChange={(e) => {
+                            setSelectedUniName(e.target.value);
+                            setSubject("");
+                          }}
+                        >
+                          <option value="">-- Seleccionar --</option>
+                          {profile.institutions.map((i) => (
+                            <option key={i.id} value={i.name}>
+                              {i.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-500 ml-1">
+                          Materia
+                        </label>
+                        <select
+                          className="input-aurora w-full p-3 rounded-xl text-sm"
+                          value={subject}
+                          onChange={(e) => setSubject(e.target.value)}
+                        >
+                          <option value="">-- Seleccionar --</option>
+                          {profile.institutions
+                            .find((i) => i.name === selectedUniName)
+                            ?.subjects.map((s) => (
+                              <option key={s.id} value={s.name}>
+                                {s.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <button
+                        onClick={() => setManualSubjectMode(true)}
+                        className="text-xs text-indigo-500 font-bold hover:underline pl-1"
                       >
-                        Nombre del docente
-                      </label>
-                      <input
-                        className="input-aurora w-full p-3 rounded-xl"
-                        value={teacherName}
-                        onChange={(e) => setTeacherName(e.target.value)}
-                        placeholder="Ej: Prof. Gómez"
-                      />
+                        No encuentro mi materia (Ingresar manual)
+                      </button>
                     </div>
-
-                    <div>
-                      <label
-                        style={{
-                          fontSize: 13,
-                          display: "block",
-                          marginBottom: 6,
-                          fontWeight: 500,
-                          color: "#4b5563",
-                        }}
-                      >
-                        Asignatura
-                      </label>
-
-                      {profile?.institutions &&
-                        profile.institutions.length > 0 &&
-                        !manualSubjectMode ? (
-                        <div className="bg-white/40 p-4 rounded-xl border border-white/50">
-                          <div style={{ marginBottom: 12 }}>
-                            <label className="text-xs text-gray-500 mb-1 block">
-                              Universidad
-                            </label>
-                            <select
-                              value={selectedUniName}
-                              onChange={(e) => {
-                                setSelectedUniName(e.target.value);
-                                setSubject("");
-                              }}
-                              className="input-aurora w-full p-2 rounded-lg"
-                            >
-                              <option value="">-- Seleccionar --</option>
-                              {profile.institutions.map((inst) => (
-                                <option key={inst.id} value={inst.name}>
-                                  {inst.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="text-xs text-gray-500 mb-1 block">
-                              Materia
-                            </label>
-                            <select
-                              value={subject}
-                              onChange={(e) => setSubject(e.target.value)}
-                              className="input-aurora w-full p-2 rounded-lg"
-                            >
-                              <option value="">-- Seleccionar --</option>
-                              {profile.institutions
-                                .find((i) => i.name === selectedUniName)
-                                ?.subjects.map((s) => (
-                                  <option key={s.id} value={s.name}>
-                                    {s.name}
-                                  </option>
-                                ))}
-                            </select>
-                          </div>
-                          <div className="text-right mt-2">
-                            <button
-                              onClick={() => setManualSubjectMode(true)}
-                              className="text-xs text-blue-600 underline"
-                            >
-                              No encuentro mi materia
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex gap-2">
-                          <input
-                            className="input-aurora w-full p-3 rounded-xl"
-                            value={subject}
-                            onChange={(e) => setSubject(e.target.value)}
-                            placeholder="Ej: Introducción a la Física"
-                          />
-                          {profile?.institutions?.length ? (
-                            <button
-                              onClick={() => setManualSubjectMode(false)}
-                              className="text-xs text-blue-600 underline whitespace-nowrap"
-                            >
-                              Volver a lista
-                            </button>
-                          ) : null}
-                        </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        className="input-aurora w-full p-4 rounded-2xl"
+                        value={subject}
+                        onChange={(e) => setSubject(e.target.value)}
+                        placeholder="Ej: Matemática II"
+                      />
+                      {profile?.institutions && (
+                        <button
+                          onClick={() => setManualSubjectMode(false)}
+                          className="btn-aurora w-12 flex items-center justify-center rounded-2xl text-lg backdrop-blur-md"
+                          title="Volver a la lista"
+                        >
+                          📋
+                        </button>
                       )}
                     </div>
+                  )}
+                </div>
 
-                    <div>
-                      <label
-                        style={{
-                          fontSize: 13,
-                          display: "block",
-                          marginBottom: 6,
-                          fontWeight: 500,
-                          color: "#4b5563",
-                        }}
-                      >
-                        Modo de corrección
-                      </label>
-                      <select
-                        className="input-aurora w-full p-3 rounded-xl"
-                        value={gradingMode}
-                        onChange={(e) => setGradingMode(e.target.value as any)}
-                      >
-                        <option value="auto">
-                          Automático (Feedback inmediato)
-                        </option>
-                        <option value="manual">
-                          Manual (Requiere revisión)
-                        </option>
-                      </select>
-                    </div>
-
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: 16,
-                      }}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 ml-1">
+                      Modo de Corrección
+                    </label>
+                    <select
+                      className="input-aurora w-full p-4 rounded-2xl"
+                      value={gradingMode}
+                      onChange={(e) =>
+                        setGradingMode(e.target.value as "auto" | "manual")
+                      }
                     >
-                      <div>
-                        <label
-                          style={{
-                            fontSize: 13,
-                            display: "block",
-                            marginBottom: 6,
-                            fontWeight: 500,
-                            color: "#4b5563",
-                          }}
-                        >
-                          Puntaje Máximo (opcional)
-                        </label>
-                        <input
-                          type="number"
-                          className="input-aurora w-full p-3 rounded-xl"
-                          value={maxScore}
-                          onChange={(e) => setMaxScore(e.target.value)}
-                          placeholder="Ej: 100"
-                        />
-                      </div>
-                      <div>
-                        <label
-                          style={{
-                            fontSize: 13,
-                            display: "block",
-                            marginBottom: 6,
-                            fontWeight: 500,
-                            color: "#4b5563",
-                          }}
-                        >
-                          Apertura de revisión (opcional)
-                        </label>
-                        <input
-                          type="datetime-local"
-                          className="input-aurora w-full p-3 rounded-xl"
-                          value={openAt}
-                          onChange={(e) => setOpenAt(e.target.value)}
-                        />
-                      </div>
-                    </div>
+                      <option value="auto">
+                        Automático (Feedback inmediato)
+                      </option>
+                      <option value="manual">Manual (Requiere revisión)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 ml-1">
+                      Puntaje Máximo
+                    </label>
+                    <input
+                      type="number"
+                      className="input-aurora w-full p-4 rounded-2xl"
+                      value={maxScore}
+                      onChange={(e) => setMaxScore(e.target.value)}
+                      placeholder="100"
+                    />
+                  </div>
+                </div>
 
-                    <div className="mt-4 flex justify-end">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 ml-1">
+                    Fecha de Apertura (Opcional)
+                  </label>
+                  <input
+                    type="datetime-local"
+                    className="input-aurora w-full p-4 rounded-2xl text-gray-600"
+                    value={openAt}
+                    onChange={(e) => setOpenAt(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="pt-8 flex justify-end">
+                <button
+                  onClick={() => onSaveMeta(true)}
+                  className="btn-aurora-primary px-8 py-3 rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition-all"
+                >
+                  Guardar y Continuar →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: CONFIGURACIÓN BÁSICA */}
+          {step === 2 && (
+            <div className="space-y-8 max-w-2xl">
+              <div>
+                <h2 className="font-festive text-4xl text-gradient-aurora mb-2">
+                  Configuración Básica
+                </h2>
+                <p className="text-gray-500 font-medium">
+                  Define las reglas del examen.
+                </p>
+              </div>
+
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 ml-1">
+                    Título del Examen
+                  </label>
+                  <input
+                    className="input-aurora w-full p-4 rounded-2xl"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Ej: Primer Parcial"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 ml-1">
+                      Duración (minutos)
+                    </label>
+                    <input
+                      type="number"
+                      className="input-aurora w-full p-4 rounded-2xl"
+                      value={durationMinutes}
+                      onChange={(e) => setDurationMinutes(e.target.value)}
+                      placeholder="Ej: 60"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 ml-1">
+                      Vidas / Intentos
+                    </label>
+                    <input
+                      type="number"
+                      className="input-aurora w-full p-4 rounded-2xl"
+                      value={lives}
+                      onChange={(e) => setLives(e.target.value)}
+                      placeholder="0 = ilimitado"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-white/40 p-5 rounded-2xl border border-white/60 mt-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div
+                      className={`w-3 h-3 rounded-full ${
+                        isOpen ? "bg-emerald-500" : "bg-gray-400"
+                      }`}
+                    />
+                    <span className="font-bold text-gray-800">
+                      Estado de Publicación
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-4 px-1">
+                    Si habilitas el examen, los alumnos podrán ingresar
+                    inmediatamente si tienen el código.
+                  </p>
+                  <div className="flex gap-3">
+                    {isOpen ? (
                       <button
-                        onClick={() => onSaveMeta(true)}
-                        disabled={savingMeta}
-                        className="btn-aurora-primary py-3 px-8 rounded-xl font-bold"
+                        onClick={() => {
+                          setIsOpen(false);
+                          // Aquí podrías agregar la lógica para cerrar el examen en el backend.
+                        }}
+                        className="px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-bold border border-red-200 hover:bg-red-200 transition-colors"
                       >
-                        {savingMeta ? "Guardando..." : "Guardar y Continuar →"}
+                        Cerrar Examen
                       </button>
-                    </div>
-                    {info && (
-                      <div className="text-green-600 bg-green-50 p-3 rounded-lg text-sm text-center">
-                        {info}
-                      </div>
-                    )}
-                    {err && (
-                      <div className="text-red-600 bg-red-50 p-3 rounded-lg text-sm text-center">
-                        {err}
+                    ) : (
+                      <div className="text-xs font-bold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg inline-block">
+                        El examen se abrirá al guardar.
                       </div>
                     )}
                   </div>
-                </section>
-              )}
+                </div>
 
-              {/* PASO 2: Config básica */}
-              {step === 2 && (
-                <section className="glass-panel p-8 rounded-3xl animate-slide-up">
-                  <h2 className="font-festive text-gradient-aurora text-2xl mb-6">
-                    Reglas del Juego
+                <div className="pt-8 flex justify-end gap-4">
+                  <button
+                    onClick={() => saveAndOpenExam(false)}
+                    className="btn-aurora px-6 py-3 rounded-xl font-bold text-sm text-gray-600"
+                  >
+                    Solo Guardar
+                  </button>
+                  <button
+                    onClick={() => saveAndOpenExam(true)}
+                    className="btn-aurora-primary px-8 py-3 rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition-all"
+                  >
+                    Guardar y Siguiente →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: PREGUNTAS */}
+          {step === 3 && (
+            <div className="h-full flex flex-col">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-gray-100/50 pb-6 mb-6 gap-4">
+                <div>
+                  <h2 className="font-festive text-4xl text-gradient-aurora mb-2">
+                    Preguntas
                   </h2>
-                  <div style={{ display: "grid", gap: 20 }}>
-                    <div>
-                      <label
-                        style={{
-                          fontSize: 13,
-                          display: "block",
-                          marginBottom: 6,
-                          fontWeight: 500,
-                          color: "#4b5563",
-                        }}
-                      >
-                        Título del examen
-                      </label>
-                      <input
-                        className="input-aurora w-full p-3 rounded-xl"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        placeholder="Ej: Final de Historia 2024"
-                      />
+                  <p className="text-gray-500 font-medium">
+                    Carga las preguntas y respuestas correctas.
+                  </p>
+                  <button
+                    onClick={reloadQuestions}
+                    className="text-xs text-indigo-500 font-bold hover:underline mt-1 bg-transparent border-none p-0 cursor-pointer"
+                  >
+                    🔄 Recargar lista
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
+                {/* LISTA DE PREGUNTAS */}
+                <div className="lg:col-span-4 flex flex-col gap-3 overflow-y-auto max-h-[600px] pr-2">
+                  {questions.length === 0 && (
+                    <div className="p-8 text-center border-2 border-dashed border-gray-200 rounded-3xl text-gray-400 text-sm font-medium">
+                      No hay preguntas cargadas.
                     </div>
+                  )}
+                  {questions.map((q, idx) => (
                     <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: 16,
-                      }}
+                      key={q.id}
+                      onClick={() => startEditQuestion(q)}
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer group relative ${
+                        editingQuestionId === q.id
+                          ? "bg-indigo-50 border-indigo-200 shadow-sm"
+                          : "bg-white/40 border-white/60 hover:bg-white/60 hover:border-indigo-100"
+                      }`}
                     >
-                      <div>
-                        <label
-                          style={{
-                            fontSize: 13,
-                            display: "block",
-                            marginBottom: 6,
-                            fontWeight: 500,
-                            color: "#4b5563",
-                          }}
+                      <div className="flex justify-between items-start mb-1">
+                        <span
+                          className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md mb-2 inline-block ${
+                            editingQuestionId === q.id
+                              ? "bg-indigo-200 text-indigo-800"
+                              : "bg-gray-100 text-gray-500"
+                          }`}
                         >
-                          Duración (minutos)
-                        </label>
-                        <input
-                          type="number"
-                          className="input-aurora w-full p-3 rounded-xl"
-                          value={durationMinutes}
-                          onChange={(e) => setDurationMinutes(e.target.value)}
-                          placeholder="Ej: 60"
-                        />
-                      </div>
-                      <div>
-                        <label
-                          style={{
-                            fontSize: 13,
-                            display: "block",
-                            marginBottom: 6,
-                            fontWeight: 500,
-                            color: "#4b5563",
+                          {q.kind} • {q.points} pt
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteQuestion(q.id);
                           }}
+                          className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition-colors opacity-0 group-hover:opacity-100 font-bold"
+                          title="Eliminar"
                         >
-                          Vidas (opcional)
+                          ✕
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-700 font-medium line-clamp-2">
+                        {idx + 1}. {q.stem}
+                      </p>
+                    </div>
+                  ))}
+
+                  <button
+                    onClick={resetQuestionForm}
+                    className="w-full py-3 rounded-xl font-bold text-sm text-indigo-600 mt-2 border-dashed border-2 border-indigo-200 hover:border-indigo-400 bg-transparent transition-colors"
+                  >
+                    + Nueva Pregunta
+                  </button>
+                </div>
+
+                {/* FORMULARIO DE EDICIÓN */}
+                <div className="lg:col-span-8 bg-white/30 p-6 rounded-3xl border border-white/50">
+                  <h3 className="text-lg font-extrabold text-indigo-950 mb-4 flex items-center gap-2">
+                    {editingQuestionId
+                      ? "✏️ Editando Pregunta"
+                      : "✨ Nueva Pregunta"}
+                  </h3>
+
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-600 ml-1">
+                          Tipo
                         </label>
-                        <input
-                          type="number"
-                          className="input-aurora w-full p-3 rounded-xl"
-                          value={lives}
-                          onChange={(e) => setLives(e.target.value)}
-                          placeholder="Ej: 3"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex justify-end">
-                      <button
-                        onClick={() => saveAndOpenExam(true)}
-                        disabled={savingExam}
-                        className="btn-aurora-primary py-3 px-8 rounded-xl font-bold"
-                      >
-                        {savingExam
-                          ? "Guardando..."
-                          : "Guardar y Abrir Examen →"}
-                      </button>
-                    </div>
-                    {info && (
-                      <div className="text-green-600 bg-green-50 p-3 rounded-lg text-sm text-center">
-                        {info}
-                      </div>
-                    )}
-                    {err && (
-                      <div className="text-red-600 bg-red-50 p-3 rounded-lg text-sm text-center">
-                        {err}
-                      </div>
-                    )}
-                  </div>
-                </section>
-              )}
-
-              {/* PASO 3: Preguntas */}
-              {step === 3 && (
-                <div className="animate-slide-up space-y-6">
-                  {/* Formulario de Pregunta */}
-                  <section className="glass-panel p-8 rounded-3xl border-2 border-white/50">
-                    <h2 className="font-festive text-gradient-aurora text-2xl mb-6">
-                      {editingQuestionId ? "Editar Desafío" : "Nuevo Desafío"}
-                    </h2>
-
-                    <div className="space-y-4">
-                      <div className="flex gap-4">
                         <select
-                          className="input-aurora p-3 rounded-xl flex-1"
+                          className="input-aurora w-full p-2.5 rounded-xl text-sm"
                           value={qKind}
                           onChange={(e) =>
                             setQKind(e.target.value as QuestionKind)
@@ -1001,291 +1007,246 @@ export default function TeacherExamPage() {
                           <option value="MCQ">Opción Múltiple</option>
                           <option value="TRUE_FALSE">Verdadero / Falso</option>
                           <option value="SHORT_TEXT">Texto Corto</option>
-                          <option value="FILL_IN">Completar Espacios</option>
+                          <option value="FILL_IN">Completar (Fill in)</option>
                         </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-600 ml-1">
+                          Puntos
+                        </label>
                         <input
                           type="number"
-                          className="input-aurora p-3 rounded-xl w-24 text-center"
-                          placeholder="Pts"
+                          className="input-aurora w-full p-2.5 rounded-xl text-sm"
                           value={qPoints}
                           onChange={(e) => setQPoints(Number(e.target.value))}
                         />
                       </div>
+                    </div>
 
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-600 ml-1">
+                        Enunciado / Consigna
+                      </label>
                       <textarea
-                        className="input-aurora w-full p-4 rounded-xl"
-                        rows={3}
-                        placeholder={
-                          qKind === "FILL_IN"
-                            ? "El [cielo] es azul."
-                            : "Escribe la consigna aquí..."
-                        }
+                        className="input-aurora w-full p-3 rounded-xl text-sm font-medium min-h-[80px]"
                         value={qStem}
                         onChange={(e) => setQStem(e.target.value)}
+                        placeholder="Escribe la pregunta aquí..."
                       />
-
-                      {/* Lógica específica por tipo */}
-                      {qKind === "MCQ" && (
-                        <div className="space-y-2 pl-4 border-l-2 border-purple-200">
-                          <label className="text-xs font-bold text-purple-600 uppercase">
-                            Opciones (marca la correcta)
-                          </label>
-                          {mcqChoices.map((c, i) => (
-                            <div key={i} className="flex gap-2 items-center">
-                              <input
-                                type="radio"
-                                name="mcq_correct"
-                                checked={mcqCorrect === i}
-                                onChange={() => setMcqCorrect(i)}
-                                className="accent-pink-600 w-5 h-5"
-                              />
-                              <input
-                                className="input-aurora flex-1 p-2 rounded-lg"
-                                value={c}
-                                onChange={(e) => {
-                                  const copy = [...mcqChoices];
-                                  copy[i] = e.target.value;
-                                  setMcqChoices(copy);
-                                }}
-                                placeholder={`Opción ${i + 1}`}
-                              />
-                              <button
-                                onClick={() => {
-                                  const copy = mcqChoices.filter(
-                                    (_, idx) => idx !== i
-                                  );
-                                  setMcqChoices(copy);
-                                  if (mcqCorrect >= copy.length)
-                                    setMcqCorrect(Math.max(0, copy.length - 1));
-                                }}
-                                className="text-red-400 hover:text-red-600 p-1"
-                              >
-                                ✖
-                              </button>
-                            </div>
-                          ))}
-                          <button
-                            onClick={() => setMcqChoices([...mcqChoices, ""])}
-                            className="text-sm text-purple-600 font-bold hover:underline mt-2"
-                          >
-                            + Agregar opción
-                          </button>
-                        </div>
-                      )}
-
-                      {qKind === "TRUE_FALSE" && (
-                        <div className="flex gap-4 pl-4">
-                          <label
-                            className={`cursor-pointer px-4 py-2 rounded-lg border transition-all ${tfCorrect
-                              ? "bg-green-100 border-green-300 text-green-700"
-                              : "bg-white border-gray-200"
-                              }`}
-                          >
-                            <input
-                              type="radio"
-                              className="hidden"
-                              checked={tfCorrect}
-                              onChange={() => setTfCorrect(true)}
-                            />
-                            Verdadero
-                          </label>
-                          <label
-                            className={`cursor-pointer px-4 py-2 rounded-lg border transition-all ${!tfCorrect
-                              ? "bg-red-100 border-red-300 text-red-700"
-                              : "bg-white border-gray-200"
-                              }`}
-                          >
-                            <input
-                              type="radio"
-                              className="hidden"
-                              checked={!tfCorrect}
-                              onChange={() => setTfCorrect(false)}
-                            />
-                            Falso
-                          </label>
-                        </div>
-                      )}
-
                       {qKind === "FILL_IN" && (
-                        <div className="pl-4">
-                          <label className="text-xs text-gray-500 mb-1 block">
-                            Palabras Distractoras (Opcional)
-                          </label>
-                          <input
-                            className="input-aurora w-full p-3 rounded-lg"
-                            placeholder="Ej: rojo, verde, mar"
-                            value={fillDistractorsText}
-                            onChange={(e) =>
-                              setFillDistractorsText(e.target.value)
-                            }
-                          />
-                          <p className="text-xs text-gray-400 mt-2">
-                            En el enunciado escribí las respuestas correctas entre [corchetes].
-                            <br />
-                            En esta lista agregá SOLO palabras distractoras; el sistema va a sumar automáticamente las respuestas correctas.
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="flex justify-end gap-3 mt-6 border-t pt-4 border-white/20">
-                        {editingQuestionId && (
-                          <button
-                            onClick={resetQuestionForm}
-                            className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg"
-                          >
-                            Cancelar
-                          </button>
-                        )}
-                        <button
-                          onClick={saveQuestion}
-                          disabled={savingQuestion}
-                          className="btn-aurora-primary py-2 px-6 rounded-lg font-bold shadow-lg"
-                        >
-                          {savingQuestion
-                            ? "Guardando..."
-                            : editingQuestionId
-                              ? "Actualizar Pregunta"
-                              : "Agregar Pregunta"}
-                        </button>
-                      </div>
-                      {questionErr && (
-                        <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded">
-                          {questionErr}
-                        </div>
+                        <p className="text-[10px] text-indigo-600 pl-1 mt-1">
+                          Usa [corchetes] para las respuestas a completar. Ej:
+                          La capital de Francia es [París].
+                        </p>
                       )}
                     </div>
-                  </section>
 
-                  {/* Listado de Preguntas */}
-                  <section>
-                    <h3 className="text-lg font-bold text-gray-700 mb-4 pl-2">
-                      Preguntas Cargadas ({questions.length})
-                    </h3>
-                    {loadingQuestions ? (
-                      <div className="glass-panel p-4 text-center">
-                        Cargando...
-                      </div>
-                    ) : questions.length === 0 ? (
-                      <div className="text-gray-400 italic pl-2">
-                        Aún no hay preguntas. ¡Agregá la primera arriba!
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {questions.map((q, i) => (
-                          <div
-                            key={q.id}
-                            className="glass-panel p-4 rounded-xl flex justify-between items-start hover:bg-white/40 transition-colors"
-                          >
-                            <div>
-                              <div className="text-xs font-bold text-purple-600 mb-1">
-                                {i + 1}. {q.kind} ({q.points} pts)
-                              </div>
-                              <div className="text-gray-800 font-medium">
-                                {q.stem}
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => startEditQuestion(q)}
-                                className="p-2 hover:bg-blue-100 rounded-full text-blue-600"
-                                title="Editar"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                onClick={() => deleteQuestion(q.id)}
-                                className="p-2 hover:bg-red-100 rounded-full text-red-600"
-                                title="Borrar"
-                              >
-                                🗑️
-                              </button>
-                            </div>
+                    {/* Renderizado condicional segun tipo */}
+                    {qKind === "MCQ" && (
+                      <div className="space-y-2 pt-2">
+                        <label className="text-xs font-bold text-gray-600 ml-1">
+                          Opciones
+                        </label>
+                        {mcqChoices.map((choice, idx) => (
+                          <div key={idx} className="flex gap-2">
+                            <button
+                              onClick={() => setMcqCorrect(idx)}
+                              className={`w-10 h-10 rounded-xl border flex items-center justify-center font-bold text-lg transition-all ${
+                                mcqCorrect === idx
+                                  ? "bg-emerald-500 border-emerald-600 text-white shadow-md"
+                                  : "bg-gray-100 text-gray-300 border-gray-200 hover:bg-gray-200"
+                              }`}
+                              title="Marcar como correcta"
+                            >
+                              {mcqCorrect === idx ? "✓" : idx + 1}
+                            </button>
+                            <input
+                              className={`input-aurora flex-1 p-2 rounded-xl text-sm ${
+                                mcqCorrect === idx
+                                  ? "font-semibold text-emerald-900 bg-emerald-50/50"
+                                  : ""
+                              }`}
+                              value={choice}
+                              onChange={(e) => {
+                                const n = [...mcqChoices];
+                                n[idx] = e.target.value;
+                                setMcqChoices(n);
+                              }}
+                              placeholder={`Opción ${idx + 1}`}
+                            />
+                            <button
+                              onClick={() => {
+                                const n = [...mcqChoices];
+                                n.splice(idx, 1);
+                                setMcqChoices(n);
+                              }}
+                              className="w-10 h-10 flex items-center justify-center text-red-400 hover:bg-red-50 rounded-xl font-bold"
+                            >
+                              ✕
+                            </button>
                           </div>
                         ))}
+                        <button
+                          onClick={() => setMcqChoices([...mcqChoices, ""])}
+                          className="text-xs font-bold text-indigo-600 hover:underline pl-1 cursor-pointer"
+                        >
+                          + Agregar opción
+                        </button>
                       </div>
                     )}
-                  </section>
 
-                  <div className="border-t border-white/30 pt-4 flex justify-end">
-                    <button
-                      onClick={() => setStep(4)}
-                      className="btn-aurora px-6 py-3 rounded-xl"
-                    >
-                      Ir al Tablero →
-                    </button>
+                    {qKind === "TRUE_FALSE" && (
+                      <div className="flex gap-4 pt-2">
+                        <button
+                          onClick={() => setTfCorrect(true)}
+                          className={`flex-1 py-3 rounded-xl font-bold border-2 transition-all ${
+                            tfCorrect
+                              ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                              : "border-transparent bg-white/50 text-gray-500"
+                          }`}
+                        >
+                          Verdadero
+                        </button>
+                        <button
+                          onClick={() => setTfCorrect(false)}
+                          className={`flex-1 py-3 rounded-xl font-bold border-2 transition-all ${
+                            !tfCorrect
+                              ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                              : "border-transparent bg-white/50 text-gray-500"
+                          }`}
+                        >
+                          Falso
+                        </button>
+                      </div>
+                    )}
+
+                    {qKind === "SHORT_TEXT" && (
+                      <div className="pt-2">
+                        <label className="text-xs font-bold text-gray-600 ml-1">
+                          Respuesta Correcta (Exacta)
+                        </label>
+                        <input
+                          className="input-aurora w-full p-3 rounded-xl mt-1"
+                          value={shortAnswer}
+                          onChange={(e) => setShortAnswer(e.target.value)}
+                          placeholder="Respuesta"
+                        />
+                      </div>
+                    )}
+
+                    {qKind === "FILL_IN" && (
+                      <div className="pt-2">
+                        <label className="text-xs font-bold text-gray-600 ml-1">
+                          Palabras distractoras (Separadas por comas)
+                        </label>
+                        <textarea
+                          className="input-aurora w-full p-3 rounded-xl mt-1 text-sm h-20"
+                          value={fillDistractorsText}
+                          onChange={(e) =>
+                            setFillDistractorsText(e.target.value)
+                          }
+                          placeholder="Ej: blanco, azul, grande..."
+                        />
+                      </div>
+                    )}
+
+                    {/* ERRORES DEL FORM */}
+                    {questionErr && (
+                      <div className="text-xs font-bold text-red-500 bg-red-50 p-2 rounded-lg text-center">
+                        {questionErr}
+                      </div>
+                    )}
+
+                    <div className="pt-4 flex justify-end gap-3">
+                      {editingQuestionId && (
+                        <button
+                          onClick={resetQuestionForm}
+                          className="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                      )}
+                      <button
+                        onClick={saveQuestion}
+                        disabled={savingQuestion}
+                        className="btn-aurora-primary px-6 py-3 rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+                      >
+                        {savingQuestion
+                          ? "Guardando..."
+                          : editingQuestionId
+                          ? "Actualizar"
+                          : "Guardar Pregunta"}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
 
-              {/* PASO 4: Tablero */}
-              {step === 4 && (
-                <>
-                  <div className="animate-slide-up space-y-6">
-                    <div className="glass-panel p-0 rounded-3xl overflow-hidden flex flex-col min-h-[600px]">
-                      <div className="p-4 bg-white/40 font-bold text-gray-700 border-b border-white/20">
-                        Monitoreo en Vivo
-                      </div>
-                      <div className="flex-1 overflow-auto bg-white/30">
-                        <BoardClient code={code} />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Floating Exam Link - Top Right (Moved outside animation) */}
-                  <button
-                    onClick={copyStudentLink}
-                    style={{
-                      position: "fixed",
-                      top: 96,
-                      right: 24,
-                      zIndex: 9999,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "6px 12px",
-                      borderRadius: 999,
-                      cursor: "pointer",
-                      background: "rgba(255, 255, 255, 0.75)",
-                      backdropFilter: "blur(20px)",
-                      border: "1px solid rgba(255,255,255,0.8)",
-                      boxShadow: "0 4px 16px rgba(31, 38, 135, 0.1)",
-                      transition: "all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
-                      transform: linkCopied ? "scale(1.05)" : "scale(1)"
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!linkCopied) e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.9)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.75)";
-                    }}
-                  >
-                    <span className="text-lg">{linkCopied ? "✅" : "🔗"}</span>
-                    <div className="flex flex-col items-start leading-none">
-                      <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-0.5">
-                        Link Examen
-                      </span>
-                      <span className={`text-xs font-mono font-bold text-[#1e1b4b] transition-colors ${linkCopied ? "text-green-600" : ""}`}>
-                        {linkCopied ? "¡Copiado!" : code}
-                      </span>
-                    </div>
-                  </button>
-
-                  {/* Move outside of animate-slide-up to avoid transform trapping position:fixed */}
-                  <FloatingChatShell label="Chat">
-                    <ExamChat
-                      code={code}
-                      role="teacher"
-                      defaultName="Docente"
-                    />
-                  </FloatingChatShell>
-                </>
-              )}
+              <div className="mt-8 pt-6 border-t border-gray-200/50 flex justify-end">
+                <button
+                  onClick={() => setStep(4)}
+                  className="btn-aurora flex items-center gap-2 px-6 py-3 rounded-xl overflow-hidden group"
+                >
+                  Ir al Tablero{" "}
+                  <span className="group-hover:translate-x-1 transition-transform">
+                    →
+                  </span>
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+
+          {/* STEP 4: TABLERO / CHAT */}
+          {step === 4 && (
+            <div className="h-full flex flex-col">
+              <div className="mb-6 flex flex-col md:flex-row justify-between items-end gap-4">
+                <div>
+                  <h2 className="font-festive text-4xl text-gradient-aurora mb-2">
+                    Tablero de Control
+                  </h2>
+                  <p className="text-gray-500 font-medium">
+                    Monitorea a los alumnos en tiempo real.
+                  </p>
+                </div>
+                <button
+                  onClick={copyStudentLink}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all shadow-sm border ${
+                    linkCopied
+                      ? "bg-emerald-500 text-white border-emerald-600"
+                      : "bg-white text-indigo-900 border-indigo-100 hover:bg-indigo-50"
+                  }`}
+                >
+                  <span className="text-lg">{linkCopied ? "✅" : "🔗"}</span>
+                  {linkCopied ? "¡Link Copiado!" : "Copiar Link Examen"}
+                </button>
+              </div>
+
+              <div className="flex-1 glass-panel p-0 rounded-3xl overflow-hidden flex flex-col border border-white/50">
+                <div className="p-3 bg-white/40 border-b border-white/20 text-xs font-bold text-gray-500 uppercase tracking-wider flex justify-between items-center px-6">
+                  <span>Vista en vivo</span>
+                  <span
+                    className="w-2 h-2 rounded-full bg-red-500 animate-pulse"
+                    title="Live"
+                  />
+                </div>
+                <div className="flex-1 bg-white/20 relative">
+                  <BoardClient code={code} />
+                </div>
+              </div>
+
+              <div className="relative z-[100]">
+                <FloatingChatShell label="Chat con Alumnos">
+                  <ExamChat
+                    code={code}
+                    role="teacher"
+                    defaultName={teacherName || "Docente"}
+                  />
+                </FloatingChatShell>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }

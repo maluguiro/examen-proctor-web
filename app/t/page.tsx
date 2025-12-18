@@ -146,479 +146,175 @@ export default function TeacherHomePage() {
   // 1) NO AUTENTICADO -> Pantalla de acceso
   if (!authToken) {
     return (
-      <>
-        <style jsx global>{`
-          @keyframes superbloom {
-            0% {
-              background-position: 0% 50%;
-            }
-            50% {
-              background-position: 100% 50%;
-            }
-            100% {
-              background-position: 0% 50%;
-            }
-          }
-          @keyframes float {
-            0% {
-              transform: translateY(0px);
-            }
-            50% {
-              transform: translateY(-10px);
-            }
-            100% {
-              transform: translateY(0px);
-            }
-          }
-          .input-bloom:focus {
-            background: rgba(255, 255, 255, 0.95) !important;
-            box-shadow: 0 0 0 3px rgba(255, 154, 158, 0.3) !important;
-            border-color: #ff9a9e !important;
-          }
-          .btn-bloom:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(255, 107, 107, 0.3) !important;
-          }
-        `}</style>
-        <div
-          style={{
-            minHeight: "100vh",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: "'Inter', sans-serif",
-            // Removed inline background to let .app-background show through
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
-          {/* Orbes decorativos de fondo (Opcional: Mantenerlos o no. 
-              El plan decía integrar con el nuevo fondo. 
-              Los orbes "aurora" siguen siendo consistentes con el estilo pastel. 
-              Los dejaré pero con menos desenfoque para que se mezclen mejor con el grain) */}
-          <div
-            className="aurora-blob animate-float-slow"
-            style={{
-              position: "absolute",
-              top: "15%",
-              left: "10%",
-              width: "40vw",
-              height: "40vw",
-              background: "radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 70%)",
-              zIndex: 0
-            }}
-          />
+      <div className="relative z-10 w-full min-h-screen flex justify-center items-center p-6 md:p-10">
+        <main className="glass-panel p-10 rounded-3xl max-w-md w-full text-center animate-slide-up relative z-20">
+          <div className="mb-8">
+            <h1 className="font-festive text-gradient-aurora text-5xl mb-4">
+              {authMode === "forgot" ? "Recuperar" : "ProctoEtic"}
+            </h1>
+            <p className="text-gray-600 font-medium text-lg opacity-80">
+              {authMode === "forgot"
+                ? "Restaura tu acceso docente"
+                : "Evaluaciones seguras y simples"}
+            </p>
+          </div>
 
-          <main
-            style={{
-              width: "100%",
-              maxWidth: 440,
-              background: "rgba(255, 255, 255, 0.65)",
-              backdropFilter: "blur(25px)",
-              WebkitBackdropFilter: "blur(25px)",
-              borderRadius: 30,
-              border: "1px solid rgba(255, 255, 255, 0.9)",
-              boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.1)",
-              padding: "48px 40px",
-              position: "relative",
-              zIndex: 10,
-              animation: "float 1s ease-out", // Simple entrance
-            }}
-          >
-            <div style={{ textAlign: "center", marginBottom: 32 }}>
-              <h1
-                style={{
-                  margin: 0,
-                  fontSize: 32,
-                  fontFamily: "var(--font-festive), sans-serif", // Syne Font
-                  fontWeight: 800,
-                  background: "linear-gradient(90deg, #ff6b6b, #556270)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  letterSpacing: "-1px",
+          {authMode !== "forgot" && (
+            <div className="flex bg-white/40 p-1.5 rounded-2xl mb-8 border border-white/50">
+              <button
+                onClick={() => {
+                  setAuthMode("login");
+                  setAuthError(null);
                 }}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${authMode === "login"
+                    ? "bg-white text-pink-500 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                  }`}
               >
-                {authMode === "forgot" ? "Recuperar" : "ProctoEtic"}
-              </h1>
-              <p
-                style={{
-                  color: "#6c757d",
-                  fontSize: 15,
-                  marginTop: 8,
-                  fontWeight: 500,
+                Ingresar
+              </button>
+              <button
+                onClick={() => {
+                  setAuthMode("register");
+                  setAuthError(null);
                 }}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${authMode === "register"
+                    ? "bg-white text-pink-500 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                  }`}
               >
-                {authMode === "forgot"
-                  ? "Restaura tu acceso"
-                  : "Crea examenes más seguros"}
-              </p>
+                Registrarse
+              </button>
             </div>
+          )}
 
-            {authMode !== "forgot" && (
-              <div
-                style={{
-                  display: "flex",
-                  background: "rgba(255,255,255,0.5)",
-                  padding: 5,
-                  borderRadius: 16,
-                  marginBottom: 32,
-                  border: "1px solid rgba(255,255,255,0.6)",
-                }}
-              >
-                <button
-                  onClick={() => {
-                    setAuthMode("login");
-                    setAuthError(null);
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: "10px",
-                    background: authMode === "login" ? "white" : "transparent",
-                    color: authMode === "login" ? "#ff6b6b" : "#888",
-                    border: "none",
-                    borderRadius: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontSize: 14,
-                    boxShadow:
-                      authMode === "login"
-                        ? "0 4px 6px rgba(0,0,0,0.05)"
-                        : "none",
-                    transition: "all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
-                  }}
-                >
-                  Ingresar
-                </button>
-                <button
-                  onClick={() => {
-                    setAuthMode("register");
-                    setAuthError(null);
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: "10px",
-                    background:
-                      authMode === "register" ? "white" : "transparent",
-                    color: authMode === "register" ? "#ff6b6b" : "#888",
-                    border: "none",
-                    borderRadius: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontSize: 14,
-                    boxShadow:
-                      authMode === "register"
-                        ? "0 4px 6px rgba(0,0,0,0.05)"
-                        : "none",
-                    transition: "all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
-                  }}
-                >
-                  Registrarse
-                </button>
+          {authError && (
+            <div className="bg-red-100/80 border border-red-200 text-red-600 p-3 rounded-xl mb-6 text-sm font-semibold backdrop-blur-sm">
+              {authError}
+            </div>
+          )}
+
+          {/* FORGOT PASSWORD FORM */}
+          {authMode === "forgot" ? (
+            <form onSubmit={handleForgot} className="space-y-4">
+              <div className="text-left">
+                <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">
+                  Email de recuperación
+                </label>
+                <input
+                  type="email"
+                  required
+                  className="input-aurora w-full p-4 rounded-xl"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="tu@email.com"
+                />
               </div>
-            )}
-
-            {authError && (
-              <div
-                style={{
-                  background: "rgba(254, 226, 226, 0.9)",
-                  color: "#ef4444",
-                  padding: "14px",
-                  borderRadius: 16,
-                  marginBottom: 24,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  textAlign: "center",
-                  border: "1px solid rgba(252, 165, 165, 0.5)",
-                  backdropFilter: "blur(4px)",
+              <button type="submit" disabled={authLoading} className="btn-aurora-primary w-full p-4 rounded-xl text-lg shadow-lg hover:shadow-xl transition-all mt-4">
+                {authLoading ? "Enviando..." : "Recuperar Contraseña"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode("login");
+                  setAuthError(null);
                 }}
+                className="w-full p-3 text-gray-500 hover:text-pink-500 font-bold text-sm transition-colors"
               >
-                {authError}
-              </div>
-            )}
-
-            {/* FORGOT PASSWORD FORM */}
-            {authMode === "forgot" ? (
-              <form onSubmit={handleForgot}>
-                <div style={{ marginBottom: 20 }}>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 13,
-                      fontWeight: 700,
-                      marginBottom: 8,
-                      color: "#495057",
-                      marginLeft: 4,
-                    }}
-                  >
-                    Email de recuperación
+                ← Volver al inicio
+              </button>
+            </form>
+          ) : (
+            <form
+              onSubmit={authMode === "login" ? handleLogin : handleRegister}
+              className="space-y-5"
+            >
+              {authMode === "register" && (
+                <div className="text-left">
+                  <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">
+                    Nombre completo
                   </label>
                   <input
-                    type="email"
+                    type="text"
                     required
-                    className="input-bloom"
-                    style={{
-                      width: "100%",
-                      padding: "14px 18px",
-                      borderRadius: 16,
-                      border: "1px solid rgba(255,255,255,0.8)",
-                      background: "rgba(255,255,255,0.6)",
-                      fontSize: 15,
-                      outline: "none",
-                      transition: "all 0.3s",
-                      color: "#495057",
-                    }}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="tu@email.com"
+                    className="input-aurora w-full p-4 rounded-xl"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Juan Pérez"
                   />
                 </div>
-                <button
-                  type="submit"
-                  disabled={authLoading}
-                  className="btn-bloom"
-                  style={{
-                    width: "100%",
-                    padding: "16px",
-                    borderRadius: 16,
-                    border: "none",
-                    background:
-                      "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)",
-                    color: "white",
-                    fontWeight: 800,
-                    cursor: authLoading ? "default" : "pointer",
-                    opacity: authLoading ? 0.8 : 1,
-                    fontSize: 15,
-                    boxShadow: "0 4px 15px rgba(255, 154, 158, 0.4)",
-                    marginTop: 8,
-                    transition: "transform 0.2s, box-shadow 0.2s",
-                    letterSpacing: "0.5px",
-                    textShadow: "0 1px 2px rgba(0,0,0,0.1)",
-                  }}
-                >
-                  {authLoading ? "Enviando enlace..." : "Recuperar Contraseña"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode("login");
-                    setAuthError(null);
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "16px",
-                    background: "transparent",
-                    border: "none",
-                    color: "#888",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    marginTop: 8,
-                    transition: "color 0.2s",
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.color = "#ff6b6b")}
-                  onMouseOut={(e) => (e.currentTarget.style.color = "#888")}
-                >
-                  ← Volver al inicio
-                </button>
-              </form>
-            ) : (
-              <form
-                onSubmit={authMode === "login" ? handleLogin : handleRegister}
-              >
-                {authMode === "register" && (
-                  <div style={{ marginBottom: 20 }}>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        marginBottom: 8,
-                        color: "#495057",
-                        marginLeft: 4,
-                      }}
-                    >
-                      Nombre completo
-                    </label>
+              )}
+
+              <div className="text-left">
+                <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">
+                  Correo electrónico
+                </label>
+                <input
+                  type="email"
+                  required
+                  className="input-aurora w-full p-4 rounded-xl"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="hola@ejemplo.com"
+                />
+              </div>
+
+              <div className="text-left">
+                <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">
+                  Contraseña
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  className="input-aurora w-full p-4 rounded-xl"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </div>
+
+              {/* REMEMBER ME CHECKBOX */}
+              {authMode === "login" && (
+                <div className="flex justify-between items-center px-1">
+                  <label className="flex items-center gap-2 text-sm text-gray-600 font-medium cursor-pointer">
                     <input
-                      type="text"
-                      required
-                      className="input-bloom"
-                      style={{
-                        width: "100%",
-                        padding: "14px 18px",
-                        borderRadius: 16,
-                        border: "1px solid rgba(255,255,255,0.8)",
-                        background: "rgba(255,255,255,0.6)",
-                        fontSize: 15,
-                        outline: "none",
-                        transition: "all 0.3s",
-                        color: "#495057",
-                      }}
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Juan Pérez"
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="accent-pink-400 w-4 h-4 cursor-pointer"
                     />
-                  </div>
-                )}
-
-                <div style={{ marginBottom: 20 }}>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 13,
-                      fontWeight: 700,
-                      marginBottom: 8,
-                      color: "#495057",
-                      marginLeft: 4,
-                    }}
-                  >
-                    Correo electrónico
+                    Recordarme
                   </label>
-                  <input
-                    type="email"
-                    required
-                    className="input-bloom"
-                    style={{
-                      width: "100%",
-                      padding: "14px 18px",
-                      borderRadius: 16,
-                      border: "1px solid rgba(255,255,255,0.8)",
-                      background: "rgba(255,255,255,0.6)",
-                      fontSize: 15,
-                      outline: "none",
-                      transition: "all 0.3s",
-                      color: "#495057",
-                    }}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="hola@ejemplo.com"
-                  />
-                </div>
 
-                <div style={{ marginBottom: 24 }}>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 13,
-                      fontWeight: 700,
-                      marginBottom: 8,
-                      color: "#495057",
-                      marginLeft: 4,
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("forgot");
+                      setAuthError(null);
                     }}
+                    className="text-sm font-bold text-indigo-400 hover:text-pink-500 transition-colors"
                   >
-                    Contraseña
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    className="input-bloom"
-                    style={{
-                      width: "100%",
-                      padding: "14px 18px",
-                      borderRadius: 16,
-                      border: "1px solid rgba(255,255,255,0.8)",
-                      background: "rgba(255,255,255,0.6)",
-                      fontSize: 15,
-                      outline: "none",
-                      transition: "all 0.3s",
-                      color: "#495057",
-                    }}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                  />
+                    ¿Olvidaste pass?
+                  </button>
                 </div>
+              )}
 
-                {/* REMEMBER ME CHECKBOX */}
-                {authMode === "login" && (
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: 32,
-                      padding: "0 4px",
-                    }}
-                  >
-                    <label
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        fontSize: 13,
-                        cursor: "pointer",
-                        color: "#6c757d",
-                        fontWeight: 500,
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={rememberMe}
-                        onChange={(e) => setRememberMe(e.target.checked)}
-                        style={{
-                          accentColor: "#ff9a9e",
-                          width: 16,
-                          height: 16,
-                        }}
-                      />
-                      Recordarme
-                    </label>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAuthMode("forgot");
-                        setAuthError(null);
-                      }}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "#a18cd1",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        padding: 0,
-                      }}
-                    >
-                      ¿Olvidaste pass?
-                    </button>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={authLoading}
-                  className="btn-bloom"
-                  style={{
-                    width: "100%",
-                    padding: "16px",
-                    borderRadius: 16,
-                    border: "none",
-                    background:
-                      "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)",
-                    color: "white",
-                    fontWeight: 800,
-                    cursor: authLoading ? "default" : "pointer",
-                    opacity: authLoading ? 0.8 : 1,
-                    fontSize: 15,
-                    boxShadow: "0 4px 15px rgba(255, 154, 158, 0.4)",
-                    transition: "transform 0.2s, box-shadow 0.2s",
-                    letterSpacing: "0.5px",
-                    textShadow: "0 1px 2px rgba(0,0,0,0.1)",
-                  }}
-                >
-                  {authLoading
-                    ? "Conectando..."
-                    : authMode === "login"
-                      ? "Comenzar"
-                      : "Crear Cuenta"}
-                </button>
-              </form>
-            )}
-          </main>
-        </div>
-      </>
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="btn-aurora-primary w-full p-4 rounded-xl text-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
+              >
+                {authLoading
+                  ? "Conectando..."
+                  : authMode === "login"
+                    ? "Comenzar"
+                    : "Crear Cuenta"}
+              </button>
+            </form>
+          )}
+        </main>
+      </div>
     );
   }
 

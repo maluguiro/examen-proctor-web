@@ -1,8 +1,35 @@
 @import "tailwindcss";
 
+/* 
+  PLASTIC SUMMER THEME - ANIMATED IMAGE VERSION
+  Ref: Background image with movement + Soft Aerosol texture.
+*/
 :root {
+  --bg-base: #fffaf2;
+  /* Blanco manteca cálido */
+
+  /* Paleta Pastel (Mantenida) */
+  --bg-pink: rgba(255, 182, 193, 0.75);
+  --bg-peach: rgba(255, 200, 160, 0.75);
+  --bg-butter: rgba(255, 235, 140, 0.80);
+  --bg-aqua: rgba(100, 245, 210, 0.70);
+  --bg-sky: rgba(135, 215, 250, 0.65);
+  --bg-lilac: rgba(210, 180, 230, 0.65);
+
+  --bg-orange-soft: rgba(255, 180, 100, 0.72);
+  --bg-coral: rgba(255, 140, 110, 0.75);
+
+  /* Superficie */
+  --surface: rgba(255, 255, 255, 0.85);
+  --border-soft: rgba(255, 255, 255, 0.65);
+
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Fonts */
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-festive: var(--font-festive);
 }
 
 @theme inline {
@@ -13,246 +40,74 @@
   --font-festive: var(--font-festive);
 }
 
-/* Texture Utils */
-.bg-noise {
-  position: relative;
-}
-
-.bg-noise::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.12;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-}
-
-/* Font Utils */
-.font-festive {
-  font-family: var(--font-festive), sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* 
+   LAYER 1: BASE COLOR
+   Solo el color sólido de fondo.
+*/
 body {
-  background: var(--background);
+  background-color: var(--bg-base);
   color: var(--foreground);
   font-family: var(--font-sans), sans-serif;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
 }
 
+/* 
+   LAYER 2: BACKGROUND IMAGE (ANIMADA)
+   Imagen movida a un pseudo-elemento para poder animarla y ajustar opacidad.
+*/
+/* 
+   LAYER 2: BACKGROUND IMAGE (USER PROVIDED)
+*/
+body::before {
+  content: "";
+  position: fixed;
+  inset: -5%;
+  z-index: -2;
 
-/* Animations */
-@keyframes superbloom {
+  background-image: url("/bg-plastic-final.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  /* Natural look */
+  opacity: 1;
+
+  /* Gentle float */
+  animation: plastic-float 60s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+/* Removed separate noise layer (body::after) as the image contains texture */
+body::after {
+  content: none;
+}
+
+/* Animación de flotación suave */
+@keyframes plastic-float {
   0% {
-    background-position: 0% 50%;
-  }
-
-  50% {
-    background-position: 100% 50%;
+    transform: scale(1.05) translate(0, 0);
   }
 
   100% {
-    background-position: 0% 50%;
+    transform: scale(1.1) translate(-2%, -1%);
   }
 }
 
-@keyframes slideInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-superbloom {
-  animation: superbloom 20s ease infinite;
-  background-size: 400% 400%;
-}
-
-.animate-slide-up {
-  opacity: 0;
-  animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Base Stagger Delays (can be extended if needed) */
-.stagger-1 {
-  animation-delay: 0.1s;
-}
-
-.stagger-2 {
-  animation-delay: 0.2s;
-}
-
-.stagger-3 {
-  animation-delay: 0.3s;
-}
-
-.stagger-4 {
-  animation-delay: 0.4s;
-}
-
-.stagger-5 {
-  animation-delay: 0.5s;
-}
-
-/* Premium UI Utilities */
-
-/* Fluid Aurora Theme Animations */
-@keyframes aurora-1 {
-
-  0%,
-  100% {
-    top: 0;
-    right: 0;
-  }
-
-  50% {
-    top: 20%;
-    right: 20%;
-  }
-}
-
-@keyframes aurora-2 {
-
-  0%,
-  100% {
-    bottom: 0;
-    left: 0;
-  }
-
-  50% {
-    bottom: 20%;
-    left: 20%;
-  }
-}
-
-@keyframes aurora-3 {
-
-  0%,
-  100% {
-    bottom: 0;
-    right: 0;
-  }
-
-  50% {
-    bottom: 20%;
-    right: 20%;
-  }
-}
-
-@keyframes float-slow {
-  0% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-
-  33% {
-    transform: translate(30px, -50px) rotate(10deg);
-  }
-
-  66% {
-    transform: translate(-20px, 20px) rotate(-5deg);
-  }
-
-  100% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-}
-
-@keyframes float-medium {
-  0% {
-    transform: translate(0, 0) scale(1);
-  }
-
-  50% {
-    transform: translate(-40px, 40px) scale(1.1);
-  }
-
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-}
-
-@keyframes morph {
-  0% {
-    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
-  }
-
-  50% {
-    border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
-  }
-
-  100% {
-    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
-  }
-}
-
-.animate-aurora-1 {
-  animation: aurora-1 20s infinite alternate linear;
-}
-
-.animate-aurora-2 {
-  animation: aurora-2 25s infinite alternate linear;
-}
-
-.animate-aurora-3 {
-  animation: aurora-3 30s infinite alternate linear;
-}
-
-.animate-float-slow {
-  animation: float-slow 15s ease-in-out infinite;
-}
-
-.animate-float-medium {
-  animation: float-medium 12s ease-in-out infinite;
-}
-
-.animate-morph {
-  animation: morph 10s ease-in-out infinite;
-}
-
-/* Aurora Blobs */
-.aurora-blob {
-  position: absolute;
-  filter: blur(80px);
-  opacity: 0.8;
-  border-radius: 50%;
-  animation: morph 20s infinite;
-}
-
-/* Premium Glass & Utilities */
+/* Glass Panel Refinado */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.02),
-    0 2px 4px -1px rgba(0, 0, 0, 0.02),
-    inset 0 0 20px rgba(255, 255, 255, 0.5);
+  background: var(--surface);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 12px 40px rgba(31, 38, 135, 0.08);
 }
 
-.text-gradient-aurora {
-  background: linear-gradient(135deg, #7928CA 0%, #FF0080 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
+/* Buttons: Aurora/Plastic style */
 .btn-aurora {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.8);
   color: #1a1a1a;
@@ -266,48 +121,92 @@ body {
 .btn-aurora::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(121, 40, 202, 0.1), rgba(255, 0, 128, 0.1));
+  inset: 0;
+  background: linear-gradient(135deg, var(--bg-pink), var(--bg-aqua));
   opacity: 0;
   transition: opacity 0.3s ease;
+  z-index: -1;
 }
 
 .btn-aurora:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(121, 40, 202, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(121, 40, 202, 0.1);
   border-color: #fff;
+  background: rgba(255, 255, 255, 0.85);
 }
 
 .btn-aurora:hover::before {
-  opacity: 1;
+  opacity: 0.3;
 }
 
 .btn-aurora-primary {
-  background: linear-gradient(135deg, #7928CA 0%, #FF0080 100%);
+  background: linear-gradient(135deg, #FF69B4 0%, #FFB6C1 100%);
   color: white;
   border: none;
-  box-shadow: 0 4px 15px rgba(255, 0, 128, 0.3);
+  box-shadow: 0 4px 15px rgba(255, 105, 180, 0.4);
+  font-weight: 700;
 }
 
 .btn-aurora-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(255, 0, 128, 0.5);
-  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgba(255, 105, 180, 0.5);
+  filter: brightness(1.05);
 }
 
 .input-aurora {
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--border-soft);
   backdrop-filter: blur(10px);
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  color: var(--foreground);
 }
 
 .input-aurora:focus {
-  background: rgba(255, 255, 255, 0.8);
-  border-color: #FF0080;
-  box-shadow: 0 0 0 3px rgba(255, 0, 128, 0.1);
+  background: rgba(255, 255, 255, 0.95);
+  border-color: #FFB6C1;
+  box-shadow: 0 0 0 3px rgba(255, 182, 193, 0.25);
   outline: none;
+}
+
+/* Text Gradients */
+.text-gradient-aurora {
+  background: linear-gradient(135deg, #D946EF 0%, #F43F5E 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Animations */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  opacity: 0;
+  animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Aurora Blobs Helpers */
+.aurora-blob {
+  position: absolute;
+  filter: blur(80px);
+  opacity: 0.8;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.animate-float-slow {
+  animation: plastic-float 25s infinite alternate;
+}
+
+.animate-float-medium {
+  animation: plastic-float 20s infinite alternate;
 }

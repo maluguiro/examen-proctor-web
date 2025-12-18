@@ -25,6 +25,9 @@ type ExamListItem = {
   code: string;
   createdAt: string;
   subject?: string;
+  date?: string;
+  duration?: number;
+  registeredCount?: number;
 };
 
 // --- Componente Dashboard ---
@@ -36,7 +39,7 @@ export default function TeacherDashboard({
 
   // View State
   const [activeView, setActiveView] = React.useState<
-    "dashboard" | "universities" | "calendar" | "profile"
+    "dashboard" | "universities" | "calendar" | "profile" | "exams"
   >("dashboard");
   const [search, setSearch] = React.useState("");
 
@@ -197,302 +200,286 @@ export default function TeacherDashboard({
     switch (activeView) {
       case "universities":
         return (
-          <UniversitiesView
-            profile={profile}
-            exams={exams}
-            onDeleteExam={handleDeleteExam}
-            onUpdateProfile={handleUpdateProfile}
-          />
+          <div className="glass-panel p-8 rounded-[2rem] w-full animate-slide-up">
+            <UniversitiesView
+              profile={profile}
+              exams={exams}
+              onDeleteExam={handleDeleteExam}
+              onUpdateProfile={handleUpdateProfile}
+            />
+          </div>
         );
-      case "calendar":
-        return <CalendarView exams={exams} />;
-      case "dashboard":
-      default:
-        // Vista original Dashboard
-        return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            {lastActionMessage && (
-              <div
-                style={{
-                  padding: "12px 16px",
-                  borderRadius: "12px",
-                  background:
-                    lastActionMessage.type === "success"
-                      ? "#dcfce7"
-                      : "#fee2e2",
-                  color:
-                    lastActionMessage.type === "success"
-                      ? "#166534"
-                      : "#991b1b",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                }}
-              >
-                {lastActionMessage.type === "success" ? "✅ " : "⚠️ "}
-                {lastActionMessage.text}
-              </div>
-            )}
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-                gap: "32px",
-                gridAutoRows: "minmax(200px, auto)",
-              }}
-            >
-              {/* A: Próximos Exámenes */}
-              <div className="glass-panel" style={{ padding: 32, gridColumn: "span 2", borderRadius: 32 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 20, color: "#1e1b4b" }}>
-                  Próximos exámenes{" "}
-                  <span
-                    style={{
-                      color: "#9ca3af",
-                      fontWeight: 400,
-                      fontSize: "0.9em",
-                      marginLeft: 4,
-                    }}
-                  >
-                    ({exams.length})
-                  </span>
-                </h3>
-                {loadingExams ? (
-                  <p>Cargando...</p>
-                ) : exams.length === 0 ? (
+      case "calendar":
+        return (
+          <div className="glass-panel p-8 rounded-[2rem] w-full animate-slide-up">
+            <CalendarView exams={exams} />
+          </div>
+        );
+      case "exams":
+        return (
+          <div className="glass-panel p-8 rounded-[2rem] w-full animate-slide-up space-y-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-gray-200/50">
+              <div>
+                <h2 className="font-festive text-gradient-aurora text-3xl mb-1">
+                  Mis Exámenes
+                </h2>
+                <p className="text-gray-500 font-medium text-sm">
+                  Gestiona tus evaluaciones y crea nuevas.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Card "Crear Nuevo" rápida */}
+              <div
+                onClick={handleCreateExam}
+                className="border-2 border-dashed border-indigo-200 bg-indigo-50/30 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-indigo-50 transition-colors group min-h-[180px]"
+              >
+                <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-2xl mb-3 group-hover:scale-110 transition-transform shadow-sm">
+                  +
+                </div>
+                <span className="font-bold text-indigo-700">Crear Examen</span>
+              </div>
+
+              {loadingExams ? (
+                <div className="col-span-full py-10 text-center text-gray-500 animate-pulse font-medium">
+                  Cargando exámenes...
+                </div>
+              ) : exams.length === 0 ? (
+                <div className="col-span-full py-10 text-center text-gray-400 font-medium">
+                  No tienes exámenes creados aún.
+                </div>
+              ) : (
+                exams.map((exam) => (
                   <div
-                    style={{
-                      textAlign: "center",
-                      color: "#9ca3af",
-                      padding: 20,
-                    }}
+                    key={exam.id}
+                    className="bg-white/40 border border-white/60 p-5 rounded-2xl hover:bg-white/60 transition-all flex flex-col gap-3 group relative shadow-sm"
                   >
-                    No hay exámenes creados. Crea uno nuevo para empezar.
+                    <div className="flex justify-between items-start">
+                      <span
+                        className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                          exam.status.toLowerCase() === "open"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {exam.status === "open" ? "Abierto" : "Borrador"}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/t/${exam.code}`);
+                        }}
+                        className="p-1.5 hover:bg-white rounded-lg text-indigo-600 transition-colors bg-white/50"
+                        title="Editar"
+                      >
+                        ✏️
+                      </button>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-800 leading-tight mb-1 text-lg">
+                        {exam.title || "Sin título"}
+                      </h3>
+                      <div className="text-xs text-gray-500 font-mono bg-white/50 px-2 py-0.5 rounded inline-block border border-white/50">
+                        {exam.code}
+                      </div>
+                    </div>
+                    <div className="mt-auto pt-3 border-t border-gray-200/50 flex justify-between items-center text-xs font-medium text-gray-500">
+                      <span>{exam.subject || "Sin materia"}</span>
+                      <span>
+                        {new Date(exam.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => router.push(`/t/${exam.code}`)}
+                      className="absolute inset-0 z-0"
+                      aria-label="Ver detalle"
+                    />
                   </div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                    {exams.slice(0, 4).map((ex) => (
-                      <div key={ex.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                        <div
-                          style={{ cursor: "pointer", flex: 1, color: '#4b5563' }}
-                          onClick={() => router.push(`/t/${ex.code}`)}
-                        >
-                          <strong>{ex.title}</strong>
-                          <span style={{ margin: "0 8px", color: "#d1d5db" }}>
-                            |
-                          </span>
-                          {ex.code}
+                ))
+              )}
+            </div>
+          </div>
+        );
+      case "profile":
+        return (
+          <div className="glass-panel p-8 rounded-[2rem] w-full animate-slide-up bg-white/60">
+            <h2 className="font-festive text-gradient-aurora text-3xl mb-6">
+              Mi Perfil Docente
+            </h2>
+            <div className="bg-white/40 p-6 rounded-2xl border border-white/50 space-y-4 max-w-xl">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+                  Nombre
+                </label>
+                <div className="text-lg font-bold text-gray-800">
+                  {profile?.name}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+                  Email
+                </label>
+                <div className="text-lg font-bold text-gray-800">
+                  {profile?.email}
+                </div>
+              </div>
+              <div className="pt-4">
+                <button className="btn-aurora px-6 py-2.5 rounded-xl text-sm font-bold shadow-sm">
+                  Editar información
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+
+      default: // "dashboard"
+        return (
+          <div className="animate-slide-up space-y-6">
+            {/* KPI Cards HIDDEN
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+              <div className="glass-panel p-6 rounded-[2rem] flex flex-col justify-between h-36 md:h-44 relative overflow-hidden group hover:shadow-lg transition-shadow">
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity text-6xl rotate-12">📊</div>
+                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide z-10">Exámenes Activos</h3>
+                <div className="text-4xl md:text-5xl font-black text-[#1e1b4b] z-10 mt-auto">
+                  {exams.filter(e => e.status === 'open').length}
+                </div>
+              </div>
+
+              <div className="glass-panel p-6 rounded-[2rem] flex flex-col justify-between h-36 md:h-44 relative overflow-hidden group hover:shadow-lg transition-shadow">
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity text-6xl rotate-12">🛡️</div>
+                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide z-10">Intentos de Fraude</h3>
+                <div className="text-4xl md:text-5xl font-black text-rose-500 z-10 mt-auto">
+                  {fraudStats.violations}
+                </div>
+                <div className="text-xs font-bold text-rose-400 mt-1 uppercase tracking-wide">Últimos 7 días</div>
+              </div>
+
+              <div className="glass-panel p-6 rounded-[2rem] flex flex-col justify-between h-36 md:h-44 relative overflow-hidden group hover:shadow-lg transition-shadow">
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity text-6xl rotate-12">🎓</div>
+                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide z-10">Alumnos Evaluados</h3>
+                <div className="text-4xl md:text-5xl font-black text-emerald-600 z-10 mt-auto">
+                  {fraudStats.clean + fraudStats.violations}
+                </div>
+              </div>
+            </div>
+            */}
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* M: Mis Exámenes Recientes */}
+              <div className="glass-panel p-6 md:p-8 rounded-[2.5rem] lg:col-span-2 flex flex-col shadow-sm">
+                <div className="flex justify-between items-center mb-5">
+                  <h3 className="text-lg md:text-xl font-bold text-[#1e1b4b]">
+                    Mis Exámenes Recientes
+                  </h3>
+                  <button
+                    onClick={() => setActiveView("exams")}
+                    className="text-[11px] md:text-xs font-bold text-indigo-500 hover:text-indigo-700 hover:underline bg-indigo-50 px-3 py-1.5 rounded-full transition-colors"
+                  >
+                    Ver todos →
+                  </button>
+                </div>
+
+                <div className="flex-1 space-y-2.5">
+                  {loadingExams ? (
+                    <div className="text-center py-8 text-gray-400 font-medium">
+                      Cargando...
+                    </div>
+                  ) : (
+                    exams.slice(0, 3).map((exam) => (
+                      <div
+                        key={exam.id}
+                        onClick={() => router.push(`/t/${exam.code}`)}
+                        className="group bg-pink-50/60 hover:bg-pink-100 p-4 rounded-2xl transition-all cursor-pointer border border-pink-100 flex justify-between items-center shadow-sm hover:shadow-md"
+                      >
+                        {/* Icono + texto */}
+                        <div className="flex items-center gap-3">
+                          {/* Icono documento + estado */}
+                          <div className="relative w-9 h-9 rounded-2xl flex items-center justify-center text-base shadow-sm border border-pink-100 bg-pink-50">
+                            <span className="text-lg">📄</span>
+                            <span
+                              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-white ${
+                                exam.status === "open"
+                                  ? "bg-emerald-400"
+                                  : "bg-slate-300"
+                              }`}
+                            />
+                          </div>
+
+                          <div>
+                            <div className="font-semibold text-gray-800 group-hover:text-indigo-700 transition-colors text-sm md:text-base">
+                              {exam.title || "Sin título"}
+                            </div>
+                            <div className="text-[11px] md:text-xs text-gray-500 flex flex-wrap items-center gap-2 mt-0.5">
+                              <span className="font-mono bg-white/60 px-1.5 py-0.5 rounded border border-gray-100">
+                                {exam.code}
+                              </span>
+                              <span className="font-medium">
+                                • {exam.subject || "Sin materia"}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span
-                            style={{
-                              padding: "4px 12px",
-                              borderRadius: "99px",
-                              fontSize: "11px",
-                              fontWeight: 700,
-                              background: ex.status.toUpperCase() === "OPEN" ? "#dcfce7" : "#f1f5f9",
-                              color: ex.status.toUpperCase() === "OPEN" ? "#166534" : "#64748b",
-                              border: ex.status.toUpperCase() === "OPEN" ? "1px solid #bbf7d0" : "1px solid #e2e8f0",
-                            }}
-                          >
-                            {ex.status}
-                          </span>
+
+                        {/* Acciones: eliminar + flecha */}
+                        <div className="flex items-center gap-1.5">
                           <button
-                            onClick={() => {
-                              if (confirm("¿Seguro de borrar?"))
-                                handleDeleteExam(ex.id);
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteExam(exam.id);
                             }}
-                            title="Borrar"
-                            className="btn-aurora"
-                            style={{
-                              width: 28, height: 28, borderRadius: '50%',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              color: '#ef4444', border: 'none'
-                            }}
+                            className="w-7 h-7 rounded-full bg-white/70 text-[11px] flex items-center justify-center text-rose-500 hover:bg-rose-50 hover:text-rose-600 border border-rose-100 opacity-0 group-hover:opacity-100 transition-all"
+                            title="Eliminar examen"
                           >
                             🗑️
                           </button>
+                          <div className="w-7 h-7 rounded-full bg-white/60 flex items-center justify-center text-gray-400 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-all opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0">
+                            →
+                          </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    ))
+                  )}
+
+                  <button
+                    onClick={handleCreateExam}
+                    className="w-full py-3 rounded-2xl border-2 border-dashed border-indigo-200 text-indigo-500 font-bold hover:bg-indigo-50 hover:border-indigo-300 transition-all flex items-center justify-center gap-2 mt-4 text-sm"
+                  >
+                    <span className="text-base">+</span> Crear nuevo examen
+                  </button>
+                </div>
               </div>
 
-              {/* B: Calendario Mini (Acceso rápido a vista completa) */}
-              <div
-                className="glass-panel"
-                style={{
-                  padding: 32, borderRadius: 32,
-                  background: "rgba(31, 41, 55, 0.95)", // Dark override
-                  color: "white",
-                  cursor: "pointer",
-                  display: "flex",
-                  flexDirection: "column"
-                }}
-                onClick={() => setActiveView("calendar")}
-              >
-                <h3
-                  style={{
-                    fontSize: 18, fontWeight: 800, marginBottom: 20,
-                    color: "white",
-                    display: "flex",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  Calendario
-                  <span style={{ fontSize: 12, opacity: 0.7 }}>
-                    ↗ Ver
-                  </span>
+              {/* R: Actividad Reciente */}
+              <div className="glass-panel p-6 md:p-8 rounded-[2.5rem] flex flex-col shadow-sm">
+                <h3 className="text-xl font-bold text-[#1e1b4b] mb-6">
+                  Actividad
                 </h3>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(7, 1fr)",
-                    gap: "8px",
-                    fontSize: "12px",
-                    marginTop: "auto",
-                  }}
-                >
-                  {["L", "M", "M", "J", "V", "S", "D"].map((d, i) => (
-                    <div key={i} style={{ textAlign: "center", opacity: 0.5 }}>
-                      {d}
-                    </div>
-                  ))}
-                  {Array.from({ length: 30 }).map((_, i) => (
+                <div className="flex-1 space-y-4 overflow-y-auto max-h-[400px] pr-2 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
+                  {activityLog.map((log, i) => (
                     <div
                       key={i}
-                      style={{
-                        textAlign: "center",
-                        padding: "6px",
-                        borderRadius: "6px",
-                        background: [12, 15, 23].includes(i + 1)
-                          ? "#3b82f6"
-                          : "transparent",
-                        fontWeight: [12, 15, 23].includes(i + 1) ? 700 : 400,
-                      }}
+                      className="flex gap-4 p-3 hover:bg-white/30 rounded-xl transition-colors"
                     >
-                      {i + 1}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* C: Resumen Antifraude */}
-              <div className="glass-panel" style={{ padding: 32, borderRadius: 32 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 20, color: '#1e1b4b' }}>Resumen Antifraude</h3>
-                <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
-                  <div
-                    style={{
-                      flex: 1,
-                      padding: 12,
-                      background: "rgba(255,255,255,0.5)",
-                      borderRadius: 12,
-                    }}
-                  >
-                    <div style={{ fontSize: 24, fontWeight: 800 }}>
-                      {fraudStats.totalAttempts}
-                    </div>
-                    <div style={{ fontSize: 12, color: "#6b7280" }}>
-                      Intentos
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      flex: 1,
-                      padding: 12,
-                      background: "#dcfce7", // Keep green for success
-                      borderRadius: 12,
-                      color: "#166534",
-                    }}
-                  >
-                    <div style={{ fontSize: 24, fontWeight: 800 }}>
-                      {fraudStats.clean}%
-                    </div>
-                    <div style={{ fontSize: 12 }}>Limpios</div>
-                  </div>
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
-                  Top motivos:
-                </div>
-                <ul
-                  style={{
-                    margin: 0,
-                    paddingLeft: 20,
-                    fontSize: 13,
-                    color: "#4b5563",
-                  }}
-                >
-                  {fraudStats.topReasons.map((r) => (
-                    <li key={r}>{r}</li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* D: Materias Shortcut */}
-              <div className="glass-panel" style={{ padding: 32, borderRadius: 32 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 20, color: '#1e1b4b' }}>Tus Materias</h3>
-                {profile?.institutions?.length ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {profile.institutions[0].subjects.slice(0, 3).map((s) => (
-                      <div key={s.id} style={{ padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,0.05)', color: '#4b5563', fontSize: 14 }}>
-                        <span>📚 {s.name}</span>
-                      </div>
-                    ))}
-                    <button
-                      onClick={() => setActiveView("universities")}
-                      style={{
-                        marginTop: 8,
-                        border: "none",
-                        background: "transparent",
-                        color: "#2563eb",
-                        fontSize: 13,
-                        cursor: "pointer",
-                        textAlign: "left",
-                        padding: 0,
-                      }}
-                    >
-                      Ver todas →
-                    </button>
-                  </div>
-                ) : (
-                  <p style={{ fontSize: 13, color: "#9ca3af" }}>
-                    No hay materias configuradas.
-                  </p>
-                )}
-              </div>
-
-              {/* E: Actividad Reciente */}
-              <div className="glass-panel" style={{ padding: 32, gridColumn: "span 2", borderRadius: 32 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 20, color: '#1e1b4b' }}>Actividad Reciente</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {activityLog.map((log, i) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,0.05)', fontSize: 14, color: '#4b5563' }}>
                       <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: "50%",
-                            background:
-                              log.type === "alert"
-                                ? "#ef4444"
-                                : log.type === "success"
-                                  ? "#22c55e"
-                                  : "#3b82f6",
-                          }}
-                        />
-                        {log.text}
+                        className={`mt-1.5 min-w-[10px] h-2.5 rounded-full shadow-sm ${
+                          log.type === "alert"
+                            ? "bg-rose-400"
+                            : log.type === "success"
+                            ? "bg-emerald-400"
+                            : "bg-blue-400"
+                        }`}
+                      />
+                      <div>
+                        <p className="text-gray-700 font-bold leading-snug text-sm">
+                          {log.text}
+                        </p>
+                        <span className="text-xs text-gray-400 font-medium block mt-1">
+                          {log.time}
+                        </span>
                       </div>
-                      <span style={{ fontSize: 11, color: "#9ca3af" }}>
-                        {log.time}
-                      </span>
                     </div>
                   ))}
                 </div>
@@ -504,36 +491,17 @@ export default function TeacherDashboard({
   };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", position: 'relative', overflow: 'hidden' }}>
-
+    <div className="flex flex-col md:flex-row min-h-screen relative overflow-hidden bg-transparent p-4 md:p-6 gap-6">
       {/* Sidebar - Ahora es Glass Panel */}
-      <aside
-        className="glass-panel"
-        style={{
-          width: "280px",
-          borderRight: "1px solid rgba(255,255,255,0.4)",
-          padding: "32px 24px",
-          display: "flex",
-          flexDirection: "column",
-          flexShrink: 0,
-          zIndex: 50,
-        }}
-      >
-        <div
-          className="font-festive text-gradient-aurora"
-          style={{
-            fontSize: "28px",
-            fontWeight: 800,
-            marginBottom: "48px",
-            letterSpacing: "-1px",
-            paddingLeft: "12px",
-          }}
-        >
+      <aside className="glass-panel w-full md:w-72 p-6 md:p-8 flex flex-col md:h-[calc(100vh-3rem)] rounded-3xl sticky top-6 z-50 shrink-0">
+        <div className="font-festive text-gradient-aurora text-xl md:text-2xl font-extrabold mb-8 md:mb-12 tracking-tight text-center w-full leading-tight">
           ProctoEtic
         </div>
-        <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <nav className="flex flex-col gap-2">
           {navItems.map((item) => {
-            const active = activeView === item.id || (activeView === "profile" && item.id === "profile");
+            const active =
+              activeView === item.id ||
+              (activeView === "profile" && item.id === "profile");
             return (
               <div
                 key={item.id}
@@ -544,138 +512,78 @@ export default function TeacherDashboard({
                     setActiveView(item.id as any);
                   }
                 }}
-                className={active ? "glass-panel" : ""}
-                style={{
-                  padding: "12px 20px",
-                  borderRadius: "16px",
-                  marginBottom: "8px",
-                  cursor: "pointer",
-                  color: active ? "#1e1b4b" : "#64748b",
-                  background: active ? "rgba(255, 255, 255, 0.5)" : "transparent",
-                  fontWeight: active ? 700 : 500,
-                  fontSize: "15px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  transition: "all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
-                  border: active ? "1px solid rgba(255,255,255,0.8)" : "1px solid transparent",
-                }}
+                className={`flex items-center gap-3 px-5 py-3 rounded-2xl cursor-pointer text-sm font-semibold transition-all duration-200 ${
+                  active
+                    ? "bg-white/50 text-indigo-900 border border-white/80 shadow-sm"
+                    : "text-slate-500 hover:bg-white/20 hover:text-slate-700 border border-transparent"
+                }`}
               >
-                <span>{item.icon}</span>
+                <span className="text-xl">{item.icon}</span>
                 {item.label}
               </div>
             );
           })}
           <div
             onClick={onLogout}
-            style={{
-              padding: "12px 20px",
-              borderRadius: "16px",
-              marginTop: "20px",
-              cursor: "pointer",
-              color: "#ef4444",
-              fontWeight: 600,
-              fontSize: "15px",
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-            }}
+            className="flex items-center gap-3 px-5 py-3 rounded-2xl cursor-pointer text-sm font-bold text-red-500 hover:bg-red-50/50 mt-8 transition-colors"
           >
-            <span>🚪</span>
+            <span className="text-xl">🚪</span>
             Cerrar sesión
           </div>
         </nav>
 
-        <div style={{
-          marginTop: "auto",
-          padding: "16px",
-          background: "rgba(255,255,255,0.3)",
-          borderRadius: "20px",
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-          backdropFilter: "blur(5px)",
-          border: "1px solid rgba(255,255,255,0.4)",
-        }}>
-          <div style={{
-            width: "36px",
-            height: "36px",
-            borderRadius: "12px",
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            color: "white",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "14px",
-            fontWeight: 700,
-            boxShadow: "0 4px 6px rgba(118, 75, 162, 0.3)",
-          }}>
+        <div className="mt-auto p-4 bg-white/30 rounded-2xl flex items-center gap-3 border border-white/40 backdrop-blur-sm shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold text-sm shadow-md">
             {profile?.name?.charAt(0).toUpperCase() || "D"}
           </div>
-          <div style={{ fontSize: "13px", overflow: "hidden" }}>
-            <div
-              style={{
-                fontWeight: 600,
-                whiteSpace: "nowrap",
-                textOverflow: "ellipsis",
-              }}
-            >
+          <div className="overflow-hidden">
+            <div className="font-bold text-sm truncate text-gray-800">
               {profile?.name || "Docente"}
             </div>
-            <div style={{ color: "#6b7280", fontSize: "12px" }}>Dashboard</div>
+            <div className="text-xs text-gray-500 font-medium">Dashboard</div>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main style={{
-        flex: 1,
-        padding: "40px",
-        height: "100vh",
-        overflowY: "auto",
-        position: "relative",
-        // Transparency is default, fits Phase 2 plan.
-      }}>
-        {/* Top Bar */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "40px" }}>
-          <div>
-            <h1 className="text-gradient-aurora font-festive" style={{ fontSize: "32px", fontWeight: 700, margin: 0 }}>
-              {activeView === "dashboard"
-                ? `Hola, ${profile?.name?.split(" ")[0] || "Docente"} 👋`
-                : activeView === "universities"
+      <main className="flex-1 flex justify-center overflow-y-auto h-[calc(100vh-3rem)] relative rounded-3xl pb-20 md:pb-0 scrollbar-hide">
+        <div className="w-full max-w-6xl space-y-6">
+          {/* Top Bar */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div>
+              <h1 className="text-gradient-aurora font-festive text-4xl font-bold m-0 leading-tight">
+                {activeView === "dashboard"
+                  ? `Hola, ${profile?.name?.split(" ")[0] || "Docente"} 👋`
+                  : activeView === "universities"
                   ? "Universidades"
                   : activeView === "calendar"
-                    ? "Calendario"
-                    : "Panel"}
-            </h1>
-            <p
-              style={{ margin: "4px 0 0", color: "#6b7280", fontSize: "14px" }}
-            >
-              {activeView === "dashboard"
-                ? "Resumen de tu actividad académica hoy."
-                : "Gestión de evaluaciones."}
-            </p>
+                  ? "Calendario"
+                  : "Panel"}
+              </h1>
+              <p className="mt-2 text-gray-500 text-sm font-medium">
+                {activeView === "dashboard"
+                  ? "Resumen de tu actividad académica hoy."
+                  : "Gestión de evaluaciones."}
+              </p>
+            </div>
+            <div className="flex gap-4 w-full md:w-auto">
+              <input
+                className="input-aurora px-6 py-3 rounded-full w-full md:w-80 text-sm"
+                placeholder="Buscar examen, materia..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <button
+                onClick={handleCreateExam}
+                className="btn-aurora-primary px-6 py-3 rounded-full text-sm font-bold whitespace-nowrap shadow-md hover:shadow-lg transition-all"
+              >
+                ➕ Crear examen
+              </button>
+            </div>
           </div>
-          <div style={{ display: "flex", gap: "16px" }}>
-            <input
-              className="input-aurora"
-              style={{
-                padding: "12px 24px",
-                borderRadius: "24px",
-                width: "320px",
-                fontSize: "14px",
-              }}
-              placeholder="Buscar examen, materia..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <button onClick={handleCreateExam} className="btn-aurora-primary" style={{ padding: "12px 28px", borderRadius: "24px", fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-              ➕ Crear examen
-            </button>
-          </div>
-        </div>
 
-        {renderContent()}
+          {renderContent()}
+        </div>
       </main>
     </div>
   );
