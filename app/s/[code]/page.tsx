@@ -805,23 +805,24 @@ export default function StudentPage({ params }: { params: { code: string } }) {
       </div>
 
       {showFullscreenWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="glass-panel bg-black/80 border-white/10 text-white rounded-3xl p-8 max-w-md w-full text-center relative overflow-hidden shadow-2xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/50 to-pink-900/50 z-0" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="glass-panel bg-emerald-950/85 border-emerald-400/30 text-emerald-50 rounded-3xl p-8 max-w-md w-full text-center relative overflow-hidden shadow-2xl">
+            {/* Capa de luz verde-lima */}
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/70 via-lime-800/40 to-sky-900/60 z-0" />
             <div className="relative z-10">
-              <div className="text-5xl mb-4">🚨</div>
-              <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400 mb-4">
-                Alerta de Fraude
+              <div className="text-5xl mb-4">🛡️</div>
+              <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-lime-300 to-sky-300 mb-4">
+                Alerta de seguridad
               </h2>
-              <p className="text-gray-300 mb-8 leading-relaxed">
-                Se ha detectado una actividad sospechosa fuera de la pantalla
-                del examen.
+              <p className="text-emerald-50/90 mb-8 leading-relaxed text-sm">
+                Se ha detectado una actividad fuera del modo examen.
                 <br />
                 <br />
-                <span className="text-sm bg-red-500/20 px-2 py-1 rounded text-red-200">
+                <span className="text-xs bg-emerald-500/15 px-2 py-1 rounded-full text-emerald-100 border border-emerald-400/40 inline-flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-lime-300" />
                   {lastViolationType === "fullscreen-exit"
-                    ? "Salida de Pantalla Completa"
-                    : "Cambio de Ventana Detectado"}
+                    ? "Salida de pantalla completa"
+                    : "Cambio de ventana detectado"}
                 </span>
               </p>
               <button
@@ -833,10 +834,10 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                   ) {
                     try {
                       await document.documentElement.requestFullscreen();
-                    } catch {}
+                    } catch (e) {}
                   }
                 }}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold hover:brightness-110 transition-all"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-lime-400 to-sky-400 text-emerald-950 font-bold hover:brightness-110 hover:shadow-lg transition-all"
               >
                 Entendido, volver al examen
               </button>

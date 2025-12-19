@@ -252,11 +252,10 @@ export default function TeacherDashboard({
                   >
                     <div className="flex justify-between items-start">
                       <span
-                        className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                          exam.status.toLowerCase() === "open"
+                        className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${exam.status.toLowerCase() === "open"
                             ? "bg-emerald-100 text-emerald-700"
                             : "bg-gray-100 text-gray-500"
-                        }`}
+                          }`}
                       >
                         {exam.status === "open" ? "Abierto" : "Borrador"}
                       </span>
@@ -386,19 +385,18 @@ export default function TeacherDashboard({
                       <div
                         key={exam.id}
                         onClick={() => router.push(`/t/${exam.code}`)}
-                        className="group bg-pink-50/60 hover:bg-pink-100 p-4 rounded-2xl transition-all cursor-pointer border border-pink-100 flex justify-between items-center shadow-sm hover:shadow-md"
+                        className="group bg-esmerald-50/60 hover:bg-esmerald-100 p-4 rounded-2xl transition-all cursor-pointer border border-esmerald-100 flex justify-between items-center shadow-sm hover:shadow-md"
                       >
                         {/* Icono + texto */}
                         <div className="flex items-center gap-3">
                           {/* Icono documento + estado */}
-                          <div className="relative w-9 h-9 rounded-2xl flex items-center justify-center text-base shadow-sm border border-pink-100 bg-pink-50">
+                          <div className="relative w-9 h-9 rounded-2xl flex items-center justify-center text-base shadow-sm border border-esmerald-100 bg-esmerald-50">
                             <span className="text-lg">📄</span>
                             <span
-                              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-white ${
-                                exam.status === "open"
+                              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-white ${exam.status === "open"
                                   ? "bg-emerald-400"
                                   : "bg-slate-300"
-                              }`}
+                                }`}
                             />
                           </div>
 
@@ -462,13 +460,12 @@ export default function TeacherDashboard({
                       className="flex gap-4 p-3 hover:bg-white/30 rounded-xl transition-colors"
                     >
                       <div
-                        className={`mt-1.5 min-w-[10px] h-2.5 rounded-full shadow-sm ${
-                          log.type === "alert"
+                        className={`mt-1.5 min-w-[10px] h-2.5 rounded-full shadow-sm ${log.type === "alert"
                             ? "bg-rose-400"
                             : log.type === "success"
-                            ? "bg-emerald-400"
-                            : "bg-blue-400"
-                        }`}
+                              ? "bg-emerald-400"
+                              : "bg-blue-400"
+                          }`}
                       />
                       <div>
                         <p className="text-gray-700 font-bold leading-snug text-sm">
@@ -492,7 +489,7 @@ export default function TeacherDashboard({
     <div className="flex flex-col md:flex-row min-h-screen relative overflow-hidden bg-transparent p-4 md:p-6 gap-6">
       {/* Sidebar - Ahora es Glass Panel */}
       <aside className="glass-panel w-full md:w-72 p-6 md:p-8 flex flex-col md:h-[calc(100vh-3rem)] rounded-3xl sticky top-6 z-50 shrink-0">
-        <div className="font-festive text-gradient-aurora text-xl md:text-2xl font-extrabold mb-8 md:mb-12 tracking-tight text-center w-full leading-tight">
+        <div className="font-festive text-gradient-sun text-xl md:text-2xl font-extrabold mb-8 md:mb-12 tracking-tight text-center w-full leading-tight">
           ProctoEtic
         </div>
         <nav className="flex flex-col gap-2">
@@ -510,11 +507,10 @@ export default function TeacherDashboard({
                     setActiveView(item.id as any);
                   }
                 }}
-                className={`flex items-center gap-3 px-5 py-3 rounded-2xl cursor-pointer text-sm font-semibold transition-all duration-200 ${
-                  active
+                className={`flex items-center gap-3 px-5 py-3 rounded-2xl cursor-pointer text-sm font-semibold transition-all duration-200 ${active
                     ? "bg-white/50 text-indigo-900 border border-white/80 shadow-sm"
                     : "text-slate-500 hover:bg-white/20 hover:text-slate-700 border border-transparent"
-                }`}
+                  }`}
               >
                 <span className="text-xl">{item.icon}</span>
                 {item.label}
@@ -549,14 +545,14 @@ export default function TeacherDashboard({
           {/* Top Bar */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
             <div>
-              <h1 className="text-gradient-aurora font-festive text-4xl font-bold m-0 leading-tight">
+              <h1 className="text-gradient-sun font-festive text-4xl font-bold m-0 leading-tight">
                 {activeView === "dashboard"
                   ? `Hola, ${profile?.name?.split(" ")[0] || "Docente"} 👋`
                   : activeView === "universities"
-                  ? "Universidades"
-                  : activeView === "calendar"
-                  ? "Calendario"
-                  : "Panel"}
+                    ? "Universidades"
+                    : activeView === "calendar"
+                      ? "Calendario"
+                      : "Panel"}
               </h1>
               <p className="mt-2 text-gray-500 text-sm font-medium">
                 {activeView === "dashboard"

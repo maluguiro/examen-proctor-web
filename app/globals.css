@@ -166,6 +166,13 @@ body.student-shell::before {
   background-clip: text;
 }
 
+.text-gradient-sun {
+  background: linear-gradient(135deg, #a3e635 0%, #facc15 50%, #fb923c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 @keyframes slideInUp {
   from {
     opacity: 0;
@@ -244,7 +251,7 @@ body.student-shell::before {
 
 /* Fondo examen pastel (fijo) */
 .bg-student-exam {
-  background: #f7f8fb;
+  background: #e6f8cf;
 }
 
 .bg-student-exam::before {
@@ -252,13 +259,13 @@ body.student-shell::before {
   position: absolute;
   inset: -20%;
   background-image: radial-gradient(42% 36% at 20% 28%,
-      rgba(191, 228, 255, 0.85),
+      rgba(246, 255, 214, 0.85),
       transparent 62%),
     radial-gradient(46% 40% at 78% 26%,
-      rgba(240, 255, 203, 0.8),
+      rgba(241, 255, 205, 0.8),
       transparent 64%),
     radial-gradient(52% 44% at 30% 80%,
-      rgba(215, 255, 204, 0.82),
+      rgba(217, 236, 212, 0.82),
       transparent 66%),
     radial-gradient(40% 34% at 82% 78%,
       rgba(255, 241, 109, 0.45),

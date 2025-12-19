@@ -296,8 +296,8 @@ export default function ExamChat({ code, role, defaultName }: Props) {
                   {m.broadcast
                     ? "📢 Broadcast"
                     : m.fromRole === "teacher"
-                    ? "Docente"
-                    : "Alumno"}
+                      ? "Docente"
+                      : "Alumno"}
                 </span>
               </div>
               <div style={{ wordBreak: "break-word", lineHeight: 1.4 }}>
@@ -362,14 +362,14 @@ export default function ExamChat({ code, role, defaultName }: Props) {
               border: "none",
               background: sending
                 ? "#ccc"
-                : "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)",
+                : "linear-gradient(135deg, #a3e635 0%, #facc15 50%, #fb923c 100%)",
               color: "white",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: sending ? "default" : "pointer",
               transition: "all 0.2s",
-              boxShadow: "0 2px 8px rgba(161, 140, 209, 0.4)",
+              boxShadow: "0 2px 8px rgba(251, 146, 60, 0.4)",
             }}
             onMouseDown={(e) =>
               (e.currentTarget.style.transform = "scale(0.9)")

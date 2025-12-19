@@ -11,8 +11,8 @@ type ChatShellContextType = {
 // Creamos el contexto. Lo exportamos para que ExamChat lo pueda consumir.
 export const ChatShellContext = React.createContext<ChatShellContextType>({
   isOpen: false,
-  setIsOpen: () => {},
-  setHasNew: () => {},
+  setIsOpen: () => { },
+  setHasNew: () => { },
 });
 
 type Props = {
@@ -86,9 +86,9 @@ export default function FloatingChatShell({ children, label = "Chat" }: Props) {
             minWidth: 56,
             padding: "0 24px",
             borderRadius: 999,
-            background: "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)",
+            background: "linear-gradient(135deg, #a3e635 0%, #facc15 50%, #fb923c 100%)",
             border: "1px solid rgba(255,255,255,0.4)",
-            boxShadow: "0 8px 20px rgba(161, 140, 209, 0.4)",
+            boxShadow: "0 8px 20px rgba(251, 146, 60, 0.4)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
