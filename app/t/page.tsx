@@ -166,10 +166,11 @@ export default function TeacherHomePage() {
                   setAuthMode("login");
                   setAuthError(null);
                 }}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${authMode === "login"
-                    ? "bg-white text-pink-500 shadow-sm"
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                  authMode === "login"
+                    ? "bg-white text-emerald-600 shadow-sm"
                     : "text-gray-500 hover:text-gray-700"
-                  }`}
+                }`}
               >
                 Ingresar
               </button>
@@ -178,10 +179,11 @@ export default function TeacherHomePage() {
                   setAuthMode("register");
                   setAuthError(null);
                 }}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${authMode === "register"
-                    ? "bg-white text-pink-500 shadow-sm"
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                  authMode === "register"
+                    ? "bg-white text-emerald-600 shadow-sm"
                     : "text-gray-500 hover:text-gray-700"
-                  }`}
+                }`}
               >
                 Registrarse
               </button>
@@ -210,7 +212,11 @@ export default function TeacherHomePage() {
                   placeholder="tu@email.com"
                 />
               </div>
-              <button type="submit" disabled={authLoading} className="btn-aurora-primary w-full p-4 rounded-xl text-lg shadow-lg hover:shadow-xl transition-all mt-4">
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="btn-aurora-primary w-full p-4 rounded-xl text-lg shadow-lg hover:shadow-xl transition-all mt-4"
+              >
                 {authLoading ? "Enviando..." : "Recuperar Contraseña"}
               </button>
               <button
@@ -219,7 +225,7 @@ export default function TeacherHomePage() {
                   setAuthMode("login");
                   setAuthError(null);
                 }}
-                className="w-full p-3 text-gray-500 hover:text-pink-500 font-bold text-sm transition-colors"
+                className="w-full p-3 text-gray-500 hover:text-emerald-500 font-bold text-sm transition-colors"
               >
                 ← Volver al inicio
               </button>
@@ -282,7 +288,7 @@ export default function TeacherHomePage() {
                       type="checkbox"
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
-                      className="accent-pink-400 w-4 h-4 cursor-pointer"
+                      className="accent-emerald-500 w-4 h-4 cursor-pointer"
                     />
                     Recordarme
                   </label>
@@ -293,7 +299,7 @@ export default function TeacherHomePage() {
                       setAuthMode("forgot");
                       setAuthError(null);
                     }}
-                    className="text-sm font-bold text-indigo-400 hover:text-pink-500 transition-colors"
+                    className="text-sm font-bold text-indigo-400 hover:text-emerald-500 transition-colors"
                   >
                     ¿Olvidaste pass?
                   </button>
@@ -308,8 +314,8 @@ export default function TeacherHomePage() {
                 {authLoading
                   ? "Conectando..."
                   : authMode === "login"
-                    ? "Comenzar"
-                    : "Crear Cuenta"}
+                  ? "Comenzar"
+                  : "Crear Cuenta"}
               </button>
             </form>
           )}

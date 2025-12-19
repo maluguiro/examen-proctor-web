@@ -3,6 +3,7 @@
 import * as React from "react";
 import ExamChat from "@/components/ExamChat";
 import FloatingChatShell from "@/components/FloatingChatShell";
+import NatureCaustics from "@/components/NatureCaustics";
 
 const API = process.env.NEXT_PUBLIC_API_URL!;
 
@@ -16,7 +17,7 @@ type PaperQuestion = {
   points: number;
 };
 
-type Step = "name" | "exam" | "submitting" | "submitted";
+type Step = "name" | "exam" | "submitting" | "submitted" | "review";
 
 type SubmitResponse = {
   ok: boolean;
@@ -59,26 +60,14 @@ function fibParseToParts(stem: string) {
   return parts;
 }
 
-// Helper simple para mezclar arrays
-function shuffleArray<T>(array: T[]): T[] {
-  const arr = [...array];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
 function shuffleArrayWithSeed<T>(items: T[], seedString: string): T[] {
   const arr = [...items];
 
-  // Convertir el seedString (q.id) en un número semilla
   let seed = 0;
   for (let i = 0; i < seedString.length; i++) {
     seed = (seed * 31 + seedString.charCodeAt(i)) >>> 0;
   }
 
-  // LCG simple para pseudo-aleatoriedad determinística
   function random() {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed / 0xffffffff;
@@ -104,6 +93,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     code: string;
     openAt?: string | null;
   } | null>(null);
+
   const [questions, setQuestions] = React.useState<PaperQuestion[]>([]);
   const [loadingPaper, setLoadingPaper] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
@@ -130,17 +120,20 @@ export default function StudentPage({ params }: { params: { code: string } }) {
   const [score, setScore] = React.useState<number | null>(null);
   const [maxScore, setMaxScore] = React.useState<number | null>(null);
 
-  // Lógica de visibilidad de revisión
+  // IMPORTANT: apaga el fondo global viejo SOLO en esta ruta (alumno)
+  React.useEffect(() => {
+    document.body.classList.add("student-shell");
+    return () => document.body.classList.remove("student-shell");
+  }, []);
+
   const canViewReview = React.useMemo(() => {
     const hasScore =
       gradingMode === "auto" || (gradingMode === "manual" && score !== null);
     const openAtTime = exam?.openAt ? new Date(exam.openAt).getTime() : 0;
-    // Si no hay fecha (null) o es 0, asumimos disponible
     const isTimeReached = openAtTime === 0 || Date.now() >= openAtTime;
     return hasScore && isTimeReached;
   }, [gradingMode, score, exam?.openAt]);
 
-  // Guardia: Si estamos en "review" pero no se puede ver, volver a "submitted"
   React.useEffect(() => {
     if (step === "review" && !canViewReview) {
       setStep("submitted");
@@ -151,18 +144,19 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     if (!openAt) return "Próximamente";
     const d = new Date(openAt);
     return (
-      d.toLocaleString("es-AR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }).replace(",", " · ") + " hs"
+      d
+        .toLocaleString("es-AR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })
+        .replace(",", " · ") + " hs"
     );
   }
 
-  // ============================= Header común =============================
   const Header = (
     <div
       className="glass-panel"
@@ -200,13 +194,14 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     </div>
   );
 
-  // ========================= Cargar paper (examen) ========================
+  // Cargar paper/meta
   React.useEffect(() => {
     let cancelled = false;
 
     const run = async () => {
       try {
         setLoadingPaper(true);
+
         const [paperRes, metaRes] = await Promise.all([
           fetch(`${API}/exams/${code}/paper`),
           fetch(`${API}/exams/${code}/meta`),
@@ -215,6 +210,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
         if (!paperRes.ok) {
           throw new Error(`Error al cargar examen (${paperRes.status})`);
         }
+
         const data = await paperRes.json();
         const meta = metaRes.ok ? await metaRes.json() : {};
         if (cancelled) return;
@@ -254,19 +250,16 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     };
   }, [code]);
 
-  // =========================== Summary (vidas/time) =======================
+  // Summary (vidas/time)
   const refreshSummary = React.useCallback(async () => {
     if (!attemptId) return;
     try {
       const r = await fetch(`${API}/attempts/${attemptId}/summary`);
       if (!r.ok) return;
       const data = await r.json();
-      if (typeof data.remaining === "number") {
-        setLives(data.remaining);
-      }
-      if (typeof data.secondsLeft === "number") {
+      if (typeof data.remaining === "number") setLives(data.remaining);
+      if (typeof data.secondsLeft === "number")
         setSecondsLeft(data.secondsLeft);
-      }
     } catch (e) {
       console.error("SUMMARY_ERROR", e);
     }
@@ -279,9 +272,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     const tick = async () => {
       if (cancelled) return;
       await refreshSummary();
-      if (!cancelled) {
-        setTimeout(tick, 5000);
-      }
+      if (!cancelled) setTimeout(tick, 5000);
     };
 
     tick();
@@ -290,7 +281,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     };
   }, [attemptId, refreshSummary]);
 
-  // ============================ Start / Submit ============================
   const startAttempt = React.useCallback(async () => {
     if (!studentName.trim()) {
       setErr("Ingresá tu nombre antes de comenzar.");
@@ -322,7 +312,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
 
       setAttemptId(at.id);
       setStep("exam");
-
       await refreshSummary();
     } catch (e: any) {
       console.error(e);
@@ -377,7 +366,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     [attemptId, answers, questions]
   );
 
-  // =============================== Antifraude =============================
   const reportViolation = React.useCallback(
     async (type: string, meta?: any) => {
       if (!attemptId) return;
@@ -450,12 +438,10 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     };
   }, [attemptId, reportViolation, step]);
 
-  // ============================ Render preguntas ==========================
   function renderQuestion(q: PaperQuestion, idx: number) {
     const commonBox = "glass-panel p-6 mb-4 rounded-2xl animate-slide-up";
     const kind = mapKind(q.kind as string);
 
-    // ---------- TRUE / FALSE ----------
     if (kind === "TRUE_FALSE") {
       const v = String(answers[q.id] ?? "");
       return (
@@ -496,7 +482,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
       );
     }
 
-    // ---------- MCQ ----------
     if (kind === "MCQ") {
       const v = Number(answers[q.id]);
       return (
@@ -532,7 +517,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
       );
     }
 
-    // ---------- SHORT ----------
     if (kind === "SHORT") {
       return (
         <div
@@ -558,7 +542,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
       );
     }
 
-    // ---------- FILL IN (FIB) ----------
     if (kind === "FIB") {
       const parts = fibParseToParts(q.stem || "");
       const vArr: string[] = Array.isArray(answers[q.id])
@@ -571,7 +554,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
         setAnswers({ ...answers, [q.id]: next });
       };
 
-      // Construcción del banco de opciones (Fixed: sin hooks, orden estable)
       const rawChoices = Array.isArray(q.choices)
         ? q.choices.filter((w) => typeof w === "string" && w.trim().length > 0)
         : [];
@@ -601,6 +583,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
               )
             )}
           </div>
+
           {bank.length > 0 && (
             <div className="mt-4 p-3 glass-panel rounded-xl">
               <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>
@@ -615,7 +598,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                       e.dataTransfer.setData("text/plain", word)
                     }
                     onClick={() => {
-                      // find first empty
                       const boxCount = parts.filter(
                         (p) => p.type === "box"
                       ).length;
@@ -636,6 +618,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
               </div>
             </div>
           )}
+
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 12 }}>
             Puntaje: {q.points ?? 1}
           </div>
@@ -646,7 +629,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     return null;
   }
 
-  // ================================ Render Page ================================
   return (
     <div
       style={{
@@ -656,15 +638,35 @@ export default function StudentPage({ params }: { params: { code: string } }) {
         color: "#1a1a1a",
       }}
     >
-      {/* Fondo específico del alumno: mimosa + rayos de sol */}
-      <div className="bg-student-exam" aria-hidden="true" />
+      {/* INICIO (name): FOTO ÚNICA */}
+      <div
+        className="bg-student-layer bg-student-welcome"
+        data-visible={step === "name" ? "true" : "false"}
+        aria-hidden="true"
+      />
 
-      {/* --- FLUID AURORA BACKGROUND SYSTEM REMOVED to show global body background --- */}
+      {/* EXAMEN (exam/submitting): PASTEL */}
+      <div
+        className="bg-student-layer bg-student-exam"
+        data-visible={
+          step === "exam" || step === "submitting" ? "true" : "false"
+        }
+        data-mode="static"
+        aria-hidden="true"
+      />
 
-      {/* Main Container */}\n
+      {/* FINAL (submitted): MISMA FOTO ÚNICA */}
+      <div
+        className="bg-student-layer bg-student-welcome"
+        data-visible={step === "submitted" ? "true" : "false"}
+        aria-hidden="true"
+      />
+
+      {/* Caústicas solo durante el examen */}
+      {step === "exam" && <NatureCaustics variant="subtle" />}
+
       <div className="relative z-10 w-full min-h-screen flex justify-center p-6 md:p-10">
         <div className="w-full max-w-4xl">
-          {/* STEP: NAME */}
           {step === "name" && (
             <div className="glass-panel p-10 rounded-3xl text-center max-w-lg mx-auto mt-20 animate-slide-up">
               <h1 className="font-festive text-gradient-aurora text-5xl mb-4">
@@ -693,15 +695,14 @@ export default function StudentPage({ params }: { params: { code: string } }) {
             </div>
           )}
 
-          {/* STEP: EXAM */}
           {step === "exam" && (
             <div className="animate-slide-up space-y-4">
               {Header}
 
-              {/* Status Bar */}
               <div
-                className={`glass-panel p-3 rounded-2xl flex items-center justify-between transition-colors ${flash ? "bg-red-100/50" : ""
-                  }`}
+                className={`glass-panel p-3 rounded-2xl flex items-center justify-between transition-colors ${
+                  flash ? "bg-red-100/50" : ""
+                }`}
               >
                 <div className="flex gap-4 px-2">
                   <div>
@@ -716,8 +717,8 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                     ⏳{" "}
                     {secondsLeft != null
                       ? `${Math.floor(secondsLeft / 60)}:${String(
-                        secondsLeft % 60
-                      ).padStart(2, "0")}`
+                          secondsLeft % 60
+                        ).padStart(2, "0")}`
                       : "—"}
                   </div>
                 </div>
@@ -727,7 +728,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                 <div className="text-center p-10">Cargando preguntas...</div>
               )}
 
-              {/* Questions */}
               <div className="mt-6">
                 {!loadingPaper && questions.map((q, i) => renderQuestion(q, i))}
               </div>
@@ -742,6 +742,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                   </button>
                 </div>
               )}
+
               {err && (
                 <div className="text-center text-red-500 mt-4 bg-white/50 p-2 rounded">
                   {err}
@@ -750,7 +751,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
             </div>
           )}
 
-          {/* STEP: SUBMITTING */}
           {step === "submitting" && (
             <div className="glass-panel p-10 rounded-3xl text-center max-w-md mx-auto mt-20">
               <h2 className="text-2xl font-bold mb-4">
@@ -760,7 +760,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
             </div>
           )}
 
-          {/* STEP: SUBMITTED */}
           {step === "submitted" && (
             <div className="glass-panel p-10 rounded-3xl text-center max-w-md mx-auto mt-20 animate-slide-up">
               <div className="text-6xl mb-4">🧠</div>
@@ -790,8 +789,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                       <p>El docente revisará tu examen pronto.</p>
                     </div>
                   )}
-
-                  {/* Aquí podría ir el botón de 'Ver Revisión' si se implementa */}
                 </>
               ) : (
                 <div className="bg-white/40 p-6 rounded-2xl mb-6 border border-white/50">
@@ -806,8 +803,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
           )}
         </div>
       </div>
-
-      {/* --- ALERTS & MODALS (Dark Glass Theory) --- */}
 
       {showFullscreenWarning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -838,7 +833,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                   ) {
                     try {
                       await document.documentElement.requestFullscreen();
-                    } catch (e) { }
+                    } catch {}
                   }
                 }}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold hover:brightness-110 transition-all"
