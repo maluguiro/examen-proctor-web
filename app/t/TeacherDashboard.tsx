@@ -18,7 +18,12 @@ type TeacherDashboardProps = {
   onLogout: () => void;
 };
 
-type ViewState = "dashboard" | "universities" | "calendar" | "profile" | "exams";
+type ViewState =
+  | "dashboard"
+  | "universities"
+  | "calendar"
+  | "profile"
+  | "exams";
 
 type ExamListItem = {
   id: string;
@@ -253,10 +258,11 @@ export default function TeacherDashboard({
                   >
                     <div className="flex justify-between items-start">
                       <span
-                        className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${exam.status.toLowerCase() === "open"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-gray-100 text-gray-500"
-                          }`}
+                        className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                          exam.status.toLowerCase() === "open"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-gray-100 text-gray-500"
+                        }`}
                       >
                         {exam.status === "open" ? "Abierto" : "Borrador"}
                       </span>
@@ -332,7 +338,6 @@ export default function TeacherDashboard({
           <div className="animate-slide-up grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Columna Central (2): Lista de Horarios/Exámenes */}
             <div className="lg:col-span-2 space-y-6">
-
               {/* Box 1: Título y Acciones */}
               <div className="glass-panel p-5 rounded-[2rem] flex justify-between items-center">
                 <h2 className="text-xl font-bold text-[#1e1b4b]">
@@ -376,8 +381,11 @@ export default function TeacherDashboard({
                           </h3>
                           <div className="flex items-center gap-2 text-[10px] text-gray-500 font-medium uppercase tracking-wide">
                             <span
-                              className={`w-2 h-2 rounded-full ${exam.status === "open" ? "bg-emerald-400" : "bg-gray-300"
-                                }`}
+                              className={`w-2 h-2 rounded-full ${
+                                exam.status === "open"
+                                  ? "bg-emerald-400"
+                                  : "bg-gray-300"
+                              }`}
                             />
                             <span>
                               {exam.status === "open" ? "Activo" : "Borrador"}
@@ -405,11 +413,12 @@ export default function TeacherDashboard({
 
             {/* Columna Derecha (3): Widgets */}
             <div className="space-y-6">
-
               {/* Widget 1: Calendar Thumbnail (New) */}
               <div className="glass-panel p-6 rounded-[2.5rem] flex flex-col gap-4">
                 <div className="flex justify-between items-center px-1">
-                  <span className="text-sm font-bold text-gray-700">Noviembre 2024</span>
+                  <span className="text-sm font-bold text-gray-700">
+                    Noviembre 2024
+                  </span>
                   <div className="flex gap-1">
                     <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
                     <span className="w-2 h-2 rounded-full bg-gray-200"></span>
@@ -417,20 +426,43 @@ export default function TeacherDashboard({
                 </div>
                 {/* Mini Grid Visual */}
                 <div className="grid grid-cols-7 gap-1 text-[10px] text-center font-medium text-gray-400 mb-2">
-                  <div>L</div><div>M</div><div>M</div><div>J</div><div>V</div><div>S</div><div>D</div>
+                  <div>L</div>
+                  <div>M</div>
+                  <div>M</div>
+                  <div>J</div>
+                  <div>V</div>
+                  <div>S</div>
+                  <div>D</div>
                 </div>
                 <div className="grid grid-cols-7 gap-1 text-[10px] text-center font-bold text-gray-600">
                   {/* Dummy days row 1 */}
-                  <div className="py-1">29</div><div className="py-1">30</div>
-                  <div className="py-1">1</div><div className="py-1">2</div><div className="py-1">3</div><div className="py-1">4</div><div className="py-1">5</div>
+                  <div className="py-1">29</div>
+                  <div className="py-1">30</div>
+                  <div className="py-1">1</div>
+                  <div className="py-1">2</div>
+                  <div className="py-1">3</div>
+                  <div className="py-1">4</div>
+                  <div className="py-1">5</div>
 
                   {/* Dummy days row 2 */}
-                  <div className="py-1 bg-indigo-500 text-white rounded-full">6</div><div className="py-1">7</div><div className="py-1">8</div><div className="py-1">9</div>
-                  <div className="py-1">10</div><div className="py-1">11</div><div className="py-1">12</div>
+                  <div className="py-1 bg-indigo-500 text-white rounded-full">
+                    6
+                  </div>
+                  <div className="py-1">7</div>
+                  <div className="py-1">8</div>
+                  <div className="py-1">9</div>
+                  <div className="py-1">10</div>
+                  <div className="py-1">11</div>
+                  <div className="py-1">12</div>
 
                   {/* Dummy days row 3 */}
-                  <div className="py-1">13</div><div className="py-1">14</div><div className="py-1">15</div><div className="py-1">16</div>
-                  <div className="py-1">17</div><div className="py-1">18</div><div className="py-1">19</div>
+                  <div className="py-1">13</div>
+                  <div className="py-1">14</div>
+                  <div className="py-1">15</div>
+                  <div className="py-1">16</div>
+                  <div className="py-1">17</div>
+                  <div className="py-1">18</div>
+                  <div className="py-1">19</div>
                 </div>
               </div>
 
@@ -446,12 +478,13 @@ export default function TeacherDashboard({
                   {activityLog.map((log, i) => (
                     <div key={i} className="flex gap-3 items-start">
                       <div
-                        className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${log.type === "alert"
-                          ? "bg-rose-400"
-                          : log.type === "success"
+                        className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${
+                          log.type === "alert"
+                            ? "bg-rose-400"
+                            : log.type === "success"
                             ? "bg-emerald-400"
                             : "bg-indigo-400"
-                          }`}
+                        }`}
                       />
                       <div>
                         <p className="text-gray-700 font-bold text-xs leading-snug">
@@ -476,7 +509,7 @@ export default function TeacherDashboard({
       {/* Sidebar - Ahora es Glass Panel */}
       <aside className="w-full lg:w-64 shrink-0 flex flex-col gap-3 h-full transition-all duration-300">
         {/* Panel 1: Logo */}
-        <div className="glass-panel p-4 rounded-[1.5rem] flex flex-col items-center text-center justify-center shrink-0">
+        <div className="glass-panel p-3 rounded-[1rem] flex flex-col items-center text-center justify-center shrink-0">
           <div className="font-festive text-gradient-sun text-3xl font-extrabold cursor-default leading-tight">
             ProctoEtic
           </div>
@@ -488,10 +521,11 @@ export default function TeacherDashboard({
             <button
               key={item.id}
               onClick={() => setActiveView(item.id as ViewState)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative overflow-hidden ${activeView === item.id
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative overflow-hidden ${
+                activeView === item.id
                   ? "bg-white shadow-sm text-indigo-600 font-bold"
                   : "text-gray-500 hover:bg-white/50 hover:text-indigo-500 font-medium"
-                }`}
+              }`}
             >
               <span className="text-xl relative z-10 group-hover:scale-110 transition-transform duration-300">
                 {item.icon}
@@ -510,7 +544,7 @@ export default function TeacherDashboard({
         <div className="glass-panel p-2 rounded-[1.5rem] shrink-0 flex flex-col gap-1">
           <button
             onClick={onLogout}
-            className="flex items-center gap-2 text-rose-500 hover:bg-rose-50 p-2 rounded-xl transition-all w-full font-bold text-[10px]"
+            className="flex items-center gap-4 text-rose-500 hover:bg-rose-50 p-3 rounded-xl transition-all w-full font-bold text-[10px]"
           >
             <span className="text-sm">🚪</span>
             Salir
@@ -544,10 +578,10 @@ export default function TeacherDashboard({
                   {activeView === "dashboard"
                     ? `Hola, ${profile?.name?.split(" ")[0] || "Docente"} 👋`
                     : activeView === "universities"
-                      ? "Universidades"
-                      : activeView === "calendar"
-                        ? "Calendario"
-                        : "Panel"}
+                    ? "Universidades"
+                    : activeView === "calendar"
+                    ? "Calendario"
+                    : "Panel"}
                 </h1>
                 <p className="mt-2 text-gray-500 text-sm font-medium">
                   {activeView === "dashboard"
