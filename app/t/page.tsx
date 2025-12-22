@@ -301,7 +301,7 @@ export default function TeacherHomePage() {
                     }}
                     className="text-sm font-bold text-indigo-400 hover:text-emerald-500 transition-colors"
                   >
-                    ¿Olvidaste pass?
+                    ¿Olvidaste tu contraseña?
                   </button>
                 </div>
               )}
