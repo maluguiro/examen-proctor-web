@@ -190,9 +190,6 @@ export default function TeacherDashboard({
     { id: "dashboard", label: "Dashboard", icon: "📊" },
     { id: "universities", label: "Universidades", icon: "🏛️" },
     { id: "calendar", label: "Calendario", icon: "📅" },
-    { id: "calendar", label: "Calendario", icon: "📅" },
-    // Exams tab is redundant here if we have a view for it
-    // { id: "exams", label: "Mis Exámenes", icon: "📝" },
   ];
 
   // --- Contenido según ViewState ---
@@ -345,7 +342,9 @@ export default function TeacherDashboard({
                 </h2>
                 <button
                   onClick={() => setActiveView("exams")}
-                  className="text-xs font-bold text-indigo-500 hover:text-indigo-700 bg-indigo-50 px-4 py-1.5 rounded-full transition-colors"
+                  className="text-xs font-bold px-4 py-1.5 rounded-full transition-colors shadow-sm
+               bg-white/80 border border-emerald-100 text-emerald-700
+               hover:bg-emerald-50 hover:text-emerald-800"
                 >
                   Ver todos
                 </button>
@@ -367,7 +366,7 @@ export default function TeacherDashboard({
                       <div
                         key={exam.id}
                         onClick={() => router.push(`/t/${exam.code}`)}
-                        className="group bg-white hover:bg-gray-50/80 p-4 rounded-3xl transition-all cursor-pointer border border-gray-100 shadow-sm hover:shadow-md flex items-center gap-4"
+                        className="group bg-white/60 hover:bg-white p-3 md:p-4 rounded-2xl transition-all cursor-pointer border border-gray-100 shadow-sm hover:shadow-md flex items-center gap-4"
                       >
                         {/* Time/Status Block (Left) - Smaller */}
                         <div className="flex flex-col items-center justify-center w-12 h-12 rounded-2xl bg-indigo-50/50 text-indigo-500 font-bold shrink-0 text-lg">
@@ -510,7 +509,7 @@ export default function TeacherDashboard({
       <aside className="w-full lg:w-64 shrink-0 flex flex-col gap-3 h-full transition-all duration-300">
         {/* Panel 1: Logo */}
         <div className="glass-panel p-3 rounded-[1rem] flex flex-col items-center text-center justify-center shrink-0">
-          <div className="font-festive text-gradient-sun text-3xl font-extrabold cursor-default leading-tight">
+          <div className="font-festive text-gradient-sun text-3xl md:text-2xl font-extrabold cursor-default leading-tight">
             ProctoEtic
           </div>
         </div>
@@ -572,9 +571,9 @@ export default function TeacherDashboard({
         <div className="flex-1 overflow-y-auto pr-1 pb-20 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
           <div className="w-full max-w-6xl space-y-6">
             {/* Top Bar */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div>
-                <h1 className="text-gradient-sun font-festive text-4xl font-bold m-0 leading-tight">
+                <h1 className="text-gradient-sun font-festive text-3xl font-bold m-0 leading-tight">
                   {activeView === "dashboard"
                     ? `Hola, ${profile?.name?.split(" ")[0] || "Docente"} 👋`
                     : activeView === "universities"
