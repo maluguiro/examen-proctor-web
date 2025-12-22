@@ -574,14 +574,16 @@ export default function TeacherExamPage() {
               <button
                 key={s.id}
                 onClick={() => setStep(s.id)}
-                className={`text-left px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-3 ${isActive
+                className={`text-left px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-3 ${
+                  isActive
                     ? "bg-white/50 text-indigo-900 shadow-sm border border-white/60"
                     : "text-gray-500 hover:bg-white/20 hover:text-gray-700 hover:pl-5"
-                  }`}
+                }`}
               >
                 <div
-                  className={`w-2 h-2 rounded-full transition-colors ${isActive ? "bg-indigo-500" : "bg-gray-300"
-                    }`}
+                  className={`w-2 h-2 rounded-full transition-colors ${
+                    isActive ? "bg-indigo-500" : "bg-gray-300"
+                  }`}
                 />
                 {s.label}
               </button>
@@ -594,10 +596,11 @@ export default function TeacherExamPage() {
             Estado del Examen
           </div>
           <div
-            className={`px-4 py-3 rounded-xl text-center font-bold text-xs shadow-sm flex items-center justify-center gap-2 ${isOpen
+            className={`px-4 py-3 rounded-xl text-center font-bold text-xs shadow-sm flex items-center justify-center gap-2 ${
+              isOpen
                 ? "bg-emerald-100/80 text-emerald-800 border border-emerald-200"
                 : "bg-slate-100/80 text-slate-600 border border-slate-200"
-              }`}
+            }`}
           >
             {isOpen ? (
               <>
@@ -633,10 +636,11 @@ export default function TeacherExamPage() {
           {/* ERROR / INFO TOASTS */}
           {(info || err) && (
             <div
-              className={`mb-6 p-4 rounded-xl text-sm font-bold flex items-center gap-3 shadow-sm ${err
+              className={`mb-6 p-4 rounded-xl text-sm font-bold flex items-center gap-3 shadow-sm ${
+                err
                   ? "bg-red-50 text-red-600 border border-red-100"
                   : "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                }`}
+              }`}
             >
               <span>{err ? "⚠️" : "✅"}</span>
               {err || info}
@@ -681,8 +685,8 @@ export default function TeacherExamPage() {
                   </label>
 
                   {profile?.institutions &&
-                    profile.institutions.length > 0 &&
-                    !manualSubjectMode ? (
+                  profile.institutions.length > 0 &&
+                  !manualSubjectMode ? (
                     <div className="bg-white/50 p-4 rounded-2xl border border-white/60 space-y-4">
                       <div className="space-y-1">
                         <label className="text-xs font-bold text-gray-500 ml-1">
@@ -862,8 +866,9 @@ export default function TeacherExamPage() {
                 <div className="bg-white/40 p-5 rounded-2xl border border-white/60 mt-4">
                   <div className="flex items-center gap-3 mb-2">
                     <div
-                      className={`w-3 h-3 rounded-full ${isOpen ? "bg-emerald-500" : "bg-gray-400"
-                        }`}
+                      className={`w-3 h-3 rounded-full ${
+                        isOpen ? "bg-emerald-500" : "bg-gray-400"
+                      }`}
                     />
                     <span className="font-bold text-gray-800">
                       Estado de Publicación
@@ -942,17 +947,19 @@ export default function TeacherExamPage() {
                     <div
                       key={q.id}
                       onClick={() => startEditQuestion(q)}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer group relative ${editingQuestionId === q.id
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer group relative ${
+                        editingQuestionId === q.id
                           ? "bg-indigo-50 border-indigo-200 shadow-sm"
                           : "bg-white/40 border-white/60 hover:bg-white/60 hover:border-indigo-100"
-                        }`}
+                      }`}
                     >
                       <div className="flex justify-between items-start mb-1">
                         <span
-                          className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md mb-2 inline-block ${editingQuestionId === q.id
+                          className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md mb-2 inline-block ${
+                            editingQuestionId === q.id
                               ? "bg-indigo-200 text-indigo-800"
                               : "bg-gray-100 text-gray-500"
-                            }`}
+                          }`}
                         >
                           {q.kind} • {q.points} pt
                         </span>
@@ -1049,19 +1056,21 @@ export default function TeacherExamPage() {
                           <div key={idx} className="flex gap-2">
                             <button
                               onClick={() => setMcqCorrect(idx)}
-                              className={`w-10 h-10 rounded-xl border flex items-center justify-center font-bold text-lg transition-all ${mcqCorrect === idx
+                              className={`w-10 h-10 rounded-xl border flex items-center justify-center font-bold text-lg transition-all ${
+                                mcqCorrect === idx
                                   ? "bg-emerald-500 border-emerald-600 text-white shadow-md"
                                   : "bg-gray-100 text-gray-300 border-gray-200 hover:bg-gray-200"
-                                }`}
+                              }`}
                               title="Marcar como correcta"
                             >
                               {mcqCorrect === idx ? "✓" : idx + 1}
                             </button>
                             <input
-                              className={`input-aurora flex-1 p-2 rounded-xl text-sm ${mcqCorrect === idx
+                              className={`input-aurora flex-1 p-2 rounded-xl text-sm ${
+                                mcqCorrect === idx
                                   ? "font-semibold text-emerald-900 bg-emerald-50/50"
                                   : ""
-                                }`}
+                              }`}
                               value={choice}
                               onChange={(e) => {
                                 const n = [...mcqChoices];
@@ -1095,19 +1104,21 @@ export default function TeacherExamPage() {
                       <div className="flex gap-4 pt-2">
                         <button
                           onClick={() => setTfCorrect(true)}
-                          className={`flex-1 py-3 rounded-xl font-bold border-2 transition-all ${tfCorrect
+                          className={`flex-1 py-3 rounded-xl font-bold border-2 transition-all ${
+                            tfCorrect
                               ? "border-emerald-500 bg-emerald-50 text-emerald-700"
                               : "border-transparent bg-white/50 text-gray-500"
-                            }`}
+                          }`}
                         >
                           Verdadero
                         </button>
                         <button
                           onClick={() => setTfCorrect(false)}
-                          className={`flex-1 py-3 rounded-xl font-bold border-2 transition-all ${!tfCorrect
+                          className={`flex-1 py-3 rounded-xl font-bold border-2 transition-all ${
+                            !tfCorrect
                               ? "border-emerald-500 bg-emerald-50 text-emerald-700"
                               : "border-transparent bg-white/50 text-gray-500"
-                            }`}
+                          }`}
                         >
                           Falso
                         </button>
@@ -1168,8 +1179,8 @@ export default function TeacherExamPage() {
                         {savingQuestion
                           ? "Guardando..."
                           : editingQuestionId
-                            ? "Actualizar"
-                            : "Guardar Pregunta"}
+                          ? "Actualizar"
+                          : "Guardar Pregunta"}
                       </button>
                     </div>
                   </div>
@@ -1204,10 +1215,11 @@ export default function TeacherExamPage() {
                 </div>
                 <button
                   onClick={copyStudentLink}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all shadow-sm border ${linkCopied
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all shadow-sm border ${
+                    linkCopied
                       ? "bg-emerald-500 text-white border-emerald-600"
                       : "bg-white text-indigo-900 border-indigo-100 hover:bg-indigo-50"
-                    }`}
+                  }`}
                 >
                   <span className="text-lg">{linkCopied ? "✅" : "🔗"}</span>
                   {linkCopied ? "¡Link Copiado!" : "Copiar Link Examen"}
@@ -1228,6 +1240,7 @@ export default function TeacherExamPage() {
               </div>
 
               {/* CHAT FLOTANTE SIEMPRE VISIBLE */}
+
               <div className="fixed bottom-6 right-6 z-[120]">
                 <FloatingChatShell label="Chat con Alumnos">
                   <ExamChat

@@ -504,7 +504,7 @@ export default function TeacherDashboard({
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-transparent p-4 md:p-6 gap-6">
+    <div className="flex flex-col md:flex-row min-h-screen w-full overflow-x-hidden bg-transparent p-4 md:p-6 gap-6">
       {/* Sidebar - Ahora es Glass Panel */}
       <aside className="w-full lg:w-64 shrink-0 flex flex-col gap-3 h-full transition-all duration-300">
         {/* Panel 1: Logo */}
@@ -566,10 +566,10 @@ export default function TeacherDashboard({
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative rounded-[2.5rem]">
+      <main className="flex-1 flex flex-col h-full overflow-x-hidden relative">
         {/* Scrollable Content Container */}
         <div className="flex-1 overflow-y-auto pr-1 pb-20 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-          <div className="w-full max-w-6xl space-y-6">
+          <div className="w-full max-w-6xl mx-auto space-y-6">
             {/* Top Bar */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div>
@@ -597,9 +597,15 @@ export default function TeacherDashboard({
                 />
                 <button
                   onClick={handleCreateExam}
-                  className="btn-aurora-primary px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap shadow-md hover:shadow-lg transition-all"
+                  className="
+    px-8 py-3 rounded-full text-sm font-bold whitespace-nowrap
+    shadow-md hover:shadow-lg transition-all
+    bg-gradient-to-r from-lime-300 via-amber-300 to-orange-300
+    text-[#1f2933]
+    border border-white/60
+  "
                 >
-                  ➕ Crear examen
+                  🌼 Crear examen
                 </button>
               </div>
             </div>
