@@ -504,114 +504,133 @@ export default function TeacherDashboard({
   };
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen w-full overflow-x-hidden bg-transparent p-4 md:p-6 gap-6">
+    <div
+      className="
+        flex flex-col md:flex-row
+        min-h-screen
+        w-full
+        bg-transparent
+        p-4 md:p-6
+        gap-6
+      "
+    >
       {/* Sidebar - Ahora es Glass Panel */}
-      <aside className="w-full lg:w-64 shrink-0 flex flex-col gap-3 h-full transition-all duration-300">
-        {/* Panel 1: Logo */}
-        <div className="glass-panel p-3 rounded-[1rem] flex flex-col items-center text-center justify-center shrink-0">
-          <div className="font-festive text-gradient-sun text-3xl md:text-2xl font-extrabold cursor-default leading-tight">
+      {/* SIDEBAR CON 3 BLOQUES */}
+      <aside className="w-full lg:w-72 shrink-0 flex flex-col gap-3 h-[calc(100vh-3rem)] sticky top-4">
+        {/* BLOQUE 1: PROCTOETIC (DEJAMOS IGUAL SALVO TAMAÑO LIGERAMENTE MENOR SI QUERÉS) */}
+        <div className="glass-panel p-3 rounded-[1rem] flex items-center justify-center">
+          <div className="font-festive text-gradient-sun text-3xl font-extrabold cursor-default leading-tight">
             ProctoEtic
           </div>
         </div>
 
-        {/* Panel 2: Navigation */}
-        <div className="glass-panel p-2 rounded-[1.5rem] flex-1 flex flex-col gap-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveView(item.id as ViewState)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative overflow-hidden ${
-                activeView === item.id
-                  ? "bg-white shadow-sm text-indigo-600 font-bold"
-                  : "text-gray-500 hover:bg-white/50 hover:text-indigo-500 font-medium"
-              }`}
-            >
-              <span className="text-xl relative z-10 group-hover:scale-110 transition-transform duration-300">
-                {item.icon}
-              </span>
-              <span className="relative z-10 text-sm whitespace-nowrap">
-                {item.label}
-              </span>
-              {activeView === item.id && (
-                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-indigo-500 rounded-full" />
-              )}
-            </button>
-          ))}
+        {/* BLOQUE 2: MENÚ (SE ALARGA CON flex-1) */}
+        <div className="glass-panel flex-1 rounded-[1.5rem] p-4 md:p-6 flex flex-col">
+          <nav className="flex-1 flex flex-col gap-2">
+            {navItems.map((item) => {
+              const active =
+                activeView === item.id ||
+                (activeView === "profile" && item.id === "profile");
+
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => {
+                    if (item.action) {
+                      item.action();
+                    } else {
+                      setActiveView(item.id as any);
+                    }
+                  }}
+                  className={`flex items-center gap-3 px-5 py-3 rounded-2xl cursor-pointer text-sm font-semibold transition-all duration-200 ${
+                    active
+                      ? "bg-white/60 text-indigo-900 border border-white/80 shadow-sm"
+                      : "text-slate-500 hover:bg-white/25 hover:text-slate-700 border border-transparent"
+                  }`}
+                >
+                  <span className="text-xl">{item.icon}</span>
+                  {item.label}
+                </div>
+              );
+            })}
+          </nav>
+
+          {/* BOTÓN SALIR PEGADO AL FINAL DEL BLOQUE 2 */}
+          <div
+            onClick={onLogout}
+            className="mt-4 flex items-center gap-3 px-5 py-3 rounded-2xl cursor-pointer text-sm font-bold text-red-500 hover:bg-red-50/70 transition-colors"
+          >
+            <span className="text-xl">🚪</span>
+            Salir
+          </div>
         </div>
 
-        {/* Panel 3: Logout & Profile (Ultra Compacto) */}
-        <div className="glass-panel p-2 rounded-[1.5rem] shrink-0 flex flex-col gap-1">
-          <button
-            onClick={onLogout}
-            className="flex items-center gap-4 text-rose-500 hover:bg-rose-50 p-3 rounded-xl transition-all w-full font-bold text-[10px]"
-          >
-            <span className="text-sm">🚪</span>
-            Salir
-          </button>
-
-          <div className="bg-indigo-50/50 p-1.5 rounded-xl flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
-              {profile?.name?.charAt(0) || "D"}
+        {/* BLOQUE 3: AVATAR DOCENTE, SIEMPRE ABAJO */}
+        <div className="glass-panel p-4 rounded-[1.5rem] flex items-center gap-3 border border-white/40 backdrop-blur-sm shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-lime-500 to-emerald-500 text-white flex items-center justify-center font-bold text-sm shadow-md">
+            {profile?.name?.charAt(0).toUpperCase() || "D"}
+          </div>
+          <div className="overflow-hidden">
+            <div className="font-bold text-sm truncate text-gray-800">
+              {profile?.name || "Docente"}
             </div>
-            <div className="flex-col overflow-hidden">
-              <div className="text-[11px] font-bold text-gray-800 truncate leading-tight">
-                {profile?.name?.split(" ")[0]}
-              </div>
-              <div className="text-[8px] text-gray-400 font-bold uppercase tracking-wider leading-tight">
-                Docente
-              </div>
-            </div>
+            <div className="text-xs text-gray-500 font-medium">Dashboard</div>
           </div>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-full overflow-x-hidden relative">
-        {/* Scrollable Content Container */}
-        <div className="flex-1 overflow-y-auto pr-1 pb-20 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-          <div className="w-full max-w-6xl mx-auto space-y-6">
-            {/* Top Bar */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div>
-                <h1 className="text-gradient-sun font-festive text-3xl font-bold m-0 leading-tight">
-                  {activeView === "dashboard"
-                    ? `Hola, ${profile?.name?.split(" ")[0] || "Docente"} 👋`
-                    : activeView === "universities"
-                    ? "Universidades"
-                    : activeView === "calendar"
-                    ? "Calendario"
-                    : "Panel"}
-                </h1>
-                <p className="mt-2 text-gray-500 text-sm font-medium">
-                  {activeView === "dashboard"
-                    ? "Resumen de tu actividad académica hoy."
-                    : "Gestión de evaluaciones."}
-                </p>
-              </div>
-              <div className="flex gap-4 w-full md:w-auto">
-                <input
-                  className="input-aurora px-5 py-2.5 rounded-full w-full md:w-80 text-sm"
-                  placeholder="Buscar examen, materia..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                <button
-                  onClick={handleCreateExam}
-                  className="
-    px-8 py-3 rounded-full text-sm font-bold whitespace-nowrap
-    shadow-md hover:shadow-lg transition-all
-    bg-gradient-to-r from-lime-300 via-amber-300 to-orange-300
-    text-[#1f2933]
-    border border-white/60
+      <main
+        className="
+    flex-1
+    flex
+    justify-center
+    overflow-y-auto
+    overflow-x-hidden
   "
-                >
-                  🌼 Crear examen
-                </button>
-              </div>
+      >
+        <div className="w-full max-w-6xl mx-auto space-y-8 pb-8">
+          {/* Top Bar */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <div>
+              <h1 className="text-gradient-sun font-festive text-3xl font-bold m-0 leading-tight">
+                {activeView === "dashboard"
+                  ? `Hola, ${profile?.name?.split(" ")[0] || "Docente"} 👋`
+                  : activeView === "universities"
+                  ? "Universidades"
+                  : activeView === "calendar"
+                  ? "Calendario"
+                  : "Panel"}
+              </h1>
+              <p className="mt-2 text-gray-500 text-sm font-medium">
+                {activeView === "dashboard"
+                  ? "Resumen de tu actividad académica hoy."
+                  : "Gestión de evaluaciones."}
+              </p>
             </div>
-
-            {renderContent()}
+            <div className="flex gap-4 w-full md:w-auto">
+              <input
+                className="input-aurora px-5 py-2.5 rounded-full w-full md:w-80 text-sm"
+                placeholder="Buscar examen, materia..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <button
+                onClick={handleCreateExam}
+                className="
+px-8 py-3 rounded-full text-sm font-bold whitespace-nowrap
+shadow-md hover:shadow-lg transition-all
+bg-gradient-to-r from-lime-300 via-amber-300 to-orange-300
+text-[#1f2933]
+border border-white/60
+"
+              >
+                🌼 Crear examen
+              </button>
+            </div>
           </div>
+
+          {renderContent()}
         </div>
       </main>
     </div>

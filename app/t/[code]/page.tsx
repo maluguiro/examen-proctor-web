@@ -1238,22 +1238,22 @@ export default function TeacherExamPage() {
                   <BoardClient code={code} />
                 </div>
               </div>
-
-              {/* CHAT FLOTANTE SIEMPRE VISIBLE */}
-
-              <div className="fixed bottom-6 right-6 z-[120]">
-                <FloatingChatShell label="Chat con Alumnos">
-                  <ExamChat
-                    code={code}
-                    role="teacher"
-                    defaultName={teacherName || "Docente"}
-                  />
-                </FloatingChatShell>
-              </div>
             </div>
           )}
         </div>
       </main>
+      {/* CHAT FLOTANTE: SOLO EN STEP 4 */}
+      {step === 4 && (
+        <div className="fixed bottom-6 right-6 z-[120]">
+          <FloatingChatShell label="Chat">
+            <ExamChat
+              code={code}
+              role="teacher"
+              defaultName={teacherName || "Docente"}
+            />
+          </FloatingChatShell>
+        </div>
+      )}
     </div>
   );
 }
