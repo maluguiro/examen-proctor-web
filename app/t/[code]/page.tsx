@@ -596,23 +596,17 @@ export default function TeacherExamPage() {
             Estado del Examen
           </div>
           <div
-            className={`px-4 py-3 rounded-xl text-center font-bold text-xs shadow-sm flex items-center justify-center gap-2 ${
-              isOpen
-                ? "bg-emerald-100/80 text-emerald-800 border border-emerald-200"
-                : "bg-slate-100/80 text-slate-600 border border-slate-200"
-            }`}
+            className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold
+    ${
+      isOpen ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
+    }`}
           >
-            {isOpen ? (
-              <>
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                </span>
-                PUBLICADO
-              </>
-            ) : (
-              "⚫ BORRADOR"
-            )}
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                isOpen ? "bg-emerald-500" : "bg-slate-400"
+              }`}
+            />
+            {isOpen ? "Abierto" : "Cerrado"}
           </div>
         </div>
       </aside>

@@ -283,14 +283,14 @@ export default function TeacherHomePage() {
               {/* REMEMBER ME CHECKBOX */}
               {authMode === "login" && (
                 <div className="flex justify-between items-center px-1">
-                  <label className="flex items-center gap-2 text-sm text-gray-600 font-medium cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs text-gray-500">
                     <input
                       type="checkbox"
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
-                      className="accent-emerald-500 w-4 h-4 cursor-pointer"
+                      className="accent-emerald-500"
                     />
-                    Recordarme
+                    Recordar mi email
                   </label>
 
                   <button

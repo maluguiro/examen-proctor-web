@@ -191,6 +191,24 @@ export default function TeacherDashboard({
     { id: "universities", label: "Universidades", icon: "🏛️" },
     { id: "calendar", label: "Calendario", icon: "📅" },
   ];
+  const normalizedSearch = search.trim().toLowerCase();
+
+  const filteredExams = React.useMemo(
+    () =>
+      !normalizedSearch
+        ? exams
+        : exams.filter((exam) => {
+            const title = exam.title?.toLowerCase() || "";
+            const subject = exam.subject?.toLowerCase() || "";
+            const code = exam.code?.toLowerCase() || "";
+            return (
+              title.includes(normalizedSearch) ||
+              subject.includes(normalizedSearch) ||
+              code.includes(normalizedSearch)
+            );
+          }),
+    [exams, normalizedSearch]
+  );
 
   // --- Contenido según ViewState ---
   const renderContent = () => {
@@ -231,73 +249,87 @@ export default function TeacherDashboard({
               {/* Card "Crear Nuevo" rápida */}
               <div
                 onClick={handleCreateExam}
-                className="border-2 border-dashed border-indigo-200 bg-indigo-50/30 rounded-3xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-indigo-50 transition-colors group min-h-[180px]"
+                className="border-2 border-dashed border-lime-200 bg-lime-50/40 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-lime-50 transition-colors group min-h-[180px]"
               >
-                <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-2xl mb-3 group-hover:scale-110 transition-transform shadow-sm">
+                <div className="w-12 h-12 rounded-full bg-white text-[#1f2933] flex items-center justify-center text-2xl mb-3 group-hover:scale-110 transition-transform shadow-sm">
                   +
                 </div>
-                <span className="font-bold text-indigo-700">Crear Examen</span>
+                <span className="font-bold text-lime-700 text-sm">
+                  Crear examen
+                </span>
               </div>
 
               {loadingExams ? (
                 <div className="col-span-full py-10 text-center text-gray-500 animate-pulse font-medium">
                   Cargando exámenes...
                 </div>
-              ) : exams.length === 0 ? (
+              ) : filteredExams.length === 0 ? (
                 <div className="col-span-full py-10 text-center text-gray-400 font-medium">
                   No tienes exámenes creados aún.
                 </div>
               ) : (
-                exams.map((exam) => (
+                filteredExams.map((exam) => (
                   <div
                     key={exam.id}
-                    className="bg-white/60 border border-white/60 p-5 rounded-3xl hover:bg-white/80 transition-all flex flex-col gap-3 group relative shadow-sm"
+                    onClick={() => router.push(`/t/${exam.code}`)}
+                    className="bg-white/70 border border-white/70 p-5 rounded-3xl hover:bg-white transition-all flex flex-col gap-3 group relative shadow-sm"
                   >
+                    {/* Estado Abierto / Cerrado */}
                     <div className="flex justify-between items-start">
                       <span
                         className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
                           exam.status.toLowerCase() === "open"
                             ? "bg-emerald-100 text-emerald-700"
-                            : "bg-gray-100 text-gray-500"
+                            : "bg-slate-100 text-slate-500"
                         }`}
                       >
-                        {exam.status === "open" ? "Abierto" : "Borrador"}
+                        {exam.status.toLowerCase() === "open"
+                          ? "Abierto"
+                          : "Cerrado"}
                       </span>
+
+                      {/* Botón eliminar (usa la lógica existente handleDeleteExam) */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          router.push(`/t/${exam.code}`);
+                          handleDeleteExam(exam.id);
                         }}
-                        className="p-1.5 hover:bg-white rounded-lg text-indigo-600 transition-colors bg-white/50"
-                        title="Editar"
+                        className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition-colors"
+                        title="Eliminar examen"
                       >
-                        ✏️
+                        🗑️
                       </button>
                     </div>
+
+                    {/* Título + materia (solo si existe) */}
                     <div>
-                      <h3 className="font-bold text-gray-800 leading-tight mb-1 text-lg">
+                      <h3 className="font-bold text-gray-800 leading-tight mb-1 text-base">
                         {exam.title || "Sin título"}
                       </h3>
-                      {/* Código removido visualmente en la tarjeta soft, pero visible aquí en vista completa si se desea. En el dashboard principal se ocultará. */}
-                    </div>
-                    <div className="mt-auto pt-3 border-t border-gray-200/50 flex justify-between items-center text-xs font-medium text-gray-500">
-                      <span>{exam.subject || "Sin materia"}</span>
-                      <span>
-                        {new Date(exam.createdAt).toLocaleDateString()}
-                      </span>
+                      {exam.subject && (
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          {exam.subject}
+                        </p>
+                      )}
                     </div>
 
-                    <button
-                      onClick={() => router.push(`/t/${exam.code}`)}
-                      className="absolute inset-0 z-0"
-                      aria-label="Ver detalle"
-                    />
+                    {/* Fecha de creación + código */}
+                    <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center text-[11px] font-medium text-gray-500">
+                      <span>
+                        Creado el{" "}
+                        {new Date(exam.createdAt).toLocaleDateString()}
+                      </span>
+                      <span className="font-mono text-gray-400">
+                        Código: {exam.code}
+                      </span>
+                    </div>
                   </div>
                 ))
               )}
             </div>
           </div>
         );
+
       case "profile":
         return (
           <div className="glass-panel p-8 rounded-[2rem] w-full animate-slide-up bg-white/60">
@@ -362,46 +394,69 @@ export default function TeacherDashboard({
                       No tienes exámenes activos hoy.
                     </div>
                   ) : (
-                    exams.slice(0, 4).map((exam) => (
+                    filteredExams.slice(0, 4).map((exam) => (
                       <div
                         key={exam.id}
                         onClick={() => router.push(`/t/${exam.code}`)}
-                        className="group bg-white/60 hover:bg-white p-3 md:p-4 rounded-2xl transition-all cursor-pointer border border-gray-100 shadow-sm hover:shadow-md flex items-center gap-4"
+                        className="group bg-white/40 hover:bg-white/80 p-4 rounded-2xl transition-all cursor-pointer border border-white/60 flex justify-between items-center shadow-sm hover:shadow-md"
                       >
-                        {/* Time/Status Block (Left) - Smaller */}
-                        <div className="flex flex-col items-center justify-center w-12 h-12 rounded-2xl bg-indigo-50/50 text-indigo-500 font-bold shrink-0 text-lg">
-                          <span>📄</span>
-                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-sm border border-white/50 bg-pink-50">
+                            📄
+                          </div>
+                          <div>
+                            <div className="font-bold text-gray-800 group-hover:text-indigo-700 transition-colors text-lg">
+                              {exam.title || "Sin título"}
+                            </div>
 
-                        {/* Info Central */}
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-gray-800 text-base mb-0.5 truncate">
-                            {exam.title || "Sin título"}
-                          </h3>
-                          <div className="flex items-center gap-2 text-[10px] text-gray-500 font-medium uppercase tracking-wide">
-                            <span
-                              className={`w-2 h-2 rounded-full ${
-                                exam.status === "open"
-                                  ? "bg-emerald-400"
-                                  : "bg-gray-300"
-                              }`}
-                            />
-                            <span>
-                              {exam.status === "open" ? "Activo" : "Borrador"}
-                            </span>
-                            <span className="text-gray-300">•</span>
-                            <span>
-                              {new Date(exam.createdAt).toLocaleDateString()}
-                            </span>
+                            <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
+                              {/* Código */}
+                              <span className="font-mono bg-white/60 px-1.5 py-0.5 rounded border border-gray-100">
+                                {exam.code}
+                              </span>
+
+                              {/* Estado abierto/cerrado */}
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold ${
+                                  exam.status?.toLowerCase() === "open"
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : "bg-slate-100 text-slate-500"
+                                }`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    exam.status?.toLowerCase() === "open"
+                                      ? "bg-emerald-500"
+                                      : "bg-slate-400"
+                                  }`}
+                                />
+                                {exam.status?.toLowerCase() === "open"
+                                  ? "Abierto"
+                                  : "Cerrado"}
+                              </span>
+
+                              {/* Materia solo si existe */}
+                              {exam.subject && (
+                                <span className="font-medium">
+                                  • {exam.subject}
+                                </span>
+                              )}
+
+                              {/* Fecha de creación si existe */}
+                              {exam.createdAt && (
+                                <span className="text-[10px] text-gray-400">
+                                  •{" "}
+                                  {new Date(
+                                    exam.createdAt
+                                  ).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
-                        {/* Actions (Right) */}
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {/* Simple chevron or minimal action */}
-                          <div className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                            ➜
-                          </div>
+                        <div className="w-8 h-8 rounded-full bg-white/50 flex items-center justify-center text-gray-400 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-all">
+                          →
                         </div>
                       </div>
                     ))
