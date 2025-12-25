@@ -336,6 +336,46 @@ export default function TeacherExamPage() {
       setSavingExam(false);
     }
   }
+  async function closeExam() {
+    if (!examId) return;
+    setSavingExam(true);
+    setErr(null);
+    setInfo(null);
+
+    try {
+      const body: any = {
+        isOpen: false,
+      };
+
+      // Mandamos también la config básica, igual que cuando abrimos
+      if (title.trim()) body.title = title.trim();
+
+      if (durationMinutes !== "") {
+        body.durationMinutes = Number(durationMinutes) || 0;
+      }
+
+      if (lives !== "") {
+        const v = Math.max(0, Math.floor(Number(lives) || 0));
+        body.lives = v;
+      }
+
+      const r = await fetch(`${API}/exams/${code}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!r.ok) throw new Error(await r.text());
+
+      setIsOpen(false);
+      setInfo("Examen cerrado.");
+    } catch (e: any) {
+      console.error(e);
+      setErr(e?.message || "Error al cerrar el examen");
+    } finally {
+      setSavingExam(false);
+    }
+  }
 
   // ----------------- preguntas: cargar / guardar / editar -----------------
 
@@ -865,27 +905,29 @@ export default function TeacherExamPage() {
                       }`}
                     />
                     <span className="font-bold text-gray-800">
-                      Estado de Publicación
+                      Estado del examen: {isOpen ? "Abierto" : "Cerrado"}
                     </span>
                   </div>
+
                   <p className="text-xs text-gray-500 mb-4 px-1">
-                    Si habilitas el examen, los alumnos podrán ingresar
-                    inmediatamente si tienen el código.
+                    Cuando el examen está abierto, los alumnos pueden ingresar
+                    con el código.
                   </p>
+
                   <div className="flex gap-3">
                     {isOpen ? (
                       <button
-                        onClick={() => {
-                          setIsOpen(false);
-                          // Aquí podrías agregar la lógica para cerrar el examen en el backend.
-                        }}
-                        className="px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-bold border border-red-200 hover:bg-red-200 transition-colors"
+                        type="button"
+                        onClick={closeExam}
+                        className="px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-bold border border-red-200 hover:bg-red-200 transition-colors disabled:opacity-60"
+                        disabled={savingExam}
                       >
-                        Cerrar Examen
+                        Cerrar examen
                       </button>
                     ) : (
-                      <div className="text-xs font-bold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg inline-block">
-                        El examen se abrirá al guardar.
+                      <div className="text-xs font-bold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg inline-block">
+                        Actualmente cerrado. Se abrirá cuando guardes con
+                        “Guardar y Siguiente”.
                       </div>
                     )}
                   </div>

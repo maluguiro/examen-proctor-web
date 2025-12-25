@@ -410,11 +410,6 @@ export default function TeacherDashboard({
                             </div>
 
                             <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
-                              {/* Código */}
-                              <span className="font-mono bg-white/60 px-1.5 py-0.5 rounded border border-gray-100">
-                                {exam.code}
-                              </span>
-
                               {/* Estado abierto/cerrado */}
                               <span
                                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold ${
@@ -663,13 +658,74 @@ export default function TeacherDashboard({
                   : "Gestión de evaluaciones."}
               </p>
             </div>
-            <div className="flex gap-4 w-full md:w-auto">
-              <input
-                className="input-aurora px-5 py-2.5 rounded-full w-full md:w-80 text-sm"
-                placeholder="Buscar examen, materia..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+            <div className="flex gap-4 w-full md:w-auto relative">
+              {/* Contenedor del buscador con resultados debajo */}
+              <div className="relative w-full md:w-80">
+                <input
+                  className="input-aurora px-5 py-2.5 rounded-full w-full text-sm"
+                  placeholder="Buscar examen, materia..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+
+                {/* Resultados tipo “Google” debajo del input */}
+                {normalizedSearch && (
+                  <div className="absolute left-0 right-0 mt-2 bg-white/95 rounded-3xl shadow-xl border border-gray-100 max-h-72 overflow-y-auto z-30">
+                    {filteredExams.length === 0 ? (
+                      <div className="px-4 py-3 text-xs text-gray-400">
+                        Sin resultados para “{search}”.
+                      </div>
+                    ) : (
+                      filteredExams.slice(0, 6).map((exam) => (
+                        <button
+                          key={exam.id}
+                          type="button"
+                          onClick={() => {
+                            // limpiar búsqueda y navegar
+                            setSearch("");
+                            router.push(`/t/${exam.code}`);
+                          }}
+                          className="w-full text-left px-4 py-3 text-xs hover:bg-emerald-50/80 transition-colors flex flex-col gap-0.5"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold text-gray-800 truncate">
+                              {exam.title || "Sin título"}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                exam.status?.toLowerCase() === "open"
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-slate-100 text-slate-500"
+                              }`}
+                            >
+                              {exam.status?.toLowerCase() === "open"
+                                ? "Abierto"
+                                : "Cerrado"}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                            {exam.subject && (
+                              <span className="truncate">{exam.subject}</span>
+                            )}
+                            {exam.createdAt && (
+                              <span className="text-gray-400">
+                                •{" "}
+                                {new Date(exam.createdAt).toLocaleDateString()}
+                              </span>
+                            )}
+                            <span className="font-mono text-gray-400 ml-auto">
+                              {exam.code}
+                            </span>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Botón Crear Examen igual que antes */}
               <button
                 onClick={handleCreateExam}
                 className="

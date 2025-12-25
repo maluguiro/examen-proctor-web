@@ -40,9 +40,9 @@ function fibParseToParts(stem: string) {
   const parts: Array<{ type: "text" | "box"; idx?: number; text?: string }> =
     [];
   const re = /\[\[(.*?)\]\]/g;
-  let last = 0,
-    m: RegExpExecArray | null,
-    box = 0;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let box = 0;
 
   while ((m = re.exec(stem)) !== null) {
     if (m.index > last) {
@@ -51,12 +51,15 @@ function fibParseToParts(stem: string) {
     parts.push({ type: "box", idx: box++ });
     last = m.index + m[0].length;
   }
+
   if (last < stem.length) {
     parts.push({ type: "text", text: stem.slice(last) });
   }
+
   if (!parts.length) {
     parts.push({ type: "text", text: stem });
   }
+
   return parts;
 }
 
@@ -365,6 +368,12 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     },
     [attemptId, answers, questions]
   );
+
+  const handleOpenReview = React.useCallback(() => {
+    if (!attemptId) return;
+    const url = `${API}/attempts/${attemptId}/review.print`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, [attemptId]);
 
   const reportViolation = React.useCallback(
     async (type: string, meta?: any) => {
@@ -789,6 +798,22 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                       <p>El docente revisará tu examen pronto.</p>
                     </div>
                   )}
+
+                  <button
+                    onClick={handleOpenReview}
+                    className="
+    w-full md:w-auto
+    px-6 py-3
+    rounded-full
+    text-sm font-bold
+    shadow-md hover:shadow-lg transition-all
+    bg-gradient-to-r from-lime-300 via-amber-300 to-orange-300
+    text-[#1f2933]
+    border border-white/60
+  "
+                  >
+                    Ver revisión detallada (PDF)
+                  </button>
                 </>
               ) : (
                 <div className="bg-white/40 p-6 rounded-2xl mb-6 border border-white/50">
@@ -818,7 +843,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                 Se ha detectado una actividad fuera del modo examen.
                 <br />
                 <br />
-                <span className="text-xs bg-emerald-500/15 px-2 py-1 rounded-full text-emerald-100 border border-emerald-400/40 inline-flex items-center gap-1">
+                <span className="text-xs bg-emerald-500/15 px-2 py-1 rounded-full text-emerald-100 border-emerald-400/40 inline-flex items-center gap-1">
                   <span className="h-1.5 w-1.5 rounded-full bg-lime-300" />
                   {lastViolationType === "fullscreen-exit"
                     ? "Salida de pantalla completa"
