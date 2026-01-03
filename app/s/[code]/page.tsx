@@ -333,10 +333,18 @@ export default function StudentPage({ params }: { params: { code: string } }) {
           answers: questions.map((q) => {
             const v = answers[q.id];
             if (q.kind === "FIB") {
-              const arr = Array.isArray(v)
-                ? v.map((x: any) => String(x ?? ""))
-                : [];
-              return { questionId: q.id, value: arr };
+              const parts = fibParseToParts(q.stem || "");
+              const boxCount = parts.filter((p) => p.type === "box").length;
+
+              const rawArray = Array.isArray(v) ? v : [];
+              const cleanArray = [];
+
+              for (let i = 0; i < boxCount; i++) {
+                const val = rawArray[i];
+                cleanArray.push(val ? String(val) : "");
+              }
+
+              return { questionId: q.id, value: cleanArray };
             }
             return { questionId: q.id, value: v };
           }),
@@ -468,7 +476,9 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                 type="radio"
                 name={`tf-${q.id}`}
                 checked={v === "true"}
-                onChange={() => setAnswers({ ...answers, [q.id]: "true" })}
+                onChange={() =>
+                  setAnswers((prev) => ({ ...prev, [q.id]: "true" }))
+                }
                 className="accent-emerald-500 w-4 h-4"
               />
               Verdadero
@@ -478,7 +488,9 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                 type="radio"
                 name={`tf-${q.id}`}
                 checked={v === "false"}
-                onChange={() => setAnswers({ ...answers, [q.id]: "false" })}
+                onChange={() =>
+                  setAnswers((prev) => ({ ...prev, [q.id]: "false" }))
+                }
                 className="accent-emerald-500 w-4 h-4"
               />
               Falso
@@ -512,7 +524,9 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                   type="radio"
                   name={`mcq-${q.id}`}
                   checked={v === i}
-                  onChange={() => setAnswers({ ...answers, [q.id]: i })}
+                  onChange={() =>
+                    setAnswers((prev) => ({ ...prev, [q.id]: i }))
+                  }
                   className="accent-emerald-500 w-4 h-4"
                 />
                 {c}
@@ -538,7 +552,10 @@ export default function StudentPage({ params }: { params: { code: string } }) {
           </div>
           <textarea
             value={String(answers[q.id] ?? "")}
-            onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
+            onChange={(e) => {
+              const val = e.target.value;
+              setAnswers((prev) => ({ ...prev, [q.id]: val }));
+            }}
             placeholder="Escribe tu respuesta…"
             rows={4}
             maxLength={2000}
@@ -558,9 +575,12 @@ export default function StudentPage({ params }: { params: { code: string } }) {
         : [];
 
       const setAt = (ix: number, val: string) => {
-        const next = [...(vArr || [])];
-        next[ix] = val;
-        setAnswers({ ...answers, [q.id]: next });
+        setAnswers((prev) => {
+          const raw = prev[q.id];
+          const next = Array.isArray(raw) ? [...raw] : [];
+          next[ix] = val;
+          return { ...prev, [q.id]: next };
+        });
       };
 
       const rawChoices = Array.isArray(q.choices)
@@ -709,9 +729,8 @@ export default function StudentPage({ params }: { params: { code: string } }) {
               {Header}
 
               <div
-                className={`glass-panel p-3 rounded-2xl flex items-center justify-between transition-colors ${
-                  flash ? "bg-red-100/50" : ""
-                }`}
+                className={`glass-panel p-3 rounded-2xl flex items-center justify-between transition-colors ${flash ? "bg-red-100/50" : ""
+                  }`}
               >
                 <div className="flex gap-4 px-2">
                   <div>
@@ -726,8 +745,8 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                     ⏳{" "}
                     {secondsLeft != null
                       ? `${Math.floor(secondsLeft / 60)}:${String(
-                          secondsLeft % 60
-                        ).padStart(2, "0")}`
+                        secondsLeft % 60
+                      ).padStart(2, "0")}`
                       : "—"}
                   </div>
                 </div>
@@ -859,7 +878,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                   ) {
                     try {
                       await document.documentElement.requestFullscreen();
-                    } catch (e) {}
+                    } catch (e) { }
                   }
                 }}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-lime-400 to-sky-400 text-emerald-950 font-bold hover:brightness-110 hover:shadow-lg transition-all"
