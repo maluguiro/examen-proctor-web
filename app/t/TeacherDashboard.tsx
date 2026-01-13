@@ -11,6 +11,7 @@ import {
 import { TeacherProfile, saveTeacherProfile } from "@/lib/teacherProfile";
 import UniversitiesView from "./components/UniversitiesView";
 import CalendarView from "./components/CalendarView";
+import ThemeToggle from "./components/ThemeToggle";
 
 // --- Props ---
 type TeacherDashboardProps = {
@@ -198,15 +199,15 @@ export default function TeacherDashboard({
       !normalizedSearch
         ? exams
         : exams.filter((exam) => {
-            const title = exam.title?.toLowerCase() || "";
-            const subject = exam.subject?.toLowerCase() || "";
-            const code = exam.code?.toLowerCase() || "";
-            return (
-              title.includes(normalizedSearch) ||
-              subject.includes(normalizedSearch) ||
-              code.includes(normalizedSearch)
-            );
-          }),
+          const title = exam.title?.toLowerCase() || "";
+          const subject = exam.subject?.toLowerCase() || "";
+          const code = exam.code?.toLowerCase() || "";
+          return (
+            title.includes(normalizedSearch) ||
+            subject.includes(normalizedSearch) ||
+            code.includes(normalizedSearch)
+          );
+        }),
     [exams, normalizedSearch]
   );
 
@@ -249,12 +250,12 @@ export default function TeacherDashboard({
               {/* Card "Crear Nuevo" rápida */}
               <div
                 onClick={handleCreateExam}
-                className="border-2 border-dashed border-lime-200 bg-lime-50/40 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-lime-50 transition-colors group min-h-[180px]"
+                className="border-2 border-dashed border-lime-200 bg-lime-50/40 dark:border-lime-800 dark:bg-lime-900/10 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-lime-50 dark:hover:bg-lime-900/20 transition-colors group min-h-[180px]"
               >
-                <div className="w-12 h-12 rounded-full bg-white text-[#1f2933] flex items-center justify-center text-2xl mb-3 group-hover:scale-110 transition-transform shadow-sm">
+                <div className="w-12 h-12 rounded-full bg-white dark:bg-slate-800 text-[#1f2933] dark:text-white flex items-center justify-center text-2xl mb-3 group-hover:scale-110 transition-transform shadow-sm">
                   +
                 </div>
-                <span className="font-bold text-lime-700 text-sm">
+                <span className="font-bold text-lime-700 dark:text-lime-400 text-sm">
                   Crear examen
                 </span>
               </div>
@@ -272,16 +273,15 @@ export default function TeacherDashboard({
                   <div
                     key={exam.id}
                     onClick={() => router.push(`/t/${exam.code}`)}
-                    className="bg-white/70 border border-white/70 p-5 rounded-3xl hover:bg-white transition-all flex flex-col gap-3 group relative shadow-sm"
+                    className="bg-white/70 dark:bg-slate-800/60 border border-white/70 dark:border-slate-700 p-5 rounded-3xl hover:bg-white dark:hover:bg-slate-800 transition-all flex flex-col gap-3 group relative shadow-sm"
                   >
                     {/* Estado Abierto / Cerrado */}
                     <div className="flex justify-between items-start">
                       <span
-                        className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                          exam.status.toLowerCase() === "open"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-slate-100 text-slate-500"
-                        }`}
+                        className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${exam.status.toLowerCase() === "open"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-100 text-slate-500"
+                          }`}
                       >
                         {exam.status.toLowerCase() === "open"
                           ? "Abierto"
@@ -303,7 +303,7 @@ export default function TeacherDashboard({
 
                     {/* Título + materia (solo si existe) */}
                     <div>
-                      <h3 className="font-bold text-gray-800 leading-tight mb-1 text-base">
+                      <h3 className="font-bold text-gray-800 dark:text-slate-200 leading-tight mb-1 text-base">
                         {exam.title || "Sin título"}
                       </h3>
                       {exam.subject && (
@@ -332,24 +332,24 @@ export default function TeacherDashboard({
 
       case "profile":
         return (
-          <div className="glass-panel p-8 rounded-[2rem] w-full animate-slide-up bg-white/60">
+          <div className="glass-panel p-8 rounded-[2rem] w-full animate-slide-up bg-white/60 dark:bg-slate-800/60">
             <h2 className="font-festive text-gradient-sun text-3xl mb-6">
               Mi Perfil Docente
             </h2>
-            <div className="bg-white/40 p-6 rounded-3xl border border-white/50 space-y-4 max-w-xl">
+            <div className="bg-white/40 dark:bg-slate-800/40 p-6 rounded-3xl border border-white/50 dark:border-slate-700 space-y-4 max-w-xl">
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1">
                   Nombre
                 </label>
-                <div className="text-lg font-bold text-gray-800">
+                <div className="text-lg font-bold text-gray-800 dark:text-slate-200">
                   {profile?.name}
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1">
                   Email
                 </label>
-                <div className="text-lg font-bold text-gray-800">
+                <div className="text-lg font-bold text-gray-800 dark:text-slate-200">
                   {profile?.email}
                 </div>
               </div>
@@ -369,7 +369,7 @@ export default function TeacherDashboard({
             <div className="lg:col-span-2 space-y-6">
               {/* Box 1: Título y Acciones */}
               <div className="glass-panel p-5 rounded-[2rem] flex justify-between items-center">
-                <h2 className="text-xl font-bold text-[#1e1b4b]">
+                <h2 className="text-xl font-bold text-[#1e1b4b] dark:text-slate-100">
                   Mis Exámenes
                 </h2>
                 <button
@@ -398,32 +398,30 @@ export default function TeacherDashboard({
                       <div
                         key={exam.id}
                         onClick={() => router.push(`/t/${exam.code}`)}
-                        className="group bg-white/40 hover:bg-white/80 p-4 rounded-2xl transition-all cursor-pointer border border-white/60 flex justify-between items-center shadow-sm hover:shadow-md"
+                        className="group bg-white/40 dark:bg-slate-800/40 hover:bg-white/80 dark:hover:bg-slate-800/80 p-4 rounded-2xl transition-all cursor-pointer border border-white/60 dark:border-slate-700 flex justify-between items-center shadow-sm hover:shadow-md"
                       >
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-sm border border-white/50 bg-pink-50">
+                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-sm border border-white/50 dark:border-slate-600 bg-pink-50 dark:bg-pink-900/20">
                             📄
                           </div>
                           <div>
-                            <div className="font-bold text-gray-800 group-hover:text-indigo-700 transition-colors text-lg">
+                            <div className="font-bold text-gray-800 dark:text-slate-200 group-hover:text-indigo-700 dark:group-hover:text-indigo-400 transition-colors text-lg">
                               {exam.title || "Sin título"}
                             </div>
 
                             <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
                               {/* Estado abierto/cerrado */}
                               <span
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold ${
-                                  exam.status?.toLowerCase() === "open"
-                                    ? "bg-emerald-50 text-emerald-700"
-                                    : "bg-slate-100 text-slate-500"
-                                }`}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold ${exam.status?.toLowerCase() === "open"
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-slate-100 text-slate-500"
+                                  }`}
                               >
                                 <span
-                                  className={`w-1.5 h-1.5 rounded-full ${
-                                    exam.status?.toLowerCase() === "open"
-                                      ? "bg-emerald-500"
-                                      : "bg-slate-400"
-                                  }`}
+                                  className={`w-1.5 h-1.5 rounded-full ${exam.status?.toLowerCase() === "open"
+                                    ? "bg-emerald-500"
+                                    : "bg-slate-400"
+                                    }`}
                                 />
                                 {exam.status?.toLowerCase() === "open"
                                   ? "Abierto"
@@ -450,7 +448,7 @@ export default function TeacherDashboard({
                           </div>
                         </div>
 
-                        <div className="w-8 h-8 rounded-full bg-white/50 flex items-center justify-center text-gray-400 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-all">
+                        <div className="w-8 h-8 rounded-full bg-white/50 dark:bg-slate-700/50 flex items-center justify-center text-gray-400 hover:text-indigo-500 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-900/30 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-all">
                           →
                         </div>
                       </div>
@@ -515,10 +513,9 @@ export default function TeacherDashboard({
                 </div>
               </div>
 
-              {/* Widget 2: Activity Log */}
-              <div className="bg-white/40 p-6 rounded-[2.5rem] border border-white/40">
+              <div className="bg-white/40 dark:bg-slate-800/40 p-6 rounded-[2.5rem] border border-white/40 dark:border-slate-700">
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-bold text-[#1e1b4b]">Actividad</h3>
+                  <h3 className="font-bold text-[#1e1b4b] dark:text-slate-100">Actividad</h3>
                   <span className="text-xs text-indigo-500 font-bold cursor-pointer">
                     Ver todo
                   </span>
@@ -527,16 +524,15 @@ export default function TeacherDashboard({
                   {activityLog.map((log, i) => (
                     <div key={i} className="flex gap-3 items-start">
                       <div
-                        className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${
-                          log.type === "alert"
-                            ? "bg-rose-400"
-                            : log.type === "success"
+                        className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${log.type === "alert"
+                          ? "bg-rose-400"
+                          : log.type === "success"
                             ? "bg-emerald-400"
                             : "bg-indigo-400"
-                        }`}
+                          }`}
                       />
                       <div>
-                        <p className="text-gray-700 font-bold text-xs leading-snug">
+                        <p className="text-gray-700 dark:text-slate-300 font-bold text-xs leading-snug">
                           {log.text}
                         </p>
                         <span className="text-[10px] text-gray-400 font-medium">
@@ -577,7 +573,7 @@ export default function TeacherDashboard({
         {/* BLOQUE 2: MENÚ (SE ALARGA CON flex-1) */}
         <div className="glass-panel flex-1 rounded-[1.5rem] p-4 md:p-6 flex flex-col">
           <nav className="flex-1 flex flex-col gap-2">
-            {navItems.map((item) => {
+            {navItems.map((item: any) => {
               const active =
                 activeView === item.id ||
                 (activeView === "profile" && item.id === "profile");
@@ -592,11 +588,10 @@ export default function TeacherDashboard({
                       setActiveView(item.id as any);
                     }
                   }}
-                  className={`flex items-center gap-3 px-5 py-3 rounded-2xl cursor-pointer text-sm font-semibold transition-all duration-200 ${
-                    active
-                      ? "bg-white/60 text-indigo-900 border border-white/80 shadow-sm"
-                      : "text-slate-500 hover:bg-white/25 hover:text-slate-700 border border-transparent"
-                  }`}
+                  className={`flex items-center gap-3 px-5 py-3 rounded-2xl cursor-pointer text-sm font-semibold transition-all duration-200 ${active
+                    ? "bg-white/60 dark:bg-slate-800/60 text-indigo-900 dark:text-indigo-300 border border-white/80 dark:border-slate-700 shadow-sm"
+                    : "text-slate-500 dark:text-slate-400 hover:bg-white/25 dark:hover:bg-slate-800/30 hover:text-slate-700 dark:hover:text-slate-200 border border-transparent"
+                    }`}
                 >
                   <span className="text-xl">{item.icon}</span>
                   {item.label}
@@ -615,16 +610,22 @@ export default function TeacherDashboard({
           </div>
         </div>
 
-        {/* BLOQUE 3: AVATAR DOCENTE, SIEMPRE ABAJO */}
-        <div className="glass-panel p-4 rounded-[1.5rem] flex items-center gap-3 border border-white/40 backdrop-blur-sm shadow-sm">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-lime-500 to-emerald-500 text-white flex items-center justify-center font-bold text-sm shadow-md">
-            {profile?.name?.charAt(0).toUpperCase() || "D"}
+        {/* BLOQUE TOGGLE + AVATAR (Agrupados o separados) */}
+        <div className="flex items-center gap-2">
+          <div className="glass-panel p-3 rounded-[1.5rem] flex items-center justify-center">
+            <ThemeToggle />
           </div>
-          <div className="overflow-hidden">
-            <div className="font-bold text-sm truncate text-gray-800">
-              {profile?.name || "Docente"}
+
+          <div className="glass-panel p-4 rounded-[1.5rem] flex-1 flex items-center gap-3 border border-white/40 backdrop-blur-sm shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-lime-500 to-emerald-500 text-white flex items-center justify-center font-bold text-sm shadow-md">
+              {profile?.name?.charAt(0).toUpperCase() || "D"}
             </div>
-            <div className="text-xs text-gray-500 font-medium">Dashboard</div>
+            <div className="overflow-hidden">
+              <div className="font-bold text-sm truncate text-gray-800 dark:text-slate-200">
+                {profile?.name || "Docente"}
+              </div>
+              <div className="text-xs text-gray-500 font-medium">Dashboard</div>
+            </div>
           </div>
         </div>
       </aside>
@@ -647,12 +648,12 @@ export default function TeacherDashboard({
                 {activeView === "dashboard"
                   ? `Hola, ${profile?.name?.split(" ")[0] || "Docente"} 👋`
                   : activeView === "universities"
-                  ? "Universidades"
-                  : activeView === "calendar"
-                  ? "Calendario"
-                  : "Panel"}
+                    ? "Universidades"
+                    : activeView === "calendar"
+                      ? "Calendario"
+                      : "Panel"}
               </h1>
-              <p className="mt-2 text-gray-500 text-sm font-medium">
+              <p className="mt-2 text-gray-500 dark:text-slate-400 text-sm font-medium">
                 {activeView === "dashboard"
                   ? "Resumen de tu actividad académica hoy."
                   : "Gestión de evaluaciones."}
@@ -670,7 +671,7 @@ export default function TeacherDashboard({
 
                 {/* Resultados tipo “Google” debajo del input */}
                 {normalizedSearch && (
-                  <div className="absolute left-0 right-0 mt-2 bg-white/95 rounded-3xl shadow-xl border border-gray-100 max-h-72 overflow-y-auto z-30">
+                  <div className="absolute left-0 right-0 mt-2 bg-white/95 dark:bg-slate-800 rounded-3xl shadow-xl border border-gray-100 dark:border-slate-700 max-h-72 overflow-y-auto z-30">
                     {filteredExams.length === 0 ? (
                       <div className="px-4 py-3 text-xs text-gray-400">
                         Sin resultados para “{search}”.
@@ -688,15 +689,14 @@ export default function TeacherDashboard({
                           className="w-full text-left px-4 py-3 text-xs hover:bg-emerald-50/80 transition-colors flex flex-col gap-0.5"
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-semibold text-gray-800 truncate">
+                            <span className="font-semibold text-gray-800 dark:text-slate-200 truncate">
                               {exam.title || "Sin título"}
                             </span>
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                exam.status?.toLowerCase() === "open"
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : "bg-slate-100 text-slate-500"
-                              }`}
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${exam.status?.toLowerCase() === "open"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-slate-100 text-slate-500"
+                                }`}
                             >
                               {exam.status?.toLowerCase() === "open"
                                 ? "Abierto"
