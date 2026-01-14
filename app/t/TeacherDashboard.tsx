@@ -237,7 +237,7 @@ export default function TeacherDashboard({
           <div className="glass-panel p-8 rounded-[2rem] w-full animate-slide-up space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-gray-200/50">
               <div>
-                <h2 className="font-festive text-gradient-sun text-3xl mb-1">
+                <h2 className="font-festive text-gradient-sun dark:text-white dark:bg-none dark:text-fill-inherit text-3xl mb-1">
                   Mis Exámenes
                 </h2>
                 <p className="text-gray-500 font-medium text-sm">
@@ -369,7 +369,7 @@ export default function TeacherDashboard({
             <div className="lg:col-span-2 space-y-6">
               {/* Box 1: Título y Acciones */}
               <div className="glass-panel p-5 rounded-[2rem] flex justify-between items-center">
-                <h2 className="text-xl font-bold text-[#1e1b4b] dark:text-slate-100">
+                <h2 className="text-xl font-bold text-[#1e1b4b] dark:!text-slate-100">
                   Mis Exámenes
                 </h2>
                 <button
@@ -515,7 +515,7 @@ export default function TeacherDashboard({
 
               <div className="bg-white/40 dark:bg-slate-800/40 p-6 rounded-[2.5rem] border border-white/40 dark:border-slate-700">
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-bold text-[#1e1b4b] dark:text-slate-100">Actividad</h3>
+                  <h3 className="font-bold text-indigo-950 dark:text-white">Actividad</h3>
                   <span className="text-xs text-indigo-500 font-bold cursor-pointer">
                     Ver todo
                   </span>
