@@ -1,5 +1,6 @@
 
 import Link from "next/link";
+import HomeActionButton from "./components/HomeActionButton";
 
 export default function Home() {
   return (
@@ -35,12 +36,8 @@ export default function Home() {
               <span className="group-hover:translate-x-1 transition-transform">→</span>
             </Link>
 
-            <button
-              className="btn-premium flex items-center justify-center gap-3 w-full bg-white text-gray-900 border border-gray-200 rounded-xl h-14 font-semibold text-lg hover:bg-gray-50 hover:border-gray-300 transition-colors"
-              onClick={() => alert("Funcionalidad de alumno próximamente...")}
-            >
-              <span>Ingresar como Alumno</span>
-            </button>
+            <HomeActionButton />
+
           </div>
 
           {/* Footer Info */}
