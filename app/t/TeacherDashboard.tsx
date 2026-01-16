@@ -237,9 +237,10 @@ export default function TeacherDashboard({
           <div className="glass-panel p-8 rounded-[2rem] w-full animate-slide-up space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-gray-200/50">
               <div>
-                <h2 className="font-festive text-gradient-sun dark:text-white dark:bg-none dark:text-fill-inherit text-3xl mb-1">
-                  Mis Exámenes
-                </h2>
+                <h2 className="font-festive text-gradient-sun dark:!text-slate-100 dark:!bg-none dark:!text-fill-inherit text-3xl mb-1">
+  Mis Exámenes
+</h2>
+
                 <p className="text-gray-500 font-medium text-sm">
                   Gestiona tus evaluaciones y crea nuevas.
                 </p>
@@ -270,60 +271,59 @@ export default function TeacherDashboard({
                 </div>
               ) : (
                 filteredExams.map((exam) => (
-                  <div
-                    key={exam.id}
-                    onClick={() => router.push(`/t/${exam.code}`)}
-                    className="bg-white/70 dark:bg-slate-800/60 border border-white/70 dark:border-slate-700 p-5 rounded-3xl hover:bg-white dark:hover:bg-slate-800 transition-all flex flex-col gap-3 group relative shadow-sm"
-                  >
-                    {/* Estado Abierto / Cerrado */}
-                    <div className="flex justify-between items-start">
-                      <span
-                        className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${exam.status.toLowerCase() === "open"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-slate-100 text-slate-500"
-                          }`}
-                      >
-                        {exam.status.toLowerCase() === "open"
-                          ? "Abierto"
-                          : "Cerrado"}
-                      </span>
+              <div
+  key={exam.id}
+  onClick={() => router.push(`/t/${exam.code}`)}
+  className="bg-white/70 dark:bg-slate-800/60 border border-white/70 dark:border-slate-700 p-5 rounded-3xl hover:bg-white dark:hover:bg-slate-800 transition-all flex flex-col gap-3 group relative shadow-sm dark:text-slate-200"
+>
+  {/* Estado Abierto / Cerrado */}
+  <div className="flex justify-between items-start">
+    <span
+      className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+        exam.status.toLowerCase() === "open"
+          ? "bg-emerald-100 text-black dark:!text-black"
+          : "bg-slate-100 text-black dark:!text-black"
+      }`}
+    >
+      {exam.status.toLowerCase() === "open" ? "Abierto" : "Cerrado"}
+    </span>
 
-                      {/* Botón eliminar (usa la lógica existente handleDeleteExam) */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteExam(exam.id);
-                        }}
-                        className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition-colors"
-                        title="Eliminar examen"
-                      >
-                        🗑️
-                      </button>
-                    </div>
+    {/* Botón eliminar (usa la lógica existente handleDeleteExam) */}
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        handleDeleteExam(exam.id);
+      }}
+      className="p-1.5 rounded-lg text-black dark:!text-black hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+      title="Eliminar examen"
+    >
+      🗑️
+    </button>
+  </div>
 
                     {/* Título + materia (solo si existe) */}
-                    <div>
-                      <h3 className="font-bold text-gray-800 dark:text-slate-200 leading-tight mb-1 text-base">
-                        {exam.title || "Sin título"}
-                      </h3>
-                      {exam.subject && (
-                        <p className="text-[11px] text-gray-500 mt-0.5">
-                          {exam.subject}
-                        </p>
-                      )}
-                    </div>
+                   <div>
+    <h3 className="font-bold !text-grey leading-tight mb-1 text-base">
+      {exam.title || "Sin título"}
+    </h3>
+    {exam.subject && (
+      <p className="text-[11px] !text-grey mt-0.5">
+        {exam.subject}
+      </p>
+    )}
+  </div>
 
-                    {/* Fecha de creación + código */}
-                    <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center text-[11px] font-medium text-gray-500">
-                      <span>
-                        Creado el{" "}
-                        {new Date(exam.createdAt).toLocaleDateString()}
-                      </span>
-                      <span className="font-mono text-gray-400">
-                        Código: {exam.code}
-                      </span>
-                    </div>
-                  </div>
+  {/* Fecha de creación + código */}
+  <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center text-[11px] font-medium !text-black">
+    <span>
+      Creado el{" "}
+      {new Date(exam.createdAt).toLocaleDateString()}
+    </span>
+    <span className="font-mono !text-black">
+      Código: {exam.code}
+    </span>
+  </div>
+</div>
                 ))
               )}
             </div>
@@ -369,9 +369,10 @@ export default function TeacherDashboard({
             <div className="lg:col-span-2 space-y-6">
               {/* Box 1: Título y Acciones */}
               <div className="glass-panel p-5 rounded-[2rem] flex justify-between items-center">
-                <h2 className="text-xl font-bold text-[#1e1b4b] dark:!text-slate-100">
-                  Mis Exámenes
-                </h2>
+                <h2 className="font-extrabold text-xl truncate text-gray-800 dark:text-slate-200">
+  Mis Exámenes
+</h2>
+
                 <button
                   onClick={() => setActiveView("exams")}
                   className="text-xs font-bold px-4 py-1.5 rounded-full transition-colors shadow-sm
