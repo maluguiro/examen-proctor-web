@@ -15,10 +15,61 @@ type ExamListItem = {
 type Props = {
     exams: ExamListItem[];
 };
+type ViewMode = "day" | "week" | "month";
 
+type CalendarEvent = {
+    id: string;
+    date: string;
+    title: string;
+};
 export default function CalendarView({ exams }: Props) {
     const router = useRouter();
     const [currentDate, setCurrentDate] = React.useState(new Date());
+const [isDark, setIsDark] = React.useState(false);
+const [viewMode, setViewMode] = React.useState<ViewMode>("month");
+    const [selectedDate, setSelectedDate] = React.useState(() => {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    });
+    const [events, setEvents] = React.useState<CalendarEvent[]>([]);
+    const [newEventTitle, setNewEventTitle] = React.useState("");
+
+    React.useEffect(() => {
+        const html = document.documentElement;
+        const updateTheme = () => setIsDark(html.classList.contains("dark"));
+        updateTheme();
+        const observer = new MutationObserver(updateTheme);
+        observer.observe(html, { attributes: true, attributeFilter: ["class"] });
+        return () => observer.disconnect();
+    }, []);
+
+    React.useEffect(() => {
+        if (typeof window === "undefined") return;
+        const raw = window.localStorage.getItem("teacher_calendar_events");
+        if (!raw) return;
+        try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                setEvents(parsed);
+            }
+        } catch {
+            // ignore
+        }
+    }, []);
+
+    React.useEffect(() => {
+        if (typeof window === "undefined") return;
+        window.localStorage.setItem("teacher_calendar_events", JSON.stringify(events));
+    }, [events]);
+
+    React.useEffect(() => {
+        const html = document.documentElement;
+        const updateTheme = () => setIsDark(html.classList.contains("dark"));
+        updateTheme();
+        const observer = new MutationObserver(updateTheme);
+        observer.observe(html, { attributes: true, attributeFilter: ["class"] });
+        return () => observer.disconnect();
+    }, []);
 
     // Helpers de fecha
     const getDaysInMonth = (date: Date) => {
@@ -54,16 +105,21 @@ export default function CalendarView({ exams }: Props) {
         setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + delta, 1));
     };
 
-    const monthName = currentDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
-
+    const monthText = currentDate.toLocaleDateString("es-ES", { month: "long" });
+    const monthName = `${monthText.charAt(0).toUpperCase()}${monthText.slice(1)} del ${currentDate.getFullYear()}`;
+    const selectedDateLabel = selectedDate.toLocaleDateString("es-ES", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+    });
     // Estilos
     const styles = {
         container: {
-            background: "white",
+            background: isDark ? "#89b172" : "#fdfdfd",
             borderRadius: "16px",
-            border: "1px solid #e5e7eb",
-            padding: "24px",
-            height: "calc(100vh - 140px)",
+            border: "1px solid #3cda59",
+            padding: "20px",
+            height: "auto",
             display: "flex",
             flexDirection: "column" as const,
         },
@@ -71,7 +127,7 @@ export default function CalendarView({ exams }: Props) {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: "24px",
+            marginBottom: "16px",
         },
         title: {
             fontSize: "20px",
@@ -80,26 +136,40 @@ export default function CalendarView({ exams }: Props) {
         },
         navBtn: {
             background: "transparent",
-            border: "1px solid #e5e7eb",
+            border: "1px solid #ebe9e5",
             borderRadius: "8px",
-            padding: "8px 16px",
+            padding: "6px 12px",
             cursor: "pointer",
             fontSize: "14px",
             fontWeight: 500,
         },
+         viewTabs: {
+            display: "flex",
+            gap: "8px",
+        },
+        viewTab: (active: boolean) => ({
+            padding: "6px 10px",
+            borderRadius: "8px",
+            border: active ? "1px solid #10b981" : "1px solid #e5e7eb",
+            background: active ? "#ecfdf5" : "transparent",
+            color: "#111",
+            fontSize: "12px",
+            fontWeight: 600,
+            cursor: "pointer",
+        }),
         grid: {
             display: "grid",
             gridTemplateColumns: "repeat(7, 1fr)",
             gap: "1px",
-            background: "#e5e7eb", // lineas de grilla
-            border: "1px solid #e5e7eb",
+            background: "#89b172", // lineas de grilla
+            border: "1px solid #3cda59",
             borderRadius: "8px",
             overflow: "hidden",
             flex: 1,
         },
         dayHeader: {
             background: "#f9fafb",
-            padding: "12px",
+            padding: "10px",
             textAlign: "center" as const,
             fontSize: "12px",
             fontWeight: 600,
@@ -108,8 +178,8 @@ export default function CalendarView({ exams }: Props) {
         },
         dayCell: {
             background: "white",
-            minHeight: "100px",
-            padding: "8px",
+            minHeight: "80px",
+            padding: "6px",
             position: "relative" as const,
             cursor: "pointer",
             transition: "background 0.2s",
@@ -132,7 +202,73 @@ export default function CalendarView({ exams }: Props) {
             overflow: "hidden",
             textOverflow: "ellipsis",
             display: "block",
-        }
+       },
+        dayPanel: {
+            border: "1px solid #e5e7eb",
+            borderRadius: "8px",
+            padding: "12px",
+            background: "#ffffff",
+        },
+        dayForm: {
+            display: "flex",
+            gap: "8px",
+            marginTop: "10px",
+        },
+        input: {
+            flex: 1,
+            border: "1px solid #e5e7eb",
+            borderRadius: "8px",
+            padding: "8px 10px",
+            fontSize: "13px",
+        },
+        addBtn: {
+            border: "1px solid #10b981",
+            background: "#ecfdf5",
+            color: "#065f46",
+            borderRadius: "8px",
+            padding: "8px 12px",
+            fontWeight: 600,
+            cursor: "pointer",
+            fontSize: "13px",
+        },
+        eventItem: {
+            fontSize: "13px",
+            color: "#111",
+            padding: "6px 0",
+            borderBottom: "1px dashed #e5e7eb",
+        },
+    };
+
+    const eventsByDay = React.useMemo(() => {
+        const map: Record<string, CalendarEvent[]> = {};
+        events.forEach(evt => {
+            if (!map[evt.date]) map[evt.date] = [];
+            map[evt.date].push(evt);
+        });
+        return map;
+    }, [events]);
+
+    const selectedDateKey = selectedDate.toISOString().slice(0, 10);
+    const selectedEvents = eventsByDay[selectedDateKey] ?? [];
+
+    const weekStart = new Date(selectedDate);
+    weekStart.setDate(selectedDate.getDate() - ((selectedDate.getDay() + 6) % 7));
+    const weekDays = Array.from({ length: 7 }).map((_, i) => {
+        const d = new Date(weekStart);
+        d.setDate(weekStart.getDate() + i);
+        return d;
+    });
+
+    const addEvent = () => {
+        const title = newEventTitle.trim();
+        if (!title) return;
+        const newEvent: CalendarEvent = {
+            id: `evt-${Date.now()}`,
+            date: selectedDateKey,
+            title,
+        };
+        setEvents(prev => [...prev, newEvent]);
+        setNewEventTitle("");
     };
 
     return (
@@ -146,50 +282,128 @@ export default function CalendarView({ exams }: Props) {
                 </div>
             </div>
 
-            {/* Grid */}
-            <div style={styles.grid}>
-                {/* Headers Semanales */}
-                {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(d => (
-                    <div key={d} style={styles.dayHeader}>{d}</div>
-                ))}
-
-                {/* Celdas Vacías inicio mes */}
-                {Array.from({ length: startOffset }).map((_, i) => (
-                    <div key={`empty-${i}`} style={{ background: "white" }} />
-                ))}
-
-                {/* Días */}
-                {Array.from({ length: days }).map((_, i) => {
-                    const dayNum = i + 1;
-                    const dayExams = examsByDay[dayNum] || [];
-                    return (
-                        <div
-                            key={dayNum}
-                            style={styles.dayCell}
-                            onMouseEnter={(e) => e.currentTarget.style.background = "#fafafa"}
-                            onMouseLeave={(e) => e.currentTarget.style.background = "white"}
-                        >
-                            <div style={styles.dayNumber}>{dayNum}</div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                {dayExams.map(ex => (
-                                    <span
-                                        key={ex.id}
-                                        style={styles.eventDot}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            router.push(`/t/${ex.code}`);
-                                        }}
-                                        title={`${ex.title} (${ex.status})`}
-                                    >
-                                        {ex.title}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-                    );
-                })}
+             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div style={styles.viewTabs}>
+                    <button style={styles.viewTab(viewMode === "day")} onClick={() => setViewMode("day")}>Día</button>
+                    <button style={styles.viewTab(viewMode === "week")} onClick={() => setViewMode("week")}>Semana</button>
+                    <button style={styles.viewTab(viewMode === "month")} onClick={() => setViewMode("month")}>Mes</button>
+                </div>
+                <div style={{ fontSize: 13, color: "#6b7280" }}>{selectedDateLabel}</div>
             </div>
+
+            {viewMode === "month" && (
+                <div style={styles.grid}>
+                    {/* Headers Semanales */}
+                    {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(d => (
+                        <div key={d} style={styles.dayHeader}>{d}</div>
+                    ))}
+
+                    {/* Celdas Vacías inicio mes */}
+                    {Array.from({ length: startOffset }).map((_, i) => (
+                        <div key={`empty-${i}`} style={{ background: "white" }} />
+                    ))}
+
+                    {/* Días */}
+                    {Array.from({ length: days }).map((_, i) => {
+                        const dayNum = i + 1;
+                        const dayExams = examsByDay[dayNum] || [];
+                        const cellDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), dayNum);
+                        const isToday =
+                            dayNum === new Date().getDate() &&
+                            currentDate.getMonth() === new Date().getMonth() &&
+                            currentDate.getFullYear() === new Date().getFullYear();
+                        const dayBackground = isToday ? "#ecfdf5" : "white";
+                        const dayKey = cellDate.toISOString().slice(0, 10);
+                        const dayEvents = eventsByDay[dayKey] ?? [];
+                        return (
+                            <div
+                                key={dayNum}
+                                style={{ ...styles.dayCell, background: dayBackground }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = "#f0fdf4"}
+                                onMouseLeave={(e) => e.currentTarget.style.background = dayBackground}
+                                onClick={() => {
+                                    setSelectedDate(cellDate);
+                                    setViewMode("day");
+                                }}
+                            >
+                                <div style={styles.dayNumber}>{dayNum}</div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    {dayExams.map(ex => (
+                                        <span
+                                            key={ex.id}
+                                            style={styles.eventDot}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                router.push(`/t/${ex.code}`);
+                                            }}
+                                            title={`${ex.title} (${ex.status})`}
+                                        >
+                                            {ex.title}
+                                        </span>
+                                    ))}
+                                    {dayEvents.map(evt => (
+                                        <span key={evt.id} style={{ ...styles.eventDot, background: "#ecfdf5", color: "#047857", borderLeft: "2px solid #10b981" }}>
+                                            {evt.title}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                                 );
+                    })}
+                </div>
+            )}
+
+            {viewMode !== "month" && (
+                <div style={styles.dayPanel}>
+                    {viewMode === "week" && (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 8 }}>
+                            {weekDays.map(day => {
+                                const dayKey = day.toISOString().slice(0, 10);
+                                const dayEvents = eventsByDay[dayKey] ?? [];
+                                return (
+                                    <div key={dayKey} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                                        <div style={{ fontWeight: 600, fontSize: 12 }}>
+                                            {day.toLocaleDateString("es-ES", { weekday: "short", day: "numeric" })}
+                                        </div>
+                                        {dayEvents.length === 0 ? (
+                                            <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>Sin eventos</div>
+                                        ) : (
+                                            dayEvents.map(evt => (
+                                                <div key={evt.id} style={styles.eventItem}>{evt.title}</div>
+                                            ))
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                         )}
+
+                    {viewMode === "day" && (
+                        <>
+                            <div style={{ fontWeight: 600 }}>{selectedDateLabel}</div>
+                            <div style={{ marginTop: 8 }}>
+                                {selectedEvents.length === 0 ? (
+                                    <div style={{ fontSize: 12, color: "#6b7280" }}>Sin eventos para este día.</div>
+                                ) : (
+                                    selectedEvents.map(evt => (
+                                        <div key={evt.id} style={styles.eventItem}>{evt.title}</div>
+                                    ))
+                                )}
+                            </div>
+                            <div style={styles.dayForm}>
+                                <input
+                                    style={styles.input}
+                                    value={newEventTitle}
+                                    onChange={(e) => setNewEventTitle(e.target.value)}
+                                    placeholder="Agregar evento"
+                                />
+                                <button style={styles.addBtn} onClick={addEvent}>Guardar</button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
