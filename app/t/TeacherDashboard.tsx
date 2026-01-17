@@ -38,6 +38,20 @@ type ExamListItem = {
   registeredCount?: number;
 };
 
+type CalendarEvent = {
+  id: string;
+  date: string;
+  title: string;
+};
+
+type CalendarTask = {
+  id: string;
+  date: string;
+  time: string;
+  title: string;
+  color: string;
+};
+
 // --- Componente Dashboard ---
 export default function TeacherDashboard({
   profile,
@@ -56,6 +70,11 @@ export default function TeacherDashboard({
     text: string;
     type: "success" | "error";
   } | null>(null);
+const [widgetDate] = React.useState(new Date());
+  const [calendarEvents, setCalendarEvents] = React.useState<CalendarEvent[]>(
+    []
+  );
+  const [calendarTasks, setCalendarTasks] = React.useState<CalendarTask[]>([]);
 
   // MOCK DATA para Cards
   const fraudStats = {
@@ -102,6 +121,78 @@ export default function TeacherDashboard({
   React.useEffect(() => {
     fetchExams();
   }, [fetchExams]);
+
+const loadCalendarData = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+    const rawEvents = window.localStorage.getItem("teacher_calendar_events");
+    const rawTasks = window.localStorage.getItem("teacher_calendar_tasks");
+    try {
+      const parsedEvents = rawEvents ? JSON.parse(rawEvents) : [];
+      setCalendarEvents(Array.isArray(parsedEvents) ? parsedEvents : []);
+    } catch {
+      setCalendarEvents([]);
+    }
+    try {
+      const parsedTasks = rawTasks ? JSON.parse(rawTasks) : [];
+      setCalendarTasks(Array.isArray(parsedTasks) ? parsedTasks : []);
+    } catch {
+      setCalendarTasks([]);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadCalendarData();
+    if (typeof window === "undefined") return;
+    const handleUpdate = () => loadCalendarData();
+    window.addEventListener("teacher_calendar_updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("teacher_calendar_updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
+  }, [loadCalendarData]);
+
+  const widgetMonthData = React.useMemo(() => {
+    const year = widgetDate.getFullYear();
+    const month = widgetDate.getMonth();
+    const days = new Date(year, month + 1, 0).getDate();
+    const firstDay = new Date(year, month, 1).getDay();
+    const startOffset = firstDay === 0 ? 6 : firstDay - 1;
+
+    const examDays = new Set<number>();
+    exams.forEach((exam) => {
+      const date = new Date(exam.createdAt);
+      if (date.getFullYear() === year && date.getMonth() === month) {
+        examDays.add(date.getDate());
+      }
+    });
+
+    const eventDays = new Set<number>();
+    calendarEvents.forEach((evt) => {
+      const date = new Date(`${evt.date}T00:00:00`);
+      if (date.getFullYear() === year && date.getMonth() === month) {
+        eventDays.add(date.getDate());
+      }
+    });
+
+    const taskDays = new Set<number>();
+    calendarTasks.forEach((task) => {
+      const date = new Date(`${task.date}T00:00:00`);
+      if (date.getFullYear() === year && date.getMonth() === month) {
+        taskDays.add(date.getDate());
+      }
+    });
+
+    return {
+      year,
+      month,
+      days,
+      startOffset,
+      examDays,
+      eventDays,
+      taskDays,
+    };
+  }, [calendarEvents, calendarTasks, exams, widgetDate]);
 
   // Crear Examen
   // Crear Examen
@@ -210,6 +301,13 @@ export default function TeacherDashboard({
         }),
     [exams, normalizedSearch]
   );
+
+const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
+    month: "long",
+  });
+  const widgetMonthLabel = `${widgetMonthText.charAt(0).toUpperCase()}${widgetMonthText.slice(
+    1
+  )} ${widgetMonthData.year}`;
 
   // --- Contenido según ViewState ---
   const renderContent = () => {
@@ -465,7 +563,7 @@ export default function TeacherDashboard({
               <div className="glass-panel p-6 rounded-[2.5rem] flex flex-col gap-4">
                 <div className="flex justify-between items-center px-1">
                   <span className="text-sm font-bold text-gray-700">
-                    Noviembre 2024
+                    {widgetMonthLabel}
                   </span>
                   <div className="flex gap-1">
                     <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
@@ -483,34 +581,41 @@ export default function TeacherDashboard({
                   <div>D</div>
                 </div>
                 <div className="grid grid-cols-7 gap-1 text-[10px] text-center font-bold text-gray-600">
-                  {/* Dummy days row 1 */}
-                  <div className="py-1">29</div>
-                  <div className="py-1">30</div>
-                  <div className="py-1">1</div>
-                  <div className="py-1">2</div>
-                  <div className="py-1">3</div>
-                  <div className="py-1">4</div>
-                  <div className="py-1">5</div>
-
-                  {/* Dummy days row 2 */}
-                  <div className="py-1 bg-indigo-500 text-white rounded-full">
-                    6
-                  </div>
-                  <div className="py-1">7</div>
-                  <div className="py-1">8</div>
-                  <div className="py-1">9</div>
-                  <div className="py-1">10</div>
-                  <div className="py-1">11</div>
-                  <div className="py-1">12</div>
-
-                  {/* Dummy days row 3 */}
-                  <div className="py-1">13</div>
-                  <div className="py-1">14</div>
-                  <div className="py-1">15</div>
-                  <div className="py-1">16</div>
-                  <div className="py-1">17</div>
-                  <div className="py-1">18</div>
-                  <div className="py-1">19</div>
+                               {Array.from({ length: widgetMonthData.startOffset }).map(
+                    (_, i) => (
+                      <div key={`empty-${i}`} className="py-1 text-gray-300">
+                        ·
+                      </div>
+                    )
+                  )}
+                  {Array.from({ length: widgetMonthData.days }).map((_, i) => {
+                    const dayNum = i + 1;
+                    const isToday =
+                      dayNum === new Date().getDate() &&
+                      widgetMonthData.month === new Date().getMonth() &&
+                      widgetMonthData.year === new Date().getFullYear();
+                    const hasItem =
+                      widgetMonthData.examDays.has(dayNum) ||
+                      widgetMonthData.eventDays.has(dayNum) ||
+                      widgetMonthData.taskDays.has(dayNum);
+                    return (
+                      <div
+                        key={`day-${dayNum}`}
+                        className={`py-1 rounded-full flex flex-col items-center gap-0.5 ${
+                          isToday ? "bg-indigo-500 text-white" : ""
+                        }`}
+                      >
+                        <span>{dayNum}</span>
+                        {hasItem && (
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              isToday ? "bg-white" : "bg-emerald-400"
+                            }`}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

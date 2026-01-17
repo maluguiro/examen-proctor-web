@@ -52,7 +52,11 @@ export default function CalendarView({ exams }: Props) {
     const [taskTime, setTaskTime] = React.useState("");
     const [taskTitle, setTaskTitle] = React.useState("");
     const [taskColor, setTaskColor] = React.useState("#34d399");
-
+const notifyCalendarUpdate = React.useCallback(() => {
+        if (typeof window === "undefined") return;
+        window.dispatchEvent(new Event("teacher_calendar_updated"));
+    }, []);
+    
     React.useEffect(() => {
         const html = document.documentElement;
         const updateTheme = () => setIsDark(html.classList.contains("dark"));
@@ -76,10 +80,16 @@ export default function CalendarView({ exams }: Props) {
         }
     }, []);
 
-    React.useEffect(() => {
-        if (typeof window === "undefined") return;
-        window.localStorage.setItem("teacher_calendar_events", JSON.stringify(events));
-    }, [events]);
+   React.useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.setItem(
+    "teacher_calendar_events",
+    JSON.stringify(events)
+  );
+
+  notifyCalendarUpdate();
+}, [events, tasks, notifyCalendarUpdate]);
 
     React.useEffect(() => {
         if (typeof window === "undefined") return;
