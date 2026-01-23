@@ -38,6 +38,20 @@ type ExamListItem = {
   registeredCount?: number;
 };
 
+type CalendarEvent = {
+  id: string;
+  date: string;
+  title: string;
+};
+
+type CalendarTask = {
+  id: string;
+  date: string;
+  time: string;
+  title: string;
+  color: string;
+};
+
 // --- Componente Dashboard ---
 export default function TeacherDashboard({
   profile,
@@ -56,6 +70,11 @@ export default function TeacherDashboard({
     text: string;
     type: "success" | "error";
   } | null>(null);
+const [widgetDate] = React.useState(new Date());
+  const [calendarEvents, setCalendarEvents] = React.useState<CalendarEvent[]>(
+    []
+  );
+  const [calendarTasks, setCalendarTasks] = React.useState<CalendarTask[]>([]);
 
   // MOCK DATA para Cards
   const fraudStats = {
@@ -102,6 +121,201 @@ export default function TeacherDashboard({
   React.useEffect(() => {
     fetchExams();
   }, [fetchExams]);
+
+  const getCalendarStorageKeys = React.useCallback(() => {
+  if (typeof window === "undefined") {
+    return {
+      eventsKey: "teacher_calendar_events",
+      tasksKey: "teacher_calendar_tasks",
+    };
+  }
+
+  const rawProfile = window.localStorage.getItem("teacherProfile");
+  let profileKey = "";
+
+  if (rawProfile) {
+    try {
+      const parsed = JSON.parse(rawProfile);
+      const identifier = `${parsed?.email || parsed?.name || ""}`.trim();
+      profileKey = identifier ? identifier.toLowerCase().replace(/\s+/g, "_") : "";
+    } catch {
+      profileKey = "";
+    }
+  }
+
+  const eventsKey = profileKey
+    ? `teacher_${profileKey}_teacher_calendar_events`
+    : "teacher_calendar_events";
+
+  const tasksKey = profileKey
+    ? `teacher_${profileKey}_teacher_calendar_tasks`
+    : "teacher_calendar_tasks";
+
+  return { eventsKey, tasksKey };
+}, []);
+
+const loadCalendarData = React.useCallback(() => {
+  if (typeof window === "undefined") return;
+
+  const legacyEventsKey = "teacher_calendar_events";
+  const legacyTasksKey = "teacher_calendar_tasks";
+
+  const token = window.localStorage.getItem("examproctor_token");
+
+  // keys por perfil (misma normalización que CalendarView)
+  const rawProfile = window.localStorage.getItem("teacherProfile");
+  let profileKey = "";
+  if (rawProfile) {
+    try {
+      const parsed = JSON.parse(rawProfile);
+      const identifier = `${parsed?.email || parsed?.name || ""}`
+        .trim()
+        .toLowerCase();
+      if (identifier) profileKey = identifier.replace(/[^a-z0-9]+/g, "_");
+    } catch {
+      profileKey = "";
+    }
+  }
+
+  const eventsKey = profileKey
+    ? `teacher_${profileKey}_teacher_calendar_events`
+    : legacyEventsKey;
+
+  const tasksKey = profileKey
+    ? `teacher_${profileKey}_teacher_calendar_tasks`
+    : legacyTasksKey;
+
+  const readArray = (key: string) => {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const loadFromStorage = () => {
+    const storedEvents =
+      readArray(eventsKey) ?? readArray(legacyEventsKey) ?? [];
+    const storedTasks =
+      readArray(tasksKey) ?? readArray(legacyTasksKey) ?? [];
+    setCalendarEvents(storedEvents);
+    setCalendarTasks(storedTasks);
+  };
+
+  // 1) Siempre: hidratar rápido desde storage
+  loadFromStorage();
+
+  // 2) Luego: si hay token, backend -> estado + sync storage
+  if (!token) return;
+
+  fetch(`${API}/teacher/calendar`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error(String(res.status));
+      return res.json();
+    })
+    .then((data) => {
+      const fetchedEvents = Array.isArray(data?.events) ? data.events : [];
+      const fetchedTasks = Array.isArray(data?.tasks) ? data.tasks : [];
+
+      setCalendarEvents(fetchedEvents);
+      setCalendarTasks(fetchedTasks);
+
+      window.localStorage.setItem(eventsKey, JSON.stringify(fetchedEvents));
+      window.localStorage.setItem(tasksKey, JSON.stringify(fetchedTasks));
+      window.localStorage.setItem(legacyEventsKey, JSON.stringify(fetchedEvents));
+      window.localStorage.setItem(legacyTasksKey, JSON.stringify(fetchedTasks));
+    })
+    .catch(() => {
+      // si falla backend, te quedás con lo que ya cargaste desde storage
+      loadFromStorage();
+    });
+}, []);
+
+  React.useEffect(() => {
+    loadCalendarData();
+    if (typeof window === "undefined") return;
+    const handleUpdate = () => loadCalendarData();
+    window.addEventListener("teacher_calendar_updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("teacher_calendar_updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
+  }, [loadCalendarData]);
+
+  React.useEffect(() => {
+  if (typeof window === "undefined") return;
+  const { eventsKey } = getCalendarStorageKeys();
+  window.localStorage.setItem(eventsKey, JSON.stringify(calendarEvents));
+}, [calendarEvents, getCalendarStorageKeys]);
+
+React.useEffect(() => {
+  if (typeof window === "undefined") return;
+  const { tasksKey } = getCalendarStorageKeys();
+  window.localStorage.setItem(tasksKey, JSON.stringify(calendarTasks));
+}, [calendarTasks, getCalendarStorageKeys]);
+
+  const widgetMonthData = React.useMemo(() => {
+    const year = widgetDate.getFullYear();
+    const month = widgetDate.getMonth();
+    const days = new Date(year, month + 1, 0).getDate();
+    const firstDay = new Date(year, month, 1).getDay();
+    const startOffset = firstDay === 0 ? 6 : firstDay - 1;
+
+    const examDays = new Set<number>();
+    exams.forEach((exam) => {
+      const date = new Date(exam.createdAt);
+      if (date.getFullYear() === year && date.getMonth() === month) {
+        examDays.add(date.getDate());
+      }
+   });
+
+    const eventItemsByDay: Record<number, CalendarEvent[]> = {};
+    const eventDays = new Set<number>();
+    calendarEvents.forEach((evt) => {
+      const date = new Date(`${evt.date}T00:00:00`);
+      if (date.getFullYear() === year && date.getMonth() === month) {
+        const day = date.getDate();
+        eventDays.add(day);
+        if (!eventItemsByDay[day]) {
+          eventItemsByDay[day] = [];
+        }
+        eventItemsByDay[day].push(evt);
+      }
+    });
+
+    const taskItemsByDay: Record<number, CalendarTask[]> = {};
+    const taskDays = new Set<number>();
+    calendarTasks.forEach((task) => {
+      const date = new Date(`${task.date}T00:00:00`);
+      if (date.getFullYear() === year && date.getMonth() === month) {
+        const day = date.getDate();
+        taskDays.add(day);
+        if (!taskItemsByDay[day]) {
+          taskItemsByDay[day] = [];
+        }
+        taskItemsByDay[day].push(task);
+      }
+    });
+
+    return {
+      year,
+      month,
+      days,
+      startOffset,
+      examDays,
+      eventDays,
+      taskDays,
+      eventItemsByDay,
+      taskItemsByDay,
+    };
+  }, [calendarEvents, calendarTasks, exams, widgetDate]);
 
   // Crear Examen
   // Crear Examen
@@ -211,6 +425,13 @@ export default function TeacherDashboard({
     [exams, normalizedSearch]
   );
 
+const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
+    month: "long",
+  });
+  const widgetMonthLabel = `${widgetMonthText.charAt(0).toUpperCase()}${widgetMonthText.slice(
+    1
+  )} ${widgetMonthData.year}`;
+
   // --- Contenido según ViewState ---
   const renderContent = () => {
     switch (activeView) {
@@ -229,7 +450,7 @@ export default function TeacherDashboard({
       case "calendar":
         return (
           <div className="glass-panel p-8 rounded-[2rem] w-full animate-slide-up">
-            <CalendarView exams={exams} />
+            <CalendarView exams={exams} profile={profile} />
           </div>
         );
       case "exams": // Vista dedicada (grid completo)
@@ -237,9 +458,10 @@ export default function TeacherDashboard({
           <div className="glass-panel p-8 rounded-[2rem] w-full animate-slide-up space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-gray-200/50">
               <div>
-                <h2 className="font-festive text-gradient-sun text-3xl mb-1">
-                  Mis Exámenes
-                </h2>
+                <h2 className="font-festive text-gradient-sun dark:!text-slate-100 dark:!bg-none dark:!text-fill-inherit text-3xl mb-1">
+  Mis Exámenes
+</h2>
+
                 <p className="text-gray-500 font-medium text-sm">
                   Gestiona tus evaluaciones y crea nuevas.
                 </p>
@@ -270,60 +492,59 @@ export default function TeacherDashboard({
                 </div>
               ) : (
                 filteredExams.map((exam) => (
-                  <div
-                    key={exam.id}
-                    onClick={() => router.push(`/t/${exam.code}`)}
-                    className="bg-white/70 dark:bg-slate-800/60 border border-white/70 dark:border-slate-700 p-5 rounded-3xl hover:bg-white dark:hover:bg-slate-800 transition-all flex flex-col gap-3 group relative shadow-sm"
-                  >
-                    {/* Estado Abierto / Cerrado */}
-                    <div className="flex justify-between items-start">
-                      <span
-                        className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${exam.status.toLowerCase() === "open"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-slate-100 text-slate-500"
-                          }`}
-                      >
-                        {exam.status.toLowerCase() === "open"
-                          ? "Abierto"
-                          : "Cerrado"}
-                      </span>
+              <div
+  key={exam.id}
+  onClick={() => router.push(`/t/${exam.code}`)}
+  className="bg-white/70 dark:bg-slate-800/60 border border-white/70 dark:border-slate-700 p-5 rounded-3xl hover:bg-white dark:hover:bg-slate-800 transition-all flex flex-col gap-3 group relative shadow-sm dark:text-slate-200"
+>
+  {/* Estado Abierto / Cerrado */}
+  <div className="flex justify-between items-start">
+    <span
+      className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+        exam.status.toLowerCase() === "open"
+          ? "bg-emerald-100 text-black dark:!text-black"
+          : "bg-slate-100 text-black dark:!text-black"
+      }`}
+    >
+      {exam.status.toLowerCase() === "open" ? "Abierto" : "Cerrado"}
+    </span>
 
-                      {/* Botón eliminar (usa la lógica existente handleDeleteExam) */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteExam(exam.id);
-                        }}
-                        className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition-colors"
-                        title="Eliminar examen"
-                      >
-                        🗑️
-                      </button>
-                    </div>
+    {/* Botón eliminar (usa la lógica existente handleDeleteExam) */}
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        handleDeleteExam(exam.id);
+      }}
+      className="p-1.5 rounded-lg text-black dark:!text-black hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+      title="Eliminar examen"
+    >
+      🗑️
+    </button>
+  </div>
 
                     {/* Título + materia (solo si existe) */}
-                    <div>
-                      <h3 className="font-bold text-gray-800 dark:text-slate-200 leading-tight mb-1 text-base">
-                        {exam.title || "Sin título"}
-                      </h3>
-                      {exam.subject && (
-                        <p className="text-[11px] text-gray-500 mt-0.5">
-                          {exam.subject}
-                        </p>
-                      )}
-                    </div>
+                   <div>
+    <h3 className="font-bold !text-grey leading-tight mb-1 text-base">
+      {exam.title || "Sin título"}
+    </h3>
+    {exam.subject && (
+      <p className="text-[11px] !text-grey mt-0.5">
+        {exam.subject}
+      </p>
+    )}
+  </div>
 
-                    {/* Fecha de creación + código */}
-                    <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center text-[11px] font-medium text-gray-500">
-                      <span>
-                        Creado el{" "}
-                        {new Date(exam.createdAt).toLocaleDateString()}
-                      </span>
-                      <span className="font-mono text-gray-400">
-                        Código: {exam.code}
-                      </span>
-                    </div>
-                  </div>
+  {/* Fecha de creación + código */}
+  <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center text-[11px] font-medium !text-black">
+    <span>
+      Creado el{" "}
+      {new Date(exam.createdAt).toLocaleDateString()}
+    </span>
+    <span className="font-mono !text-black">
+      Código: {exam.code}
+    </span>
+  </div>
+</div>
                 ))
               )}
             </div>
@@ -369,9 +590,10 @@ export default function TeacherDashboard({
             <div className="lg:col-span-2 space-y-6">
               {/* Box 1: Título y Acciones */}
               <div className="glass-panel p-5 rounded-[2rem] flex justify-between items-center">
-                <h2 className="text-xl font-bold text-[#1e1b4b] dark:text-slate-100">
-                  Mis Exámenes
-                </h2>
+                <h2 className="font-extrabold text-xl truncate text-gray-800 dark:text-slate-200">
+  Mis Exámenes
+</h2>
+
                 <button
                   onClick={() => setActiveView("exams")}
                   className="text-xs font-bold px-4 py-1.5 rounded-full transition-colors shadow-sm
@@ -464,7 +686,7 @@ export default function TeacherDashboard({
               <div className="glass-panel p-6 rounded-[2.5rem] flex flex-col gap-4">
                 <div className="flex justify-between items-center px-1">
                   <span className="text-sm font-bold text-gray-700">
-                    Noviembre 2024
+                    {widgetMonthLabel}
                   </span>
                   <div className="flex gap-1">
                     <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
@@ -482,40 +704,72 @@ export default function TeacherDashboard({
                   <div>D</div>
                 </div>
                 <div className="grid grid-cols-7 gap-1 text-[10px] text-center font-bold text-gray-600">
-                  {/* Dummy days row 1 */}
-                  <div className="py-1">29</div>
-                  <div className="py-1">30</div>
-                  <div className="py-1">1</div>
-                  <div className="py-1">2</div>
-                  <div className="py-1">3</div>
-                  <div className="py-1">4</div>
-                  <div className="py-1">5</div>
-
-                  {/* Dummy days row 2 */}
-                  <div className="py-1 bg-indigo-500 text-white rounded-full">
-                    6
-                  </div>
-                  <div className="py-1">7</div>
-                  <div className="py-1">8</div>
-                  <div className="py-1">9</div>
-                  <div className="py-1">10</div>
-                  <div className="py-1">11</div>
-                  <div className="py-1">12</div>
-
-                  {/* Dummy days row 3 */}
-                  <div className="py-1">13</div>
-                  <div className="py-1">14</div>
-                  <div className="py-1">15</div>
-                  <div className="py-1">16</div>
-                  <div className="py-1">17</div>
-                  <div className="py-1">18</div>
-                  <div className="py-1">19</div>
+                               {Array.from({ length: widgetMonthData.startOffset }).map(
+                    (_, i) => (
+                      <div key={`empty-${i}`} className="py-1 text-gray-300">
+                        ·
+                      </div>
+                    )
+                  )}
+                  {Array.from({ length: widgetMonthData.days }).map((_, i) => {
+                    const dayNum = i + 1;
+                    const isToday =
+                      dayNum === new Date().getDate() &&
+                      widgetMonthData.month === new Date().getMonth() &&
+                      widgetMonthData.year === new Date().getFullYear();
+                     const dayEvents =
+                      widgetMonthData.eventItemsByDay[dayNum] ?? [];
+                    const dayTasks =
+                      widgetMonthData.taskItemsByDay[dayNum] ?? [];
+                      const hasItem =
+                      widgetMonthData.examDays.has(dayNum) ||
+                       dayEvents.length > 0 ||
+                      dayTasks.length > 0;
+                    const tooltipLines = [
+                      ...dayTasks.map((task) =>
+                        task.time
+                          ? `• ${task.time} · ${task.title}`
+                          : `• ${task.title}`
+                      ),
+                      ...dayEvents.map((evt) => `• ${evt.title}`),
+                    ];
+                    return (
+                      <div
+                        key={`day-${dayNum}`}
+                        className={`py-1 rounded-full flex flex-col items-center gap-0.5 ${
+                          isToday ? "bg-indigo-500 text-white" : ""
+                        }`}
+                         title={tooltipLines.length > 0 ? tooltipLines.join("\n") : undefined}
+                      >
+                        <span>{dayNum}</span>
+                        {hasItem && (
+                          <span className="flex items-center gap-0.5">
+                            {dayTasks.map((task) => (
+                              <span
+                                key={task.id}
+                                className="w-1.5 h-1.5 rounded-full"
+                                style={{ backgroundColor: task.color }}
+                              />
+                            ))}
+                            {dayEvents.map((evt) => (
+                              <span
+                                key={evt.id}
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  isToday ? "bg-white" : "bg-emerald-400"
+                                }`}
+                              />
+                            ))}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
               <div className="bg-white/40 dark:bg-slate-800/40 p-6 rounded-[2.5rem] border border-white/40 dark:border-slate-700">
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-bold text-[#1e1b4b] dark:text-slate-100">Actividad</h3>
+                  <h3 className="font-bold text-indigo-950 dark:text-white">Actividad</h3>
                   <span className="text-xs text-indigo-500 font-bold cursor-pointer">
                     Ver todo
                   </span>

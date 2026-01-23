@@ -38,6 +38,16 @@ export default function UniversitiesView({ profile, exams, onDeleteExam, onUpdat
     // Selection State
     const [expandedInstIds, setExpandedInstIds] = React.useState<Set<string>>(new Set());
     const [selectedSubjectId, setSelectedSubjectId] = React.useState<string | null>(null);
+const [isDark, setIsDark] = React.useState(false);
+
+    React.useEffect(() => {
+        const html = document.documentElement;
+        const updateTheme = () => setIsDark(html.classList.contains("dark"));
+        updateTheme();
+        const observer = new MutationObserver(updateTheme);
+        observer.observe(html, { attributes: true, attributeFilter: ["class"] });
+        return () => observer.disconnect();
+    }, []);
 
     // Filter Logic
     const activeInstitutionId = Array.from(expandedInstIds).find(id =>
@@ -130,8 +140,9 @@ export default function UniversitiesView({ profile, exams, onDeleteExam, onUpdat
             gap: "24px",
             height: "calc(100vh - 140px)",
         },
+        
         column: {
-            background: "white",
+            background: isDark ? "#9ca3af" : "#ffffff",
             borderRadius: "16px",
             border: "1px solid #e5e7eb",
             overflow: "hidden",
@@ -183,7 +194,7 @@ export default function UniversitiesView({ profile, exams, onDeleteExam, onUpdat
         uniName: {
             fontWeight: 600,
             fontSize: '14px',
-            color: '#1f2937',
+            color: '#0a0d11',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
@@ -200,7 +211,7 @@ export default function UniversitiesView({ profile, exams, onDeleteExam, onUpdat
             borderRadius: '6px',
             fontSize: '13px',
             cursor: 'pointer',
-            color: active ? '#1d4ed8' : '#4b5563',
+            color: active ? '#202022' : '#000000',
             background: active ? '#eff6ff' : 'transparent',
             display: 'flex',
             justifyContent: 'space-between',

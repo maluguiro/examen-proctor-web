@@ -723,7 +723,7 @@ export default function TeacherExamPage() {
                   !manualSubjectMode ? (
                     <div className="bg-white/50 p-4 rounded-2xl border border-white/60 space-y-4">
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-500 ml-1">
+                        <label className="text-xs font-bold text-black-500 ml-1">
                           Universidad
                         </label>
                         <select
@@ -743,7 +743,7 @@ export default function TeacherExamPage() {
                         </select>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-500 ml-1">
+                        <label className="text-xs font-bold text-black-500 ml-1">
                           Materia
                         </label>
                         <select
@@ -763,7 +763,7 @@ export default function TeacherExamPage() {
                       </div>
                       <button
                         onClick={() => setManualSubjectMode(true)}
-                        className="text-xs text-indigo-500 font-bold hover:underline pl-1"
+                        className="text-xs text-black-500 font-bold hover:underline pl-1"
                       >
                         No encuentro mi materia (Ingresar manual)
                       </button>
@@ -964,7 +964,7 @@ export default function TeacherExamPage() {
                   </p>
                   <button
                     onClick={reloadQuestions}
-                    className="text-xs text-indigo-500 font-bold hover:underline mt-1 bg-transparent border-none p-0 cursor-pointer"
+                    className="text-xs text-gray-500 font-bold hover:underline mt-1 bg-transparent border-none p-0 cursor-pointer"
                   >
                     🔄 Recargar lista
                   </button>
@@ -1018,7 +1018,7 @@ export default function TeacherExamPage() {
 
                   <button
                     onClick={resetQuestionForm}
-                    className="w-full py-3 rounded-xl font-bold text-sm text-indigo-600 mt-2 border-dashed border-2 border-indigo-200 hover:border-indigo-400 bg-transparent transition-colors"
+                    className="w-full py-3 rounded-xl font-bold text-sm text-gray-600 mt-2 border-dashed border-2 border-indigo-200 hover:border-indigo-400 bg-transparent transition-colors"
                   >
                     + Nueva Pregunta
                   </button>
@@ -1129,7 +1129,7 @@ export default function TeacherExamPage() {
                         ))}
                         <button
                           onClick={() => setMcqChoices([...mcqChoices, ""])}
-                          className="text-xs font-bold text-indigo-600 hover:underline pl-1 cursor-pointer"
+                          className="text-xs font-bold text-gray-600 hover:underline pl-1 cursor-pointer"
                         >
                           + Agregar opción
                         </button>
@@ -1263,7 +1263,7 @@ export default function TeacherExamPage() {
               </div>
 
               <div className="flex-1 glass-panel p-0 rounded-3xl overflow-hidden flex flex-col border border-white/50">
-                <div className="p-3 bg-white/40 border-b border-white/20 text-xs font-bold text-gray-500 uppercase tracking-wider flex justify-between items-center px-6">
+                <div className="p-3 bg-white/40 border-b border-white/20 text-xs font-bold text-gray-700 uppercase tracking-wider flex justify-between items-center px-6">
                   <span>Vista en vivo</span>
                   <span
                     className="w-2 h-2 rounded-full bg-red-500 animate-pulse"
