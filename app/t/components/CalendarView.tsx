@@ -1,7 +1,9 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { API } from "@/lib/api";
+
 
 // --- Tipos Locales ---
 type ExamListItem = {
@@ -57,6 +59,8 @@ export default function CalendarView({ exams }: Props) {
   const [taskColor, setTaskColor] = React.useState("#34d399");
 
   const [hydrated, setHydrated] = React.useState(false);
+  const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipNextSaveRef = React.useRef(true);
 
   const notifyCalendarUpdate = React.useCallback(() => {
     if (typeof window === "undefined") return;
@@ -107,6 +111,58 @@ export default function CalendarView({ exams }: Props) {
     return { eventsKey, tasksKey, legacyEventsKey, legacyTasksKey };
   }, []);
 
+  const getAuthToken = React.useCallback(() => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem("examproctor_token") || "";
+  }, []);
+
+  const fetchCalendar = React.useCallback(
+    async (signal?: AbortSignal) => {
+      const token = getAuthToken();
+      if (!token) return null;
+      const res = await fetch(`${API}/teacher/calendar`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        signal,
+      });
+      if (!res.ok) {
+        throw new Error(`GET /api/teacher/calendar failed: ${res.status}`);
+      }
+      const data = await res.json();
+      const fetchedEvents = Array.isArray(data?.events) ? data.events : [];
+      const fetchedTasks = Array.isArray(data?.tasks) ? data.tasks : [];
+      return { events: fetchedEvents, tasks: fetchedTasks };
+    },
+    [getAuthToken]
+  );
+
+  const saveCalendar = React.useCallback(
+    async (
+      payload: { events: CalendarEvent[]; tasks: CalendarTask[] },
+      signal?: AbortSignal
+    ) => {
+      const token = getAuthToken();
+      if (!token) return false;
+      const res = await fetch(`${API}/teacher/calendar`, {
+
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+        signal,
+      });
+      if (!res.ok) {
+        throw new Error(`PUT /api/teacher/calendar failed: ${res.status}`);
+      }
+      return true;
+    },
+    [getAuthToken]
+  );
+
   // Detectar dark mode (sin cambios)
   React.useEffect(() => {
     const html = document.documentElement;
@@ -117,10 +173,11 @@ export default function CalendarView({ exams }: Props) {
     return () => observer.disconnect();
   }, []);
 
-  // Cargar events + tasks 1 vez (desde keys correctas)
+  // Cargar events + tasks 1 vez (backend con fallback a localStorage)
   React.useEffect(() => {
     if (typeof window === "undefined") return;
 
+    const controller = new AbortController();
     const { eventsKey, tasksKey, legacyEventsKey, legacyTasksKey } =
       getCalendarStorageKeys();
 
@@ -135,67 +192,114 @@ export default function CalendarView({ exams }: Props) {
       }
     };
 
-    // EVENTS: primero key por perfil, si no existe => legacy
-    const currentEvents = readArray(eventsKey);
-    const legacyEvents = readArray(legacyEventsKey);
-    const loadedEvents = currentEvents ?? legacyEvents ?? [];
-    setEvents(loadedEvents);
+    const loadFromStorage = () => {
+      const currentEvents = readArray(eventsKey);
+      const legacyEvents = readArray(legacyEventsKey);
+      const loadedEvents = currentEvents ?? legacyEvents ?? [];
+      setEvents(loadedEvents);
 
-    // Migración: si no había datos en key por perfil pero sí en legacy, copiarlos
-    if (
-      (!currentEvents || currentEvents.length === 0) &&
-      loadedEvents.length > 0 &&
-      eventsKey !== legacyEventsKey
-    ) {
-      window.localStorage.setItem(eventsKey, JSON.stringify(loadedEvents));
-    }
+      if (
+        (!currentEvents || currentEvents.length === 0) &&
+        loadedEvents.length > 0 &&
+        eventsKey !== legacyEventsKey
+      ) {
+        window.localStorage.setItem(eventsKey, JSON.stringify(loadedEvents));
+      }
 
-    // TASKS: primero key por perfil, si no existe => legacy
-    const currentTasks = readArray(tasksKey);
-    const legacyTasks = readArray(legacyTasksKey);
-    const loadedTasks = currentTasks ?? legacyTasks ?? [];
-    setTasks(loadedTasks);
+      const currentTasks = readArray(tasksKey);
+      const legacyTasks = readArray(legacyTasksKey);
+      const loadedTasks = currentTasks ?? legacyTasks ?? [];
+      setTasks(loadedTasks);
 
-    if (
-      (!currentTasks || currentTasks.length === 0) &&
-      loadedTasks.length > 0 &&
-      tasksKey !== legacyTasksKey
-    ) {
-      window.localStorage.setItem(tasksKey, JSON.stringify(loadedTasks));
-    }
+      if (
+        (!currentTasks || currentTasks.length === 0) &&
+        loadedTasks.length > 0 &&
+        tasksKey !== legacyTasksKey
+      ) {
+        window.localStorage.setItem(tasksKey, JSON.stringify(loadedTasks));
+      }
+    };
 
-    // Importantísimo: habilitar persistencia recién después de hidratar
-    setHydrated(true);
-  }, [getCalendarStorageKeys]);
+    const finalizeHydration = () => {
+      setHydrated(true);
+      skipNextSaveRef.current = true;
+    };
 
-  // Persistir events (solo cuando cambia events)  ✅ FIX: no guardar hasta hidratar
+    const hydrate = async () => {
+      try {
+        const remote = await fetchCalendar(controller.signal);
+        if (remote) {
+          setEvents(remote.events);
+          setTasks(remote.tasks);
+          finalizeHydration();
+          return;
+        }
+      } catch (err) {
+        console.error("Calendar hydrate failed, using localStorage fallback.", err);
+      }
+
+      loadFromStorage();
+      finalizeHydration();
+    };
+
+    hydrate();
+
+    return () => controller.abort();
+  }, [fetchCalendar, getCalendarStorageKeys]);
+
+  // Persistir events + tasks (debounced, backend first, localStorage on success)
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     if (!hydrated) return;
 
-    const { eventsKey, legacyEventsKey } = getCalendarStorageKeys();
-    const payload = JSON.stringify(events);
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
 
-    window.localStorage.setItem(eventsKey, payload);
-    // También en legacy para compatibilidad y para que TeacherDashboard siempre lo vea
-    window.localStorage.setItem(legacyEventsKey, payload);
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
 
+    const controller = new AbortController();
+   saveTimeoutRef.current = setTimeout(async () => {
+  const { eventsKey, tasksKey, legacyEventsKey, legacyTasksKey } =
+    getCalendarStorageKeys();
+
+  // 1) Guardado local SIEMPRE (así al refrescar no se pierde)
+  try {
+    window.localStorage.setItem(eventsKey, JSON.stringify(events));
+    window.localStorage.setItem(tasksKey, JSON.stringify(tasks));
+    window.localStorage.setItem(legacyEventsKey, JSON.stringify(events));
+    window.localStorage.setItem(legacyTasksKey, JSON.stringify(tasks));
     notifyCalendarUpdate();
-  }, [events, hydrated, getCalendarStorageKeys, notifyCalendarUpdate]);
+  } catch (err) {
+    console.error("LocalStorage write failed.", err);
+  }
 
-  // Persistir tasks (solo cuando cambia tasks) ✅ FIX: no guardar hasta hidratar
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!hydrated) return;
+  // 2) Guardado en backend (si falla, igual queda lo local)
+  try {
+    await saveCalendar({ events, tasks }, controller.signal);
+  } catch (err) {
+    console.error("Calendar save to backend failed.", err);
+  }
+}, 500);
 
-    const { tasksKey, legacyTasksKey } = getCalendarStorageKeys();
-    const payload = JSON.stringify(tasks);
 
-    window.localStorage.setItem(tasksKey, payload);
-    window.localStorage.setItem(legacyTasksKey, payload);
-
-    notifyCalendarUpdate();
-  }, [tasks, hydrated, getCalendarStorageKeys, notifyCalendarUpdate]);
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      controller.abort();
+    };
+  }, [
+    events,
+    tasks,
+    hydrated,
+    getCalendarStorageKeys,
+    notifyCalendarUpdate,
+    saveCalendar,
+  ]);
 
   // Helpers de fecha
   const getDaysInMonth = (date: Date) => {

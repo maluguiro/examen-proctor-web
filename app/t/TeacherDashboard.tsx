@@ -157,31 +157,85 @@ const [widgetDate] = React.useState(new Date());
 const loadCalendarData = React.useCallback(() => {
   if (typeof window === "undefined") return;
 
-  const { eventsKey, tasksKey } = getCalendarStorageKeys();
   const legacyEventsKey = "teacher_calendar_events";
-const legacyTasksKey = "teacher_calendar_tasks";
+  const legacyTasksKey = "teacher_calendar_tasks";
 
-const rawEvents =
-  window.localStorage.getItem(eventsKey) ?? window.localStorage.getItem(legacyEventsKey);
+  const token = window.localStorage.getItem("examproctor_token");
 
-const rawTasks =
-  window.localStorage.getItem(tasksKey) ?? window.localStorage.getItem(legacyTasksKey);
-
-  try {
-    const parsedEvents = rawEvents ? JSON.parse(rawEvents) : [];
-    setCalendarEvents(Array.isArray(parsedEvents) ? parsedEvents : []);
-  } catch {
-    setCalendarEvents([]);
+  // keys por perfil (misma normalización que CalendarView)
+  const rawProfile = window.localStorage.getItem("teacherProfile");
+  let profileKey = "";
+  if (rawProfile) {
+    try {
+      const parsed = JSON.parse(rawProfile);
+      const identifier = `${parsed?.email || parsed?.name || ""}`
+        .trim()
+        .toLowerCase();
+      if (identifier) profileKey = identifier.replace(/[^a-z0-9]+/g, "_");
+    } catch {
+      profileKey = "";
+    }
   }
 
-  try {
-    const parsedTasks = rawTasks ? JSON.parse(rawTasks) : [];
-    setCalendarTasks(Array.isArray(parsedTasks) ? parsedTasks : []);
-  } catch {
-    setCalendarTasks([]);
-  }
-}, [getCalendarStorageKeys]);
+  const eventsKey = profileKey
+    ? `teacher_${profileKey}_teacher_calendar_events`
+    : legacyEventsKey;
 
+  const tasksKey = profileKey
+    ? `teacher_${profileKey}_teacher_calendar_tasks`
+    : legacyTasksKey;
+
+  const readArray = (key: string) => {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const loadFromStorage = () => {
+    const storedEvents =
+      readArray(eventsKey) ?? readArray(legacyEventsKey) ?? [];
+    const storedTasks =
+      readArray(tasksKey) ?? readArray(legacyTasksKey) ?? [];
+    setCalendarEvents(storedEvents);
+    setCalendarTasks(storedTasks);
+  };
+
+  // 1) Siempre: hidratar rápido desde storage
+  loadFromStorage();
+
+  // 2) Luego: si hay token, backend -> estado + sync storage
+  if (!token) return;
+
+  fetch(`${API}/teacher/calendar`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error(String(res.status));
+      return res.json();
+    })
+    .then((data) => {
+      const fetchedEvents = Array.isArray(data?.events) ? data.events : [];
+      const fetchedTasks = Array.isArray(data?.tasks) ? data.tasks : [];
+
+      setCalendarEvents(fetchedEvents);
+      setCalendarTasks(fetchedTasks);
+
+      window.localStorage.setItem(eventsKey, JSON.stringify(fetchedEvents));
+      window.localStorage.setItem(tasksKey, JSON.stringify(fetchedTasks));
+      window.localStorage.setItem(legacyEventsKey, JSON.stringify(fetchedEvents));
+      window.localStorage.setItem(legacyTasksKey, JSON.stringify(fetchedTasks));
+    })
+    .catch(() => {
+      // si falla backend, te quedás con lo que ya cargaste desde storage
+      loadFromStorage();
+    });
+}, []);
 
   React.useEffect(() => {
     loadCalendarData();
