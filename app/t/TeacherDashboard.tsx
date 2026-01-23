@@ -122,23 +122,66 @@ const [widgetDate] = React.useState(new Date());
     fetchExams();
   }, [fetchExams]);
 
+  const getCalendarStorageKeys = React.useCallback(() => {
+  if (typeof window === "undefined") {
+    return {
+      eventsKey: "teacher_calendar_events",
+      tasksKey: "teacher_calendar_tasks",
+    };
+  }
+
+  const rawProfile = window.localStorage.getItem("teacherProfile");
+  let profileKey = "";
+
+  if (rawProfile) {
+    try {
+      const parsed = JSON.parse(rawProfile);
+      const identifier = `${parsed?.email || parsed?.name || ""}`.trim();
+      profileKey = identifier ? identifier.toLowerCase().replace(/\s+/g, "_") : "";
+    } catch {
+      profileKey = "";
+    }
+  }
+
+  const eventsKey = profileKey
+    ? `teacher_${profileKey}_teacher_calendar_events`
+    : "teacher_calendar_events";
+
+  const tasksKey = profileKey
+    ? `teacher_${profileKey}_teacher_calendar_tasks`
+    : "teacher_calendar_tasks";
+
+  return { eventsKey, tasksKey };
+}, []);
+
 const loadCalendarData = React.useCallback(() => {
-    if (typeof window === "undefined") return;
-    const rawEvents = window.localStorage.getItem("teacher_calendar_events");
-    const rawTasks = window.localStorage.getItem("teacher_calendar_tasks");
-    try {
-      const parsedEvents = rawEvents ? JSON.parse(rawEvents) : [];
-      setCalendarEvents(Array.isArray(parsedEvents) ? parsedEvents : []);
-    } catch {
-      setCalendarEvents([]);
-    }
-    try {
-      const parsedTasks = rawTasks ? JSON.parse(rawTasks) : [];
-      setCalendarTasks(Array.isArray(parsedTasks) ? parsedTasks : []);
-    } catch {
-      setCalendarTasks([]);
-    }
-  }, []);
+  if (typeof window === "undefined") return;
+
+  const { eventsKey, tasksKey } = getCalendarStorageKeys();
+  const legacyEventsKey = "teacher_calendar_events";
+const legacyTasksKey = "teacher_calendar_tasks";
+
+const rawEvents =
+  window.localStorage.getItem(eventsKey) ?? window.localStorage.getItem(legacyEventsKey);
+
+const rawTasks =
+  window.localStorage.getItem(tasksKey) ?? window.localStorage.getItem(legacyTasksKey);
+
+  try {
+    const parsedEvents = rawEvents ? JSON.parse(rawEvents) : [];
+    setCalendarEvents(Array.isArray(parsedEvents) ? parsedEvents : []);
+  } catch {
+    setCalendarEvents([]);
+  }
+
+  try {
+    const parsedTasks = rawTasks ? JSON.parse(rawTasks) : [];
+    setCalendarTasks(Array.isArray(parsedTasks) ? parsedTasks : []);
+  } catch {
+    setCalendarTasks([]);
+  }
+}, [getCalendarStorageKeys]);
+
 
   React.useEffect(() => {
     loadCalendarData();
@@ -151,6 +194,18 @@ const loadCalendarData = React.useCallback(() => {
       window.removeEventListener("storage", handleUpdate);
     };
   }, [loadCalendarData]);
+
+  React.useEffect(() => {
+  if (typeof window === "undefined") return;
+  const { eventsKey } = getCalendarStorageKeys();
+  window.localStorage.setItem(eventsKey, JSON.stringify(calendarEvents));
+}, [calendarEvents, getCalendarStorageKeys]);
+
+React.useEffect(() => {
+  if (typeof window === "undefined") return;
+  const { tasksKey } = getCalendarStorageKeys();
+  window.localStorage.setItem(tasksKey, JSON.stringify(calendarTasks));
+}, [calendarTasks, getCalendarStorageKeys]);
 
   const widgetMonthData = React.useMemo(() => {
     const year = widgetDate.getFullYear();
@@ -165,21 +220,33 @@ const loadCalendarData = React.useCallback(() => {
       if (date.getFullYear() === year && date.getMonth() === month) {
         examDays.add(date.getDate());
       }
-    });
+   });
 
+    const eventItemsByDay: Record<number, CalendarEvent[]> = {};
     const eventDays = new Set<number>();
     calendarEvents.forEach((evt) => {
       const date = new Date(`${evt.date}T00:00:00`);
       if (date.getFullYear() === year && date.getMonth() === month) {
-        eventDays.add(date.getDate());
+        const day = date.getDate();
+        eventDays.add(day);
+        if (!eventItemsByDay[day]) {
+          eventItemsByDay[day] = [];
+        }
+        eventItemsByDay[day].push(evt);
       }
     });
 
+    const taskItemsByDay: Record<number, CalendarTask[]> = {};
     const taskDays = new Set<number>();
     calendarTasks.forEach((task) => {
       const date = new Date(`${task.date}T00:00:00`);
       if (date.getFullYear() === year && date.getMonth() === month) {
-        taskDays.add(date.getDate());
+        const day = date.getDate();
+        taskDays.add(day);
+        if (!taskItemsByDay[day]) {
+          taskItemsByDay[day] = [];
+        }
+        taskItemsByDay[day].push(task);
       }
     });
 
@@ -191,6 +258,8 @@ const loadCalendarData = React.useCallback(() => {
       examDays,
       eventDays,
       taskDays,
+      eventItemsByDay,
+      taskItemsByDay,
     };
   }, [calendarEvents, calendarTasks, exams, widgetDate]);
 
@@ -327,7 +396,7 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
       case "calendar":
         return (
           <div className="glass-panel p-8 rounded-[2rem] w-full animate-slide-up">
-            <CalendarView exams={exams} />
+            <CalendarView exams={exams} profile={profile} />
           </div>
         );
       case "exams": // Vista dedicada (grid completo)
@@ -594,24 +663,49 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
                       dayNum === new Date().getDate() &&
                       widgetMonthData.month === new Date().getMonth() &&
                       widgetMonthData.year === new Date().getFullYear();
-                    const hasItem =
+                     const dayEvents =
+                      widgetMonthData.eventItemsByDay[dayNum] ?? [];
+                    const dayTasks =
+                      widgetMonthData.taskItemsByDay[dayNum] ?? [];
+                      const hasItem =
                       widgetMonthData.examDays.has(dayNum) ||
-                      widgetMonthData.eventDays.has(dayNum) ||
-                      widgetMonthData.taskDays.has(dayNum);
+                       dayEvents.length > 0 ||
+                      dayTasks.length > 0;
+                    const tooltipLines = [
+                      ...dayTasks.map((task) =>
+                        task.time
+                          ? `• ${task.time} · ${task.title}`
+                          : `• ${task.title}`
+                      ),
+                      ...dayEvents.map((evt) => `• ${evt.title}`),
+                    ];
                     return (
                       <div
                         key={`day-${dayNum}`}
                         className={`py-1 rounded-full flex flex-col items-center gap-0.5 ${
                           isToday ? "bg-indigo-500 text-white" : ""
                         }`}
+                         title={tooltipLines.length > 0 ? tooltipLines.join("\n") : undefined}
                       >
                         <span>{dayNum}</span>
                         {hasItem && (
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              isToday ? "bg-white" : "bg-emerald-400"
-                            }`}
-                          />
+                          <span className="flex items-center gap-0.5">
+                            {dayTasks.map((task) => (
+                              <span
+                                key={task.id}
+                                className="w-1.5 h-1.5 rounded-full"
+                                style={{ backgroundColor: task.color }}
+                              />
+                            ))}
+                            {dayEvents.map((evt) => (
+                              <span
+                                key={evt.id}
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  isToday ? "bg-white" : "bg-emerald-400"
+                                }`}
+                              />
+                            ))}
+                          </span>
                         )}
                       </div>
                     );
