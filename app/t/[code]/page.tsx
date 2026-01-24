@@ -616,7 +616,7 @@ export default function TeacherExamPage() {
                 onClick={() => setStep(s.id)}
                 className={`text-left px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-3 ${
                   isActive
-                    ? "bg-white/50 text-indigo-900 shadow-sm border border-white/60"
+                    ? "btn-aurora shadow-sm"
                     : "text-gray-500 hover:bg-white/20 hover:text-gray-700 hover:pl-5"
                 }`}
               >
@@ -658,7 +658,7 @@ export default function TeacherExamPage() {
         </span>
         <button
           onClick={() => (window.location.href = "/t")}
-          className="text-xs font-bold text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg bg-white/50"
+          className="btn-aurora text-xs font-bold px-3 py-1.5 rounded-lg"
         >
           Salir
         </button>
@@ -1016,12 +1016,12 @@ export default function TeacherExamPage() {
                     </div>
                   ))}
 
-                  <button
-                    onClick={resetQuestionForm}
-                    className="w-full py-3 rounded-xl font-bold text-sm text-gray-600 mt-2 border-dashed border-2 border-indigo-200 hover:border-indigo-400 bg-transparent transition-colors"
-                  >
-                    + Nueva Pregunta
-                  </button>
+                <button
+                  onClick={resetQuestionForm}
+                  className="btn-aurora w-full py-3 rounded-xl font-bold text-sm mt-2 border-dashed border-2 transition-colors"
+                >
+                  + Nueva Pregunta
+                </button>
                 </div>
 
                 {/* FORMULARIO DE EDICIÓN */}
@@ -1092,10 +1092,10 @@ export default function TeacherExamPage() {
                           <div key={idx} className="flex gap-2">
                             <button
                               onClick={() => setMcqCorrect(idx)}
-                              className={`w-10 h-10 rounded-xl border flex items-center justify-center font-bold text-lg transition-all ${
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg transition-all ${
                                 mcqCorrect === idx
-                                  ? "bg-emerald-500 border-emerald-600 text-white shadow-md"
-                                  : "bg-gray-100 text-gray-300 border-gray-200 hover:bg-gray-200"
+                                  ? "btn-aurora-primary"
+                                  : "btn-aurora"
                               }`}
                               title="Marcar como correcta"
                             >
@@ -1140,20 +1140,20 @@ export default function TeacherExamPage() {
                       <div className="flex gap-4 pt-2">
                         <button
                           onClick={() => setTfCorrect(true)}
-                          className={`flex-1 py-3 rounded-xl font-bold border-2 transition-all ${
+                          className={`flex-1 py-3 rounded-xl font-bold transition-all ${
                             tfCorrect
-                              ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                              : "border-transparent bg-white/50 text-gray-500"
+                              ? "btn-aurora-primary"
+                              : "btn-aurora"
                           }`}
                         >
                           Verdadero
                         </button>
                         <button
                           onClick={() => setTfCorrect(false)}
-                          className={`flex-1 py-3 rounded-xl font-bold border-2 transition-all ${
+                          className={`flex-1 py-3 rounded-xl font-bold transition-all ${
                             !tfCorrect
-                              ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                              : "border-transparent bg-white/50 text-gray-500"
+                              ? "btn-aurora-primary"
+                              : "btn-aurora"
                           }`}
                         >
                           Falso
@@ -1251,10 +1251,8 @@ export default function TeacherExamPage() {
                 </div>
                 <button
                   onClick={copyStudentLink}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all shadow-sm border ${
-                    linkCopied
-                      ? "bg-emerald-500 text-white border-emerald-600"
-                      : "bg-white text-indigo-900 border-indigo-100 hover:bg-indigo-50"
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all ${
+                    linkCopied ? "btn-aurora-primary" : "btn-aurora"
                   }`}
                 >
                   <span className="text-lg">{linkCopied ? "✅" : "🔗"}</span>

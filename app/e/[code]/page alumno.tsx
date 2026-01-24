@@ -174,9 +174,18 @@ export default function ExamPage() {
     };
   }, [attemptId]);
 
-  async function enterFullscreen() {
-    if (!document.fullscreenElement)
-      await document.documentElement.requestFullscreen();
+  function enterFullscreen() {
+    if (document.fullscreenElement) return;
+    if (!document.documentElement.requestFullscreen) {
+      console.warn("Fullscreen no disponible en este navegador.");
+      return;
+    }
+    const request = document.documentElement.requestFullscreen();
+    if (request && typeof request.then === "function") {
+      request.catch((e) => {
+        console.warn("No se pudo reactivar pantalla completa:", e);
+      });
+    }
   }
 
   if (!exam) return <p style={{ padding: 24 }}>Cargando examen...</p>;

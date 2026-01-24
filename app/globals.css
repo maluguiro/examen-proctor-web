@@ -1,19 +1,21 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 /* =========================
    THEME BASE
 ========================= */
 :root {
-  --bg-base: #fffaf2;
+  --bg-base: #f8fafc;
   --foreground: #171717;
 
-  --bg-pink: rgba(255, 182, 193, 0.75);
-  --bg-aqua: rgba(100, 245, 210, 0.7);
+    /* Aurora hover (pasamos a lila + azul suave) */
+  --bg-pink: rgba(167, 139, 250, 0.55);   /* lila */
+  --bg-aqua: rgba(96, 165, 250, 0.45);   /* azul */
 
-  --accent-primary: #2ef176;
-  --accent-secondary: #a3e635;
-  --accent-soft: #d4f591;
-  --accent-sky: #90fdc7;
+  /* Accent (primario lila/azul + acento amarillo) */
+  --accent-primary: #6366f1;    /* indigo */
+  --accent-secondary: #3b82f6;  /* blue */
+  --accent-soft: #fde68a;       /* amarillo suave */
+  --accent-sky: #a78bfa;        /* lila */
 
   --surface: rgba(255, 255, 255, 0.85);
   --border-soft: rgba(255, 255, 255, 0.65);
@@ -51,7 +53,7 @@ body::before {
   inset: -5%;
   z-index: -2;
 
-  background-image: url("/bg-student-welcome-v2.png");
+  background-image: url("/bg/fondo-moderno.jpg");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -62,8 +64,14 @@ body::before {
 }
 
 body::after {
-  content: none;
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.55);
 }
+
 
 @keyframes plastic-float {
   0% {
@@ -103,7 +111,7 @@ body.student-shell::before {
   color: #1a1a1a;
   font-weight: 600;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 6px 18px rgba(59, 130, 246, 0.18);
   position: relative;
   overflow: hidden;
 }
@@ -112,7 +120,11 @@ body.student-shell::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, var(--bg-pink), var(--bg-aqua));
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.45),
+    rgba(167, 139, 250, 0.45)
+  );
   opacity: 0;
   transition: opacity 0.3s ease;
   z-index: -1;
@@ -120,7 +132,7 @@ body.student-shell::before {
 
 .btn-aurora:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.18);
+  box-shadow: 0 8px 22px rgba(99, 102, 241, 0.22);
   border-color: #fff;
   background: rgba(255, 255, 255, 0.9);
 }
@@ -130,13 +142,15 @@ body.student-shell::before {
 }
 
 .btn-aurora-primary {
-  background: linear-gradient(135deg,
-      var(--accent-primary) 0%,
-      var(--accent-secondary) 45%,
-      var(--accent-sky) 100%);
+  background: linear-gradient(
+    135deg,
+    #3b82f6 0%,
+    #8b5cf6 52%,
+    #fde68a 100%
+  );
   color: #ffffff;
   border: none;
-  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
+  box-shadow: 0 10px 28px rgba(99, 102, 241, 0.35);
   font-weight: 700;
   transition: all 0.25s ease;
 }
@@ -191,10 +205,15 @@ body.student-shell::before {
 }
 
 .btn-sun {
-  background-image: linear-gradient(90deg, #ffd45a, #ffc14a, #ffae3b);
+  background-image: linear-gradient(
+    90deg,
+    #ffe69a,
+    #ffd875,
+    #f8c35c
+  );
   color: #14532d;
   /* verde oscuro para buen contraste */
-  box-shadow: 0 10px 25px rgba(250, 204, 21, 0.45);
+  box-shadow: 0 12px 28px rgba(167, 139, 250, 0.22);
   border-radius: 9999px;
   font-weight: 700;
   transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
@@ -203,7 +222,34 @@ body.student-shell::before {
 .btn-sun:hover {
   filter: brightness(1.05);
   transform: translateY(-1px);
-  box-shadow: 0 14px 35px rgba(250, 204, 21, 0.55);
+  box-shadow: 0 16px 36px rgba(99, 102, 241, 0.28);
+}
+
+.proctor-alert {
+  background: linear-gradient(135deg, rgba(191, 219, 254, 0.85), rgba(221, 214, 254, 0.85));
+  border: 1px solid rgba(148, 163, 255, 0.35);
+  box-shadow: 0 24px 60px rgba(99, 102, 241, 0.18);
+}
+
+.proctor-alert-title {
+  color: #1e3a8a;
+  font-weight: 800;
+}
+
+.proctor-alert-text {
+  color: rgba(30, 41, 59, 0.9);
+}
+
+.proctor-alert-hint {
+  color: rgba(99, 102, 241, 0.9);
+  background: rgba(253, 230, 138, 0.4);
+  border: 1px solid rgba(253, 230, 138, 0.6);
+}
+
+.proctor-alert-btn {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.85), rgba(167, 139, 250, 0.85), rgba(253, 230, 138, 0.85));
+  color: #1e293b;
+  box-shadow: 0 12px 28px rgba(99, 102, 241, 0.3);
 }
 
 /* =========================
@@ -228,9 +274,9 @@ body.student-shell::before {
 
 /* FOTO ÚNICA (inicio + final) */
 .bg-student-welcome {
-  background-color: #fffaf2;
+  background-color: #c4cedb;
   /* fallback si la imagen no carga */
-  background-image: url("/bg-student-welcome-v2.png");
+  background-image: url("/bg/fondo-moderno.jpg");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -267,7 +313,7 @@ body.student-shell::before {
 
 /* Fondo examen pastel (fijo) */
 .bg-student-exam {
-  background: #e6f8cf;
+  background: #eae8eb;
 }
 
 .bg-student-exam::before {
@@ -327,6 +373,11 @@ html.dark body::before {
   display: none !important;
 }
 
+html.dark body::after {
+  opacity: 0 !important;
+  display: none !important;
+}
+
 /* 2. Dark Glass Functionality */
 html.dark .glass-panel {
   background: rgba(15, 23, 42, 0.65);
@@ -374,16 +425,18 @@ html.dark .text-gray-900 {
 
 /* 5. Buttons in Dark */
 html.dark .btn-aurora {
-  background: rgba(30, 41, 59, 0.7);
+  background: rgba(30, 41, 59, 0.78);
   /* Slate-800/70 */
   border-color: rgba(255, 255, 255, 0.1);
   color: #fff;
+  box-shadow: 0 8px 22px rgba(99, 102, 241, 0.25);
 }
 
 html.dark .btn-aurora:hover {
-  background: rgba(51, 65, 85, 0.8);
+  background: rgba(51, 65, 85, 0.85);
   /* Slate-700/80 */
   border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 28px rgba(167, 139, 250, 0.28);
 }
 
 /* 6. Specific Components */
