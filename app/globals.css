@@ -4,16 +4,18 @@
    THEME BASE
 ========================= */
 :root {
-  --bg-base: #fffaf2;
+  --bg-base: #f8fafc;
   --foreground: #171717;
 
-  --bg-pink: rgba(255, 182, 193, 0.75);
-  --bg-aqua: rgba(100, 245, 210, 0.7);
+    /* Aurora hover (pasamos a lila + azul suave) */
+  --bg-pink: rgba(167, 139, 250, 0.55);   /* lila */
+  --bg-aqua: rgba(96, 165, 250, 0.45);   /* azul */
 
-  --accent-primary: #2ef176;
-  --accent-secondary: #a3e635;
-  --accent-soft: #d4f591;
-  --accent-sky: #90fdc7;
+  /* Accent (primario lila/azul + acento amarillo) */
+  --accent-primary: #6366f1;    /* indigo */
+  --accent-secondary: #3b82f6;  /* blue */
+  --accent-soft: #fde68a;       /* amarillo suave */
+  --accent-sky: #a78bfa;        /* lila */
 
   --surface: rgba(255, 255, 255, 0.85);
   --border-soft: rgba(255, 255, 255, 0.65);
@@ -51,7 +53,7 @@ body::before {
   inset: -5%;
   z-index: -2;
 
-  background-image: url("/bg-student-welcome-v2.png");
+  background-image: url("/bg/fondo-moderno.jpg");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -62,8 +64,14 @@ body::before {
 }
 
 body::after {
-  content: none;
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.55);
 }
+
 
 @keyframes plastic-float {
   0% {
@@ -323,6 +331,11 @@ html.dark body {
 }
 
 html.dark body::before {
+  opacity: 0 !important;
+  display: none !important;
+}
+
+html.dark body::after {
   opacity: 0 !important;
   display: none !important;
 }
