@@ -225,6 +225,33 @@ body.student-shell::before {
   box-shadow: 0 16px 36px rgba(99, 102, 241, 0.28);
 }
 
+.proctor-alert {
+  background: linear-gradient(135deg, rgba(191, 219, 254, 0.85), rgba(221, 214, 254, 0.85));
+  border: 1px solid rgba(148, 163, 255, 0.35);
+  box-shadow: 0 24px 60px rgba(99, 102, 241, 0.18);
+}
+
+.proctor-alert-title {
+  color: #1e3a8a;
+  font-weight: 800;
+}
+
+.proctor-alert-text {
+  color: rgba(30, 41, 59, 0.9);
+}
+
+.proctor-alert-hint {
+  color: rgba(99, 102, 241, 0.9);
+  background: rgba(253, 230, 138, 0.4);
+  border: 1px solid rgba(253, 230, 138, 0.6);
+}
+
+.proctor-alert-btn {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.85), rgba(167, 139, 250, 0.85), rgba(253, 230, 138, 0.85));
+  color: #1e293b;
+  box-shadow: 0 12px 28px rgba(99, 102, 241, 0.3);
+}
+
 /* =========================
    STUDENT BACKGROUNDS (STEP-BASED)
    - name: foto única
