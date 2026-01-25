@@ -79,6 +79,10 @@ export default function CalendarView({ exams }: Props) {
   const [editCustomColor, setEditCustomColor] = React.useState(
     sherbetColors[0]
   );
+  const [toastItems, setToastItems] = React.useState<
+    Array<{ id: string; title: string; body?: string }>
+  >([]);
+  const [notificationsEnabled, setNotificationsEnabled] = React.useState(false);
 
   const [hydrated, setHydrated] = React.useState(false);
   const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -200,6 +204,22 @@ export default function CalendarView({ exams }: Props) {
       setTaskColor(selectedColor);
     }
   }, [useCustomColor, selectedColor]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("calendar_notifications_enabled");
+    setNotificationsEnabled(stored === "true");
+  }, []);
+
+  React.useEffect(() => {
+    if (toastItems.length === 0) return;
+    const timers = toastItems.map((item) =>
+      window.setTimeout(() => {
+        setToastItems((prev) => prev.filter((t) => t.id !== item.id));
+      }, 3500)
+    );
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [toastItems]);
 
   // Cargar events + tasks 1 vez (backend con fallback a localStorage)
   React.useEffect(() => {
@@ -365,6 +385,11 @@ export default function CalendarView({ exams }: Props) {
       new Date(currentDate.getFullYear(), currentDate.getMonth() + delta, 1)
     );
   };
+  const goToday = () => {
+    const now = new Date();
+    setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    setSelectedDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+  };
 
   const monthText = currentDate.toLocaleDateString("es-ES", { month: "long" });
   const monthName = `${monthText.charAt(0).toUpperCase()}${monthText.slice(
@@ -376,71 +401,192 @@ export default function CalendarView({ exams }: Props) {
     year: "numeric",
   });
 
-  // Estilos (sin cambios)
   const styles = {
     container: {
-      background: isDark ? "#9ca3af" : "#ffffff",
-      borderRadius: "16px",
-      border: "1px solid #e5e7eb",
-      padding: "16px",
-      height: "auto",
+      background: "transparent",
+      borderRadius: 0,
+      border: "none",
+      padding: "18px",
+      height: "100%",
       display: "flex",
       flexDirection: "column" as const,
+      minHeight: "100%",
+      flex: 1,
+      overflow: "hidden",
     },
     header: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: "16px",
+      gap: "16px",
+      marginBottom: "12px",
+      flexWrap: "wrap" as const,
     },
-    title: {
-      fontSize: "20px",
+    headerLeft: {
+      display: "flex",
+      flexDirection: "column" as const,
+      gap: "2px",
+      minWidth: 0,
+    },
+    headerTitle: {
+      fontSize: "16px",
       fontWeight: 700,
       textTransform: "capitalize" as const,
+      color: "#111827",
     },
-    navBtn: {
-      background: "transparent",
-      border: "1px solid #e5e7eb",
-      borderRadius: "8px",
-      padding: "6px 12px",
+    headerSubtitle: {
+      fontSize: "12px",
+      color: "#6b7280",
+      marginTop: "2px",
+    },
+    headerActions: {
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+    },
+    headerRight: {
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+      flexWrap: "wrap" as const,
+      justifyContent: "flex-end",
+    },
+    navIconBtn: {
+      width: "34px",
+      height: "34px",
+      borderRadius: "10px",
+      border: "1px solid rgba(148,163,184,0.45)",
+      background: isDark ? "rgba(30,41,59,0.65)" : "rgba(255,255,255,0.7)",
       cursor: "pointer",
-      fontSize: "14px",
-      fontWeight: 500,
+      fontSize: "16px",
+      fontWeight: 600,
+    },
+    todayBtn: {
+      padding: "6px 12px",
+      borderRadius: "999px",
+      border: "1px solid rgba(148,163,184,0.5)",
+      background: isDark ? "rgba(30,41,59,0.65)" : "rgba(255,255,255,0.8)",
+      cursor: "pointer",
+      fontSize: "12px",
+      fontWeight: 600,
+    },
+    backBtn: {
+      padding: "6px 12px",
+      borderRadius: "999px",
+      border: "1px solid rgba(148,163,184,0.45)",
+      background: isDark ? "rgba(30,41,59,0.7)" : "rgba(255,255,255,0.8)",
+      cursor: "pointer",
+      fontSize: "12px",
+      fontWeight: 700,
+      color: isDark ? "#e2e8f0" : "#1f2937",
+    },
+    layout: {
+      display: "flex",
+      gap: "16px",
+      flex: 1,
+      minHeight: 0,
+    },
+    calendarPane: {
+      flex: 1,
+      minWidth: 0,
+      display: "flex",
+      flexDirection: "column" as const,
+      minHeight: 0,
+    },
+    sidePanel: {
+      width: "280px",
+      flexShrink: 0,
+      display: "flex",
+      flexDirection: "column" as const,
+      gap: "12px",
+      padding: "14px",
+      borderRadius: "12px",
+      border: "1px solid rgba(148,163,184,0.35)",
+      background: isDark ? "rgba(30,41,59,0.7)" : "rgba(255,255,255,0.7)",
+      boxShadow: "0 10px 24px rgba(148,163,184,0.25)",
+      alignSelf: "stretch",
+      height: "100%",
+      overflowY: "auto" as const,
+    },
+    panelSection: {
+      display: "flex",
+      flexDirection: "column" as const,
+      gap: "8px",
+    },
+    panelTitle: {
+      fontSize: "11px",
+      textTransform: "uppercase" as const,
+      letterSpacing: "0.08em",
+      color: "#6b7280",
+      fontWeight: 700,
     },
     viewTabs: {
       display: "flex",
-      gap: "8px",
+      gap: "6px",
+      flexWrap: "wrap" as const,
     },
     viewTab: (active: boolean) => ({
       padding: "6px 10px",
-      borderRadius: "8px",
-      border: active ? "1px solid #10b981" : "1px solid #e5e7eb",
-      background: active ? "#ecfdf5" : "transparent",
-      color: "#111",
+      borderRadius: "999px",
+      border: active
+        ? "1px solid rgba(99,102,241,0.6)"
+        : "1px solid rgba(148,163,184,0.35)",
+      background: active
+        ? "linear-gradient(135deg, rgba(191,219,254,0.7), rgba(221,214,254,0.7))"
+        : "rgba(255,255,255,0.6)",
+      color: "#1f2937",
       fontSize: "12px",
-      fontWeight: 600,
+      fontWeight: 700,
       cursor: "pointer",
     }),
     taskBtn: {
-      padding: "6px 12px",
+      padding: "8px 14px",
       borderRadius: "999px",
       border: "1px solid rgba(255,255,255,0.6)",
-      background: "linear-gradient(90deg, #bbf7d0, #fde68a, #fdba74)",
+      background: "linear-gradient(90deg, #bfdbfe, #e9d5ff, #fde68a)",
       color: "#1f2933",
       fontSize: "12px",
       fontWeight: 700,
       cursor: "pointer",
-      boxShadow: "0 6px 16px rgba(250, 204, 21, 0.35)",
+      boxShadow: "0 10px 20px rgba(191,219,254,0.4)",
+    },
+    notifyBtn: {
+      width: "36px",
+      height: "36px",
+      borderRadius: "12px",
+      border: "1px solid rgba(99, 102, 241, 0.25)",
+      background: "rgba(255,255,255,0.8)",
+      color: "#1f2937",
+      fontSize: "16px",
+      fontWeight: 600,
+      cursor: "pointer",
+    },
+    notifyBtnActive: {
+      border: "1px solid rgba(99, 102, 241, 0.6)",
+      background: "linear-gradient(135deg, rgba(191,219,254,0.8), rgba(221,214,254,0.8))",
+      color: "#111827",
+    },
+    panelRow: {
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+    },
+    panelHint: {
+      fontSize: "12px",
+      color: "#4b5563",
+      fontWeight: 600,
     },
     grid: {
       display: "grid",
       gridTemplateColumns: "repeat(7, 1fr)",
+      gridTemplateRows: "32px repeat(6, minmax(0, 1fr))",
       gap: "1px",
       background: "#e5e7eb",
       border: "1px solid #e5e7eb",
       borderRadius: "8px",
       overflow: "hidden",
       flex: 1,
+      minHeight: 0,
     },
     dayHeader: {
       background: "#f9fafb",
@@ -453,9 +599,12 @@ export default function CalendarView({ exams }: Props) {
     },
     dayCell: {
       background: isDark ? "#f3f4f6" : "white",
-      minHeight: "70px",
+      minHeight: 0,
+      height: "100%",
       padding: "6px",
       position: "relative" as const,
+      display: "flex",
+      flexDirection: "column" as const,
       cursor: "pointer",
       transition: "background 0.2s",
     },
@@ -478,11 +627,52 @@ export default function CalendarView({ exams }: Props) {
       textOverflow: "ellipsis",
       display: "block",
     },
+    monthItems: {
+      display: "flex",
+      flexDirection: "column" as const,
+      gap: 2,
+      flex: 1,
+      minHeight: 0,
+      overflow: "hidden",
+    },
+    monthItem: {
+      whiteSpace: "normal" as const,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      display: "-webkit-box",
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: "vertical" as const,
+      lineHeight: 1.2,
+      fontSize: "11px",
+    },
+    monthItemText: {
+      whiteSpace: "normal" as const,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      display: "-webkit-box",
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: "vertical" as const,
+      lineHeight: 1.2,
+      fontSize: "11px",
+      flex: 1,
+      minWidth: 0,
+    },
+    moreLabel: {
+      fontSize: "11px",
+      color: "#6b7280",
+      fontWeight: 600,
+      marginTop: "2px",
+    },
     dayPanel: {
       border: "1px solid #e5e7eb",
       borderRadius: "8px",
       padding: "12px",
       background: "#ffffff",
+      display: "flex",
+      flexDirection: "column" as const,
+      flex: 1,
+      minHeight: 0,
+      overflow: "auto" as const,
     },
     dayForm: {
       display: "flex",
@@ -513,10 +703,11 @@ export default function CalendarView({ exams }: Props) {
       borderBottom: "1px dashed #e5e7eb",
     },
     taskPanel: {
-      border: "1px solid #e5e7eb",
+      border: "1px solid rgba(148,163,184,0.5)",
       borderRadius: "12px",
       padding: "16px",
-      background: "linear-gradient(90deg, #bbf7d0, #fde68a, #fdba74)",
+      background:
+        "linear-gradient(135deg, rgba(191,219,254,0.95), rgba(221,214,254,0.95), rgba(254,240,138,0.85))",
       width: "100%",
       maxWidth: "420px",
       boxShadow: "0 18px 40px rgba(15, 23, 42, 0.2)",
@@ -551,7 +742,7 @@ export default function CalendarView({ exams }: Props) {
       marginTop: "10px",
     },
     taskInput: {
-      border: "1px solid #f9fcf8",
+      border: "1px solid rgba(148,163,184,0.35)",
       borderRadius: "8px",
       padding: "8px 10px",
       fontSize: "13px",
@@ -676,6 +867,32 @@ export default function CalendarView({ exams }: Props) {
       fontSize: "12px",
       opacity: 0.8,
     },
+    toastStack: {
+      position: "fixed" as const,
+      right: 24,
+      top: 24,
+      zIndex: 120,
+      display: "flex",
+      flexDirection: "column" as const,
+      gap: "8px",
+    },
+    toast: {
+      background: "linear-gradient(135deg, rgba(191,219,254,0.9), rgba(221,214,254,0.9))",
+      border: "1px solid rgba(148,163,184,0.4)",
+      color: "#1f2937",
+      borderRadius: "12px",
+      padding: "10px 12px",
+      minWidth: "220px",
+      boxShadow: "0 12px 30px rgba(99, 102, 241, 0.2)",
+      fontSize: "12px",
+      fontWeight: 600,
+    },
+    toastBody: {
+      marginTop: "4px",
+      fontSize: "11px",
+      fontWeight: 500,
+      color: "#374151",
+    },
   };
 
   const eventsByDay = React.useMemo(() => {
@@ -707,6 +924,8 @@ export default function CalendarView({ exams }: Props) {
     d.setDate(weekStart.getDate() + i);
     return d;
   });
+  const totalCells = startOffset + days;
+  const trailingCells = totalCells <= 42 ? 42 - totalCells : 0;
 
   const hours = React.useMemo(
     () => Array.from({ length: 13 }, (_, i) => 8 + i),
@@ -744,11 +963,13 @@ export default function CalendarView({ exams }: Props) {
   const deleteEvent = (id: string) => {
     if (!confirm("¿Eliminar este evento?")) return;
     setEvents((prev) => prev.filter((evt) => evt.id !== id));
+    notify("🗑️ Evento eliminado");
   };
 
   const deleteTask = (id: string) => {
     if (!confirm("¿Eliminar esta tarea?")) return;
     setTasks((prev) => prev.filter((task) => task.id !== id));
+    notify("🗑️ Tarea eliminada");
   };
 
   const saveEdit = () => {
@@ -788,6 +1009,77 @@ export default function CalendarView({ exams }: Props) {
     }
 
     setShowEditModal(false);
+    notify(
+      editType === "event" ? "✏️ Evento actualizado" : "✏️ Tarea actualizada",
+      title
+    );
+  };
+
+  const enqueueToast = (title: string, body?: string) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToastItems((prev) => [...prev, { id, title, body }]);
+  };
+
+  const requestNotificationPermission = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      enqueueToast("🔔 Notificaciones no disponibles");
+      return;
+    }
+    if (Notification.permission === "granted") {
+      enqueueToast("🔔 Notificaciones activadas");
+      return;
+    }
+    if (Notification.permission === "denied") {
+      enqueueToast("🔔 Permiso de notificaciones denegado");
+      return;
+    }
+    try {
+      const result = await Notification.requestPermission();
+      enqueueToast(
+        result === "granted"
+          ? "🔔 Notificaciones activadas"
+          : "🔔 Permiso de notificaciones denegado"
+      );
+    } catch {
+      enqueueToast("🔔 No se pudo solicitar permiso");
+    }
+  };
+
+  const handleNotificationToggle = async () => {
+    if (notificationsEnabled) {
+      setNotificationsEnabled(false);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("calendar_notifications_enabled", "false");
+      }
+      enqueueToast("🔕 Notificaciones desactivadas");
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("calendar_notifications_enabled", "false");
+    }
+    await requestNotificationPermission();
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission === "granted") {
+      setNotificationsEnabled(true);
+      window.localStorage.setItem("calendar_notifications_enabled", "true");
+    } else {
+      enqueueToast("🔔 Activá el permiso para usar notificaciones");
+    }
+  };
+
+  const notify = (title: string, body?: string) => {
+    enqueueToast(title, body);
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (!notificationsEnabled) return;
+    if (Notification.permission !== "granted") return;
+    if (document.visibilityState !== "visible") return;
+    // Base para push futuro: hoy solo notificación foreground sin service worker.
+    try {
+      new Notification(title, body ? { body } : undefined);
+    } catch {
+      // Silencioso; el toast ya informa.
+    }
   };
 
   const renderAgendaItem = (
@@ -844,6 +1136,7 @@ export default function CalendarView({ exams }: Props) {
     setEvents((prev) => [...prev, newEvent]);
     setNewEventTitle("");
     setNewEventTime("");
+    notify("📌 Evento creado", title);
   };
 
   const saveTask = () => {
@@ -860,167 +1153,150 @@ export default function CalendarView({ exams }: Props) {
     setTasks((prev) => [...prev, newTask]);
     setTaskTitle("");
     setTaskTime("");
+    setShowTaskForm(false);
+    const timeText = taskTime.trim() ? ` · ${taskTime.trim()}` : "";
+    notify("✅ Tarea creada", `${title}${timeText}`);
   };
 
   return (
     <div style={styles.container}>
-      {/* Header */}
+      {toastItems.length > 0 && (
+        <div style={styles.toastStack}>
+          {toastItems.map((toast) => (
+            <div key={toast.id} style={styles.toast}>
+              {toast.title}
+              {toast.body && <div style={styles.toastBody}>{toast.body}</div>}
+            </div>
+          ))}
+        </div>
+      )}
       <div style={styles.header}>
-        <h2 style={styles.title}>{monthName}</h2>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button style={styles.navBtn} onClick={() => changeMonth(-1)}>
-            ← Anterior
+        <div style={styles.headerLeft}>
+          <div style={styles.headerTitle}>{monthName}</div>
+          <div style={styles.headerSubtitle}>Calendario</div>
+        </div>
+        <div style={styles.headerActions}>
+          <button
+            style={styles.navIconBtn}
+            onClick={() => changeMonth(-1)}
+            aria-label="Mes anterior"
+          >
+            ‹
           </button>
-          <button style={styles.navBtn} onClick={() => changeMonth(1)}>
-            Siguiente →
+          <button style={styles.todayBtn} onClick={goToday}>
+            Hoy
+          </button>
+          <button
+            style={styles.navIconBtn}
+            onClick={() => changeMonth(1)}
+            aria-label="Mes siguiente"
+          >
+            ›
+          </button>
+        </div>
+        <div style={styles.headerRight}>
+          <button style={styles.backBtn} onClick={() => router.push("/t")}>
+            Volver
           </button>
         </div>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 12,
-        }}
-      >
-        <div style={styles.viewTabs}>
-          <button
-            style={styles.viewTab(viewMode === "day")}
-            onClick={() => setViewMode("day")}
-          >
-            Día
-          </button>
-          <button
-            style={styles.viewTab(viewMode === "week")}
-            onClick={() => setViewMode("week")}
-          >
-            Semana
-          </button>
-          <button
-            style={styles.viewTab(viewMode === "month")}
-            onClick={() => setViewMode("month")}
-          >
-            Mes
-          </button>
-          <button
-            style={styles.taskBtn}
-            onClick={() => {
-              setTaskDate(selectedDateKey);
-              setShowTaskForm((prev) => !prev);
-            }}
-          >
-            Tarea +
-          </button>
-        </div>
-        <div style={{ fontSize: 13, color: "#6b7280" }}>{selectedDateLabel}</div>
-      </div>
-
-      <div style={styles.paletteRow}>
-        <span style={styles.paletteLabel}>Colores sugeridos</span>
-        {sherbetColors.map((color) => (
-          <button
-            key={color}
-            type="button"
-            aria-label={`Seleccionar color ${color}`}
-            style={styles.paletteDot(!useCustomColor && selectedColor === color, color)}
-            onClick={() => {
-              setSelectedColor(color);
-              setUseCustomColor(false);
-            }}
-          />
-        ))}
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-          <input
-            type="checkbox"
-            checked={useCustomColor}
-            onChange={(e) => setUseCustomColor(e.target.checked)}
-          />
-          Color personalizado
-        </label>
-        {useCustomColor && (
-          <input
-            type="color"
-            value={taskColor}
-            onChange={(e) => setTaskColor(e.target.value)}
-            style={{ width: 36, height: 28, border: "1px solid #e5e7eb" }}
-          />
-        )}
-      </div>
-
-      {showTaskForm && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.taskPanel}>
-            <div style={styles.modalHeader}>
-              <div style={{ fontWeight: 600 }}>Nueva tarea</div>
+      <div style={styles.layout}>
+        <aside style={styles.sidePanel}>
+          <div style={styles.panelSection}>
+            <div style={styles.panelTitle}>Vista</div>
+            <div style={styles.viewTabs}>
               <button
-                style={styles.closeBtn}
-                onClick={() => setShowTaskForm(false)}
-                aria-label="Cerrar"
+                style={styles.viewTab(viewMode === "day")}
+                onClick={() => setViewMode("day")}
               >
-                ✕
+                Día
               </button>
-            </div>
-            <div style={styles.taskGrid}>
-              <input
-                style={styles.taskInput}
-                type="date"
-                value={taskDate}
-                onChange={(e) => setTaskDate(e.target.value)}
-              />
-              <input
-                style={styles.taskInput}
-                type="time"
-                value={taskTime}
-                onChange={(e) => setTaskTime(e.target.value)}
-              />
-              <input
-                style={{ ...styles.taskInput, ...styles.taskFull }}
-                placeholder="Nombre de la tarea"
-                value={taskTitle}
-                onChange={(e) => setTaskTitle(e.target.value)}
-              />
-              <div
-                style={{
-                  ...styles.taskFull,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
+              <button
+                style={styles.viewTab(viewMode === "week")}
+                onClick={() => setViewMode("week")}
               >
-                <span style={{ fontSize: 12, color: "#292a2c" }}>🎨 Color</span>
-                {!useCustomColor && (
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {sherbetColors.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        style={styles.paletteDot(selectedColor === color, color)}
-                        onClick={() => setSelectedColor(color)}
-                        aria-label={`Seleccionar color ${color}`}
-                      />
-                    ))}
-                  </div>
-                )}
-                {useCustomColor && (
-                  <input
-                    style={styles.taskInput}
-                    type="color"
-                    value={taskColor}
-                    onChange={(e) => setTaskColor(e.target.value)}
-                  />
-                )}
-              </div>
-            </div>
-            <div style={styles.taskActions}>
-              <button style={styles.taskSave} onClick={saveTask}>
-                Guardar tarea
+                Semana
+              </button>
+              <button
+                style={styles.viewTab(viewMode === "month")}
+                onClick={() => setViewMode("month")}
+              >
+                Mes
               </button>
             </div>
           </div>
-        </div>
-      )}
+
+          <div style={styles.panelSection}>
+            <div style={styles.panelTitle}>Acciones</div>
+            <button
+              style={styles.taskBtn}
+              onClick={() => {
+                setTaskDate(selectedDateKey);
+                setShowTaskForm((prev) => !prev);
+              }}
+            >
+              Tarea +
+            </button>
+          </div>
+
+          <div style={styles.panelSection}>
+            <div style={styles.panelTitle}>Colores</div>
+            <div style={styles.paletteRow}>
+              {sherbetColors.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  aria-label={`Seleccionar color ${color}`}
+                  style={styles.paletteDot(
+                    !useCustomColor && selectedColor === color,
+                    color
+                  )}
+                  onClick={() => {
+                    setSelectedColor(color);
+                    setUseCustomColor(false);
+                  }}
+                />
+              ))}
+            </div>
+            <label
+              style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}
+            >
+              <input
+                type="checkbox"
+                checked={useCustomColor}
+                onChange={(e) => setUseCustomColor(e.target.checked)}
+              />
+              Color personalizado
+            </label>
+            {useCustomColor && (
+              <input
+                type="color"
+                value={taskColor}
+                onChange={(e) => setTaskColor(e.target.value)}
+                style={{ width: 36, height: 28, border: "1px solid #e5e7eb" }}
+              />
+            )}
+          </div>
+
+          <div style={styles.panelSection}>
+            <div style={styles.panelRow}>
+              <button
+                style={{
+                  ...styles.notifyBtn,
+                  ...(notificationsEnabled ? styles.notifyBtnActive : {}),
+                }}
+                onClick={handleNotificationToggle}
+                aria-label="Notificaciones"
+                title="Notificaciones"
+              >
+                {notificationsEnabled ? "🔔" : "🔕"}
+              </button>
+              <span style={styles.panelHint}>Notificaciones</span>
+            </div>
+          </div>
+        </aside>
+        <div style={styles.calendarPane}>
 
       {showEditModal && (
         <div style={styles.modalOverlay}>
@@ -1151,108 +1427,152 @@ export default function CalendarView({ exams }: Props) {
               >
                 <div style={styles.dayNumber}>{dayNum}</div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  {dayExams.map((ex) => (
-                    <span
-                      key={ex.id}
-                      style={styles.eventDot}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/t/${ex.code}`);
-                      }}
-                      title={`${ex.title} (${ex.status})`}
-                    >
-                      {ex.title}
-                    </span>
-                  ))}
+                <div style={styles.monthItems}>
+                  {(() => {
+                    const monthItems = [
+                      ...dayExams.map((ex) => ({
+                        kind: "exam",
+                        id: ex.id,
+                        data: ex,
+                      })),
+                      ...dayEvents.map((evt) => ({
+                        kind: "event",
+                        id: evt.id,
+                        data: evt,
+                      })),
+                      ...dayTasks.map((task) => ({
+                        kind: "task",
+                        id: task.id,
+                        data: task,
+                      })),
+                    ];
+                    const maxItems = 3;
+                    const visibleItems = monthItems.slice(0, maxItems);
+                    const hiddenCount = monthItems.length - visibleItems.length;
 
-                  {dayEvents.map((evt) => (
-                    <div
-                      key={evt.id}
-                      style={{
-                        ...styles.eventDot,
-                        background: resolveColor(evt.color),
-                        color: "#1f2937",
-                        borderLeft: `2px solid ${resolveColor(evt.color)}`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 6,
-                      }}
-                    >
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {evt.time ? `${evt.time} · ${evt.title}` : evt.title}
-                      </span>
-                      <span style={styles.agendaActions}>
-                        <button
-                          style={styles.actionBtn}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditModal(evt, "event");
-                          }}
-                          aria-label="Editar evento"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          style={styles.actionBtn}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteEvent(evt.id);
-                          }}
-                          aria-label="Borrar evento"
-                        >
-                          🗑️
-                        </button>
-                      </span>
-                    </div>
-                  ))}
-
-                  {dayTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      style={{
-                        ...styles.eventDot,
-                        background: task.color,
-                        color: "#1f2937",
-                        borderLeft: `2px solid ${task.color}`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 6,
-                      }}
-                    >
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {task.time ? `${task.time} · ${task.title}` : task.title}
-                      </span>
-                      <span style={styles.agendaActions}>
-                        <button
-                          style={styles.actionBtn}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditModal(task, "task");
-                          }}
-                          aria-label="Editar tarea"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          style={styles.actionBtn}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteTask(task.id);
-                          }}
-                          aria-label="Borrar tarea"
-                        >
-                          🗑️
-                        </button>
-                      </span>
-                    </div>
-                  ))}
+                    return (
+                      <>
+                        {visibleItems.map((item) => {
+                          if (item.kind === "exam") {
+                            const ex = item.data as ExamListItem;
+                            return (
+                              <span
+                                key={`exam-${ex.id}`}
+                                style={{ ...styles.eventDot, ...styles.monthItem }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/t/${ex.code}`);
+                                }}
+                                title={`${ex.title} (${ex.status})`}
+                              >
+                                {ex.title}
+                              </span>
+                            );
+                          }
+                          if (item.kind === "event") {
+                            const evt = item.data as CalendarEvent;
+                            return (
+                              <div
+                                key={`event-${evt.id}`}
+                                style={{
+                                  ...styles.eventDot,
+                                  background: resolveColor(evt.color),
+                                  color: "#1f2937",
+                                  borderLeft: `2px solid ${resolveColor(evt.color)}`,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  gap: 6,
+                                }}
+                              >
+                                <span style={styles.monthItemText}>
+                                  {evt.time ? `${evt.time} · ${evt.title}` : evt.title}
+                                </span>
+                                <span style={styles.agendaActions}>
+                                  <button
+                                    style={styles.actionBtn}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditModal(evt, "event");
+                                    }}
+                                    aria-label="Editar evento"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    style={styles.actionBtn}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteEvent(evt.id);
+                                    }}
+                                    aria-label="Borrar evento"
+                                  >
+                                    🗑️
+                                  </button>
+                                </span>
+                              </div>
+                            );
+                          }
+                          const task = item.data as CalendarTask;
+                          return (
+                            <div
+                              key={`task-${task.id}`}
+                              style={{
+                                ...styles.eventDot,
+                                background: task.color,
+                                color: "#1f2937",
+                                borderLeft: `2px solid ${task.color}`,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 6,
+                              }}
+                            >
+                              <span style={styles.monthItemText}>
+                                {task.time ? `${task.time} · ${task.title}` : task.title}
+                              </span>
+                              <span style={styles.agendaActions}>
+                                <button
+                                  style={styles.actionBtn}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditModal(task, "task");
+                                  }}
+                                  aria-label="Editar tarea"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  style={styles.actionBtn}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteTask(task.id);
+                                  }}
+                                  aria-label="Borrar tarea"
+                                >
+                                  🗑️
+                                </button>
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {hiddenCount > 0 && (
+                          <div style={styles.moreLabel}>+{hiddenCount} más</div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             );
           })}
+
+          {Array.from({ length: trailingCells }).map((_, i) => (
+            <div
+              key={`trailing-${i}`}
+              style={{ background: isDark ? "#f3f4f6" : "white" }}
+            />
+          ))}
         </div>
       )}
 
@@ -1433,6 +1753,81 @@ export default function CalendarView({ exams }: Props) {
               </div>
             </>
           )}
+        </div>
+      )}
+        </div>
+      </div>
+
+      {showTaskForm && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.taskPanel}>
+            <div style={styles.modalHeader}>
+              <div style={{ fontWeight: 600 }}>Nueva tarea</div>
+              <button
+                style={styles.closeBtn}
+                onClick={() => setShowTaskForm(false)}
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+            <div style={styles.taskGrid}>
+              <input
+                style={styles.taskInput}
+                type="date"
+                value={taskDate}
+                onChange={(e) => setTaskDate(e.target.value)}
+              />
+              <input
+                style={styles.taskInput}
+                type="time"
+                value={taskTime}
+                onChange={(e) => setTaskTime(e.target.value)}
+              />
+              <input
+                style={{ ...styles.taskInput, ...styles.taskFull }}
+                placeholder="Nombre de la tarea"
+                value={taskTitle}
+                onChange={(e) => setTaskTitle(e.target.value)}
+              />
+              <div
+                style={{
+                  ...styles.taskFull,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <span style={{ fontSize: 12, color: "#292a2c" }}>🎨 Color</span>
+                {!useCustomColor && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {sherbetColors.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        style={styles.paletteDot(selectedColor === color, color)}
+                        onClick={() => setSelectedColor(color)}
+                        aria-label={`Seleccionar color ${color}`}
+                      />
+                    ))}
+                  </div>
+                )}
+                {useCustomColor && (
+                  <input
+                    style={styles.taskInput}
+                    type="color"
+                    value={taskColor}
+                    onChange={(e) => setTaskColor(e.target.value)}
+                  />
+                )}
+              </div>
+            </div>
+            <div style={styles.taskActions}>
+              <button style={styles.taskSave} onClick={saveTask}>
+                Guardar tarea
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
