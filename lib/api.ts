@@ -1,7 +1,11 @@
-// URL base de la API. En .env.local deberías tener:
-// NEXT_PUBLIC_API_URL=http://localhost:3001/api
-export const API =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
+// URL base de la API. En .env.local deberias tener:
+// NEXT_PUBLIC_API_URL=http://localhost:3001
+export const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001").replace(
+  /\/$/,
+  ""
+);
+export const API = `${API_BASE}/api`;
+
 
 export async function patchAttemptLives(
   id: string,

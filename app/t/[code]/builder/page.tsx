@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 
-const API = process.env.NEXT_PUBLIC_API_URL!; // ej: http://localhost:3001/api
+import { API } from "@/lib/api";
 
 type QuestionKind = "MCQ" | "TRUE_FALSE" | "SHORT_TEXT" | "FILL_IN";
 
