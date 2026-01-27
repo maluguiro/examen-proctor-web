@@ -459,3 +459,49 @@ html.dark ::-webkit-scrollbar-thumb {
   background: #334155;
   border: 3px solid #0f172a;
 }
+
+/* Calendar pill accent button */
+.btn-pill-accent {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: linear-gradient(90deg, #bfdbfe, #e9d5ff, #fde68a);
+  color: #1f2933;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(191, 219, 254, 0.4);
+}
+
+html.dark .btn-pill-accent {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Calendar grid contrast */
+.calendar-grid {
+  background-color: #e5e7eb;
+  border-color: #e5e7eb;
+}
+
+.calendar-grid-header {
+  background-color: #f9fafb;
+  color: #6b7280;
+}
+
+.calendar-grid-cell {
+  background-color: #ffffff;
+}
+
+html.dark .calendar-grid {
+  background-color: #334155;
+  border-color: #334155;
+}
+
+html.dark .calendar-grid-header {
+  background-color: #1f2937;
+  color: #cbd5e1;
+}
+
+html.dark .calendar-grid-cell {
+  background-color: #0f172a;
+}

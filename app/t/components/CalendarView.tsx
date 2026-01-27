@@ -395,6 +395,13 @@ export default function CalendarView({ exams }: Props) {
   const monthName = `${monthText.charAt(0).toUpperCase()}${monthText.slice(
     1
   )} del ${currentDate.getFullYear()}`;
+  const monthYearText = currentDate.toLocaleDateString("es-ES", {
+    month: "long",
+    year: "numeric",
+  });
+  const monthYearLabel = `${monthYearText.charAt(0).toUpperCase()}${monthYearText.slice(
+    1
+  )}`;
   const selectedDateLabel = selectedDate.toLocaleDateString("es-ES", {
     day: "numeric",
     month: "long",
@@ -429,14 +436,13 @@ export default function CalendarView({ exams }: Props) {
       minWidth: 0,
     },
     headerTitle: {
-      fontSize: "16px",
+      fontSize: "22px",
       fontWeight: 700,
-      textTransform: "capitalize" as const,
-      color: "#111827",
+      color: isDark ? "#e2e8f0" : "#111827",
     },
     headerSubtitle: {
       fontSize: "12px",
-      color: "#6b7280",
+      color: isDark ? "#cbd5e1" : "#6b7280",
       marginTop: "2px",
     },
     headerActions: {
@@ -457,28 +463,10 @@ export default function CalendarView({ exams }: Props) {
       borderRadius: "10px",
       border: "1px solid rgba(148,163,184,0.45)",
       background: isDark ? "rgba(30,41,59,0.65)" : "rgba(255,255,255,0.7)",
+      color: isDark ? "#ffffff" : "#111827",
       cursor: "pointer",
       fontSize: "16px",
       fontWeight: 600,
-    },
-    todayBtn: {
-      padding: "6px 12px",
-      borderRadius: "999px",
-      border: "1px solid rgba(148,163,184,0.5)",
-      background: isDark ? "rgba(30,41,59,0.65)" : "rgba(255,255,255,0.8)",
-      cursor: "pointer",
-      fontSize: "12px",
-      fontWeight: 600,
-    },
-    backBtn: {
-      padding: "6px 12px",
-      borderRadius: "999px",
-      border: "1px solid rgba(148,163,184,0.45)",
-      background: isDark ? "rgba(30,41,59,0.7)" : "rgba(255,255,255,0.8)",
-      cursor: "pointer",
-      fontSize: "12px",
-      fontWeight: 700,
-      color: isDark ? "#e2e8f0" : "#1f2937",
     },
     layout: {
       display: "flex",
@@ -517,7 +505,7 @@ export default function CalendarView({ exams }: Props) {
       fontSize: "11px",
       textTransform: "uppercase" as const,
       letterSpacing: "0.08em",
-      color: "#6b7280",
+      color: isDark ? "#cbd5e1" : "#6b7280",
       fontWeight: 700,
     },
     viewTabs: {
@@ -533,30 +521,21 @@ export default function CalendarView({ exams }: Props) {
         : "1px solid rgba(148,163,184,0.35)",
       background: active
         ? "linear-gradient(135deg, rgba(191,219,254,0.7), rgba(221,214,254,0.7))"
-        : "rgba(255,255,255,0.6)",
-      color: "#1f2937",
+        : isDark
+          ? "rgba(15,23,42,0.6)"
+          : "rgba(255,255,255,0.6)",
+      color: isDark ? "#e2e8f0" : "#1f2937",
       fontSize: "12px",
       fontWeight: 700,
       cursor: "pointer",
     }),
-    taskBtn: {
-      padding: "8px 14px",
-      borderRadius: "999px",
-      border: "1px solid rgba(255,255,255,0.6)",
-      background: "linear-gradient(90deg, #bfdbfe, #e9d5ff, #fde68a)",
-      color: "#1f2933",
-      fontSize: "12px",
-      fontWeight: 700,
-      cursor: "pointer",
-      boxShadow: "0 10px 20px rgba(191,219,254,0.4)",
-    },
     notifyBtn: {
       width: "36px",
       height: "36px",
       borderRadius: "12px",
       border: "1px solid rgba(99, 102, 241, 0.25)",
-      background: "rgba(255,255,255,0.8)",
-      color: "#1f2937",
+      background: isDark ? "rgba(30,41,59,0.8)" : "rgba(255,255,255,0.8)",
+      color: isDark ? "#e2e8f0" : "#1f2937",
       fontSize: "16px",
       fontWeight: 600,
       cursor: "pointer",
@@ -573,7 +552,7 @@ export default function CalendarView({ exams }: Props) {
     },
     panelHint: {
       fontSize: "12px",
-      color: "#4b5563",
+      color: isDark ? "#cbd5e1" : "#4b5563",
       fontWeight: 600,
     },
     grid: {
@@ -581,24 +560,24 @@ export default function CalendarView({ exams }: Props) {
       gridTemplateColumns: "repeat(7, 1fr)",
       gridTemplateRows: "32px repeat(6, minmax(0, 1fr))",
       gap: "1px",
-      background: "#e5e7eb",
-      border: "1px solid #e5e7eb",
+      background: isDark ? "#334155" : "#e5e7eb",
+      border: isDark ? "1px solid #334155" : "1px solid #e5e7eb",
       borderRadius: "8px",
       overflow: "hidden",
       flex: 1,
       minHeight: 0,
     },
     dayHeader: {
-      background: "#f9fafb",
+      background: isDark ? "#1f2937" : "#f9fafb",
       padding: "8px",
       textAlign: "center" as const,
       fontSize: "12px",
       fontWeight: 600,
-      color: "#6b7280",
+      color: isDark ? "#cbd5e1" : "#6b7280",
       textTransform: "uppercase" as const,
     },
     dayCell: {
-      background: isDark ? "#f3f4f6" : "white",
+      background: isDark ? "#0f172a" : "white",
       minHeight: 0,
       height: "100%",
       padding: "6px",
@@ -610,8 +589,6 @@ export default function CalendarView({ exams }: Props) {
     },
     dayNumber: {
       fontSize: "14px",
-      fontWeight: 600,
-      color: "#374151",
       marginBottom: "4px",
     },
     eventDot: {
@@ -659,15 +636,15 @@ export default function CalendarView({ exams }: Props) {
     },
     moreLabel: {
       fontSize: "11px",
-      color: "#6b7280",
+      color: isDark ? "#cbd5e1" : "#6b7280",
       fontWeight: 600,
       marginTop: "2px",
     },
     dayPanel: {
-      border: "1px solid #e5e7eb",
+      border: isDark ? "1px solid #334155" : "1px solid #e5e7eb",
       borderRadius: "8px",
       padding: "12px",
-      background: "#ffffff",
+      background: isDark ? "#0f172a" : "#ffffff",
       display: "flex",
       flexDirection: "column" as const,
       flex: 1,
@@ -681,15 +658,17 @@ export default function CalendarView({ exams }: Props) {
     },
     input: {
       flex: 1,
-      border: "1px solid #e5e7eb",
+      border: isDark ? "1px solid #334155" : "1px solid #e5e7eb",
       borderRadius: "8px",
       padding: "8px 10px",
       fontSize: "13px",
+      background: isDark ? "rgba(15,23,42,0.6)" : "white",
+      color: isDark ? "#e2e8f0" : "#111827",
     },
     addBtn: {
-      border: "1px solid #10b981",
-      background: "#ecfdf5",
-      color: "#065f46",
+      border: "1px solid rgba(16,185,129,0.6)",
+      background: isDark ? "rgba(16,185,129,0.15)" : "#ecfdf5",
+      color: isDark ? "#a7f3d0" : "#065f46",
       borderRadius: "8px",
       padding: "8px 12px",
       fontWeight: 600,
@@ -698,9 +677,9 @@ export default function CalendarView({ exams }: Props) {
     },
     eventItem: {
       fontSize: "13px",
-      color: "#111",
+      color: isDark ? "#e2e8f0" : "#111",
       padding: "6px 0",
-      borderBottom: "1px dashed #e5e7eb",
+      borderBottom: isDark ? "1px dashed #334155" : "1px dashed #e5e7eb",
     },
     taskPanel: {
       border: "1px solid rgba(148,163,184,0.5)",
@@ -733,7 +712,7 @@ export default function CalendarView({ exams }: Props) {
       background: "transparent",
       fontSize: "16px",
       cursor: "pointer",
-      color: "#6b7280",
+      color: isDark ? "#cbd5e1" : "#6b7280",
     },
     taskGrid: {
       display: "grid",
@@ -742,10 +721,14 @@ export default function CalendarView({ exams }: Props) {
       marginTop: "10px",
     },
     taskInput: {
-      border: "1px solid rgba(148,163,184,0.35)",
+      border: isDark
+        ? "1px solid rgba(148,163,184,0.35)"
+        : "1px solid rgba(148,163,184,0.35)",
       borderRadius: "8px",
       padding: "8px 10px",
       fontSize: "13px",
+      background: isDark ? "rgba(15,23,42,0.55)" : "white",
+      color: isDark ? "#e2e8f0" : "#111827",
     },
     taskFull: {
       gridColumn: "1 / -1",
@@ -757,9 +740,9 @@ export default function CalendarView({ exams }: Props) {
       marginTop: "10px",
     },
     taskSave: {
-      border: "1px solid #10b981",
-      background: "#ecfdf5",
-      color: "#065f46",
+      border: "1px solid rgba(16,185,129,0.6)",
+      background: isDark ? "rgba(16,185,129,0.15)" : "#ecfdf5",
+      color: isDark ? "#a7f3d0" : "#065f46",
       borderRadius: "8px",
       padding: "8px 12px",
       fontWeight: 600,
@@ -785,7 +768,7 @@ export default function CalendarView({ exams }: Props) {
     paletteLabel: {
       fontSize: "12px",
       fontWeight: 600,
-      color: "#4b5563",
+      color: isDark ? "#cbd5e1" : "#4b5563",
     },
     agendaHeader: {
       display: "grid",
@@ -796,7 +779,7 @@ export default function CalendarView({ exams }: Props) {
     agendaHeaderCell: {
       fontSize: "11px",
       fontWeight: 700,
-      color: "#6b7280",
+      color: isDark ? "#cbd5e1" : "#6b7280",
       textTransform: "uppercase" as const,
       letterSpacing: "0.02em",
     },
@@ -812,7 +795,7 @@ export default function CalendarView({ exams }: Props) {
     },
     timeCell: {
       fontSize: "11px",
-      color: "#6b7280",
+      color: isDark ? "#cbd5e1" : "#6b7280",
       textAlign: "right" as const,
       paddingRight: "8px",
       height: "54px",
@@ -833,8 +816,10 @@ export default function CalendarView({ exams }: Props) {
       minHeight: "48px",
     },
     hourCell: {
-      background: "rgba(255,255,255,0.7)",
-      border: "1px solid rgba(148,163,184,0.25)",
+      background: isDark ? "rgba(15,23,42,0.7)" : "rgba(255,255,255,0.7)",
+      border: isDark
+        ? "1px solid rgba(148,163,184,0.35)"
+        : "1px solid rgba(148,163,184,0.25)",
       borderRadius: "10px",
       padding: "6px",
       minHeight: "54px",
@@ -851,9 +836,9 @@ export default function CalendarView({ exams }: Props) {
       borderRadius: "8px",
       fontSize: "11px",
       fontWeight: 600,
-      color: "#1f2937",
-      background: "rgba(255,255,255,0.85)",
-      border: "1px solid rgba(0,0,0,0.05)",
+      color: isDark ? "#e2e8f0" : "#1f2937",
+      background: isDark ? "rgba(30,41,59,0.85)" : "rgba(255,255,255,0.85)",
+      border: isDark ? "1px solid rgba(148,163,184,0.25)" : "1px solid rgba(0,0,0,0.05)",
     },
     agendaActions: {
       display: "flex",
@@ -1259,8 +1244,7 @@ export default function CalendarView({ exams }: Props) {
       )}
       <div style={styles.header}>
         <div style={styles.headerLeft}>
-          <div style={styles.headerTitle}>{monthName}</div>
-          <div style={styles.headerSubtitle}>Calendario</div>
+          <div style={styles.headerTitle}>Calendario</div>
         </div>
         <div style={styles.headerActions}>
           <button
@@ -1270,8 +1254,8 @@ export default function CalendarView({ exams }: Props) {
           >
             ‹
           </button>
-          <button style={styles.todayBtn} onClick={goToday}>
-            Hoy
+          <button className="btn-pill-accent" onClick={goToday}>
+            {monthYearLabel}
           </button>
           <button
             style={styles.navIconBtn}
@@ -1282,7 +1266,7 @@ export default function CalendarView({ exams }: Props) {
           </button>
         </div>
         <div style={styles.headerRight}>
-          <button style={styles.backBtn} onClick={() => router.push("/t")}>
+          <button className="btn-pill-accent" onClick={() => router.back()}>
             Volver
           </button>
         </div>
@@ -1317,7 +1301,7 @@ export default function CalendarView({ exams }: Props) {
           <div style={styles.panelSection}>
             <div style={styles.panelTitle}>Acciones</div>
             <button
-              style={styles.taskBtn}
+              className="btn-pill-accent"
               onClick={() => {
                 setTaskDate(selectedDateKey);
                 setShowTaskForm((prev) => !prev);
@@ -1348,6 +1332,7 @@ export default function CalendarView({ exams }: Props) {
             </div>
             <label
               style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}
+              className="text-slate-600 dark:text-slate-200"
             >
               <input
                 type="checkbox"
@@ -1450,7 +1435,10 @@ export default function CalendarView({ exams }: Props) {
                     onChange={(e) => setEditCustomColor(e.target.value)}
                   />
                 )}
-                <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <label
+                  style={{ display: "flex", alignItems: "center", gap: 6 }}
+                  className="text-slate-600 dark:text-slate-200"
+                >
                   <input
                     type="checkbox"
                     checked={editUseCustomColor}
@@ -1470,9 +1458,9 @@ export default function CalendarView({ exams }: Props) {
       )}
 
       {viewMode === "month" && (
-        <div style={styles.grid}>
+        <div style={styles.grid} className="calendar-grid">
           {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
-            <div key={d} style={styles.dayHeader}>
+            <div key={d} style={styles.dayHeader} className="calendar-grid-header">
               {d}
             </div>
           ))}
@@ -1505,14 +1493,22 @@ export default function CalendarView({ exams }: Props) {
               <div
                 key={dayNum}
                 style={{ ...styles.dayCell, background: dayBackground }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#f0fdf4")}
+                className="calendar-grid-cell"
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = isDark ? "#1e293b" : "#f0fdf4")
+                }
                 onMouseLeave={(e) => (e.currentTarget.style.background = dayBackground)}
                 onClick={() => {
                   setSelectedDate(cellDate);
                   setViewMode("day");
                 }}
               >
-                <div style={styles.dayNumber}>{dayNum}</div>
+                <div
+                  style={styles.dayNumber}
+                  className="text-slate-600 dark:text-slate-200 font-semibold"
+                >
+                  {dayNum}
+                </div>
 
                 <div style={styles.monthItems}>
                   {(() => {
@@ -1576,7 +1572,7 @@ export default function CalendarView({ exams }: Props) {
                                 style={{
                                   ...styles.eventDot,
                                   background: resolveColor(evt.color),
-                                  color: "#1f2937",
+                                  color: isDark ? "#e2e8f0" : "#1f2937",
                                   borderLeft: `2px solid ${resolveColor(evt.color)}`,
                                   display: "flex",
                                   alignItems: "center",
@@ -1619,7 +1615,7 @@ export default function CalendarView({ exams }: Props) {
                               style={{
                                 ...styles.eventDot,
                                 background: task.color,
-                                color: "#1f2937",
+                                color: isDark ? "#e2e8f0" : "#1f2937",
                                 borderLeft: `2px solid ${task.color}`,
                                 display: "flex",
                                 alignItems: "center",
