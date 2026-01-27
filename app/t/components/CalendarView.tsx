@@ -927,18 +927,105 @@ export default function CalendarView({ exams }: Props) {
   const totalCells = startOffset + days;
   const trailingCells = totalCells <= 42 ? 42 - totalCells : 0;
 
-  const hours = React.useMemo(
-    () => Array.from({ length: 13 }, (_, i) => 8 + i),
-    []
-  );
+  const hours = React.useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
 
   const formatHour = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
 
-  const parseHour = (time?: string) => {
-    if (!time) return null;
-    const [h] = time.split(":");
+  const normalizeTimeStr = (value?: string | null) => {
+    if (!value) return null;
+    const raw = value.trim();
+    if (!raw) return null;
+    const isoMatch = raw.match(/T(\d{1,2}):(\d{2})/);
+    const candidate = isoMatch ? `${isoMatch[1]}:${isoMatch[2]}` : raw;
+    const match = candidate.match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+    return `${match[1].padStart(2, "0")}:${match[2]}`;
+  };
+  const parseTimeToMinutes = (time?: string | null) => {
+    const normalized = normalizeTimeStr(time);
+    if (!normalized) return null;
+    const [h, m] = normalized.split(":");
     const hour = Number(h);
-    return Number.isNaN(hour) ? null : hour;
+    const minutes = Number(m);
+    if (
+      Number.isNaN(hour) ||
+      Number.isNaN(minutes) ||
+      hour < 0 ||
+      hour > 23 ||
+      minutes < 0 ||
+      minutes > 59
+    ) {
+      return null;
+    }
+    return hour * 60 + minutes;
+  };
+  const getEventTimeCandidate = (event: CalendarEvent) => {
+    const source = event as CalendarEvent & {
+      startTime?: string;
+      startAt?: string;
+      dateTime?: string;
+    };
+    return source.time || source.startTime || source.startAt || source.dateTime || null;
+  };
+  const getTaskTimeCandidate = (task: CalendarTask) => {
+    const source = task as CalendarTask & {
+      dueTime?: string;
+      at?: string;
+      startTime?: string;
+      dueAt?: string;
+      dateTime?: string;
+    };
+    return (
+      source.time ||
+      source.dueTime ||
+      source.at ||
+      source.startTime ||
+      source.dueAt ||
+      source.dateTime ||
+      null
+    );
+  };
+  const getRenderItemTime = (renderItem: {
+    type: "event" | "task";
+    item: CalendarEvent | CalendarTask;
+  }) =>
+    renderItem.type === "event"
+      ? getEventTimeCandidate(renderItem.item as CalendarEvent)
+      : getTaskTimeCandidate(renderItem.item as CalendarTask);
+  const getRenderItemTitle = (renderItem: {
+    item: CalendarEvent | CalendarTask;
+  }) => renderItem.item.title;
+  const getRenderItemId = (renderItem: {
+    item: CalendarEvent | CalendarTask;
+  }) => renderItem.item.id;
+  const sortByTime = <T,>(
+    items: T[],
+    getTime: (item: T) => string | null | undefined,
+    getTitle: (item: T) => string,
+    getId?: (item: T) => string | undefined
+  ) => {
+    const mapped = items.map((item, index) => {
+      const minutes = parseTimeToMinutes(getTime(item));
+      return {
+        item,
+        minutes,
+        title: getTitle(item),
+        id: getId ? getId(item) || "" : "",
+        index,
+      };
+    });
+    mapped.sort((a, b) => {
+      if (a.minutes === null && b.minutes !== null) return 1;
+      if (b.minutes === null && a.minutes !== null) return -1;
+      if (a.minutes !== null && b.minutes !== null && a.minutes !== b.minutes) {
+        return a.minutes - b.minutes;
+      }
+      const titleOrder = a.title.localeCompare(b.title);
+      if (titleOrder !== 0) return titleOrder;
+      if (a.id !== b.id) return a.id.localeCompare(b.id);
+      return a.index - b.index;
+    });
+    return mapped.map((entry) => entry.item);
   };
 
   const resolveColor = (color?: string) => color || sherbetColors[0];
@@ -1431,24 +1518,36 @@ export default function CalendarView({ exams }: Props) {
                   {(() => {
                     const monthItems = [
                       ...dayExams.map((ex) => ({
-                        kind: "exam",
+                        kind: "exam" as const,
                         id: ex.id,
+                        title: ex.title,
+                        time: null as string | null,
                         data: ex,
                       })),
                       ...dayEvents.map((evt) => ({
-                        kind: "event",
+                        kind: "event" as const,
                         id: evt.id,
+                        title: evt.title,
+                        time: getEventTimeCandidate(evt),
                         data: evt,
                       })),
                       ...dayTasks.map((task) => ({
-                        kind: "task",
+                        kind: "task" as const,
                         id: task.id,
+                        title: task.title,
+                        time: getTaskTimeCandidate(task),
                         data: task,
                       })),
                     ];
+                    const sortedMonthItems = sortByTime(
+                      monthItems,
+                      (item) => item.time,
+                      (item) => item.title,
+                      (item) => item.id
+                    );
                     const maxItems = 3;
-                    const visibleItems = monthItems.slice(0, maxItems);
-                    const hiddenCount = monthItems.length - visibleItems.length;
+                    const visibleItems = sortedMonthItems.slice(0, maxItems);
+                    const hiddenCount = sortedMonthItems.length - visibleItems.length;
 
                     return (
                       <>
@@ -1591,45 +1690,6 @@ export default function CalendarView({ exams }: Props) {
                   </div>
                 ))}
               </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(7, 1fr)",
-                  gap: "6px",
-                  marginBottom: "10px",
-                }}
-              >
-                {weekDays.map((day) => {
-                  const dayKey = day.toISOString().slice(0, 10);
-                  const noTimeEvents = (eventsByDay[dayKey] ?? []).filter(
-                    (evt) => !evt.time
-                  );
-                  const noTimeTasks = (tasksByDay[dayKey] ?? []).filter(
-                    (task) => !task.time
-                  );
-                  return (
-                    <div key={`no-time-${dayKey}`} style={styles.noTimeBox}>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          marginBottom: 6,
-                        }}
-                      >
-                        Sin hora
-                      </div>
-                      {noTimeEvents.map((evt) => renderAgendaItem(evt, "event"))}
-                      {noTimeTasks.map((task) => renderAgendaItem(task, "task"))}
-                      {noTimeEvents.length === 0 && noTimeTasks.length === 0 && (
-                        <div style={{ fontSize: 11, color: "#9ca3af" }}>
-                          Sin items
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
               <div style={styles.agendaBody}>
                 <div style={styles.timeColumn}>
                   {hours.map((hour) => (
@@ -1642,22 +1702,36 @@ export default function CalendarView({ exams }: Props) {
                   const dayKey = day.toISOString().slice(0, 10);
                   const dayEvents = eventsByDay[dayKey] ?? [];
                   const dayTasks = tasksByDay[dayKey] ?? [];
+                  const dayItems = [
+                    ...dayEvents.map((evt) => ({
+                      type: "event" as const,
+                      item: evt,
+                    })),
+                    ...dayTasks.map((task) => ({
+                      type: "task" as const,
+                      item: task,
+                    })),
+                  ];
                   return (
                     <div key={dayKey} style={styles.agendaDayColumn}>
                       {hours.map((hour) => {
-                        const timedEvents = dayEvents.filter(
-                          (evt) => parseHour(evt.time) === hour
-                        );
-                        const timedTasks = dayTasks.filter(
-                          (task) => parseHour(task.time) === hour
+                        const timedItems = sortByTime(
+                          dayItems.filter((entry) => {
+                            const minutes = parseTimeToMinutes(
+                              getRenderItemTime(entry)
+                            );
+                            return (
+                              minutes !== null && Math.floor(minutes / 60) === hour
+                            );
+                          }),
+                          (entry) => getRenderItemTime(entry),
+                          (entry) => getRenderItemTitle(entry),
+                          (entry) => getRenderItemId(entry)
                         );
                         return (
                           <div key={`${dayKey}-${hour}`} style={styles.hourCell}>
-                            {timedEvents.map((evt) =>
-                              renderAgendaItem(evt, "event")
-                            )}
-                            {timedTasks.map((task) =>
-                              renderAgendaItem(task, "task")
+                            {timedItems.map(({ item, type }) =>
+                              renderAgendaItem(item, type)
                             )}
                           </div>
                         );
@@ -1673,30 +1747,6 @@ export default function CalendarView({ exams }: Props) {
             <>
               <div style={{ fontWeight: 600, marginBottom: 8 }}>
                 {selectedDateLabel}
-              </div>
-              <div style={{ ...styles.noTimeBox, marginBottom: 12 }}>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#6b7280",
-                    marginBottom: 6,
-                  }}
-                >
-                  Sin hora
-                </div>
-                {selectedEvents
-                  .filter((evt) => !evt.time)
-                  .map((evt) => renderAgendaItem(evt, "event"))}
-                {selectedTasks
-                  .filter((task) => !task.time)
-                  .map((task) => renderAgendaItem(task, "task"))}
-                {selectedEvents.filter((evt) => !evt.time).length === 0 &&
-                  selectedTasks.filter((task) => !task.time).length === 0 && (
-                    <div style={{ fontSize: 11, color: "#9ca3af" }}>
-                      Sin items
-                    </div>
-                  )}
               </div>
               <div
                 style={{
@@ -1715,19 +1765,33 @@ export default function CalendarView({ exams }: Props) {
                 </div>
                 <div style={styles.agendaDayColumn}>
                   {hours.map((hour) => {
-                    const timedEvents = selectedEvents.filter(
-                      (evt) => parseHour(evt.time) === hour
-                    );
-                    const timedTasks = selectedTasks.filter(
-                      (task) => parseHour(task.time) === hour
+                    const dayItems = [
+                      ...selectedEvents.map((evt) => ({
+                        type: "event" as const,
+                        item: evt,
+                      })),
+                      ...selectedTasks.map((task) => ({
+                        type: "task" as const,
+                        item: task,
+                      })),
+                    ];
+                    const timedItems = sortByTime(
+                      dayItems.filter((entry) => {
+                        const minutes = parseTimeToMinutes(
+                          getRenderItemTime(entry)
+                        );
+                        return (
+                          minutes !== null && Math.floor(minutes / 60) === hour
+                        );
+                      }),
+                      (entry) => getRenderItemTime(entry),
+                      (entry) => getRenderItemTitle(entry),
+                      (entry) => getRenderItemId(entry)
                     );
                     return (
                       <div key={`day-${hour}`} style={styles.hourCell}>
-                        {timedEvents.map((evt) =>
-                          renderAgendaItem(evt, "event")
-                        )}
-                        {timedTasks.map((task) =>
-                          renderAgendaItem(task, "task")
+                        {timedItems.map(({ item, type }) =>
+                          renderAgendaItem(item, type)
                         )}
                       </div>
                     );
