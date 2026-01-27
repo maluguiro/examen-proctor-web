@@ -25,6 +25,8 @@ type CalendarEvent = {
   id: string;
   date: string;
   title: string;
+  time?: string;
+  color?: string;
 };
 
 type CalendarTask = {
@@ -56,7 +58,31 @@ export default function CalendarView({ exams }: Props) {
   });
   const [taskTime, setTaskTime] = React.useState("");
   const [taskTitle, setTaskTitle] = React.useState("");
-  const [taskColor, setTaskColor] = React.useState("#34d399");
+  const sherbetColors = React.useMemo(
+    () => ["#c9be9c", "#c2a2b5", "#c585a6", "#9c8dae", "#a6c7c9", "#82c0c6"],
+    []
+  );
+  const [useCustomColor, setUseCustomColor] = React.useState(false);
+  const [selectedColor, setSelectedColor] = React.useState(sherbetColors[0]);
+  const [taskColor, setTaskColor] = React.useState(sherbetColors[0]);
+  const [newEventTime, setNewEventTime] = React.useState("");
+  const [showEditModal, setShowEditModal] = React.useState(false);
+  const [editType, setEditType] = React.useState<"event" | "task" | null>(null);
+  const [editId, setEditId] = React.useState("");
+  const [editDate, setEditDate] = React.useState("");
+  const [editTime, setEditTime] = React.useState("");
+  const [editTitle, setEditTitle] = React.useState("");
+  const [editUseCustomColor, setEditUseCustomColor] = React.useState(false);
+  const [editPaletteColor, setEditPaletteColor] = React.useState(
+    sherbetColors[0]
+  );
+  const [editCustomColor, setEditCustomColor] = React.useState(
+    sherbetColors[0]
+  );
+  const [toastItems, setToastItems] = React.useState<
+    Array<{ id: string; title: string; body?: string }>
+  >([]);
+  const [notificationsEnabled, setNotificationsEnabled] = React.useState(false);
 
   const [hydrated, setHydrated] = React.useState(false);
   const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -172,6 +198,28 @@ export default function CalendarView({ exams }: Props) {
     observer.observe(html, { attributes: true, attributeFilter: ["class"] });
     return () => observer.disconnect();
   }, []);
+
+  React.useEffect(() => {
+    if (!useCustomColor) {
+      setTaskColor(selectedColor);
+    }
+  }, [useCustomColor, selectedColor]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("calendar_notifications_enabled");
+    setNotificationsEnabled(stored === "true");
+  }, []);
+
+  React.useEffect(() => {
+    if (toastItems.length === 0) return;
+    const timers = toastItems.map((item) =>
+      window.setTimeout(() => {
+        setToastItems((prev) => prev.filter((t) => t.id !== item.id));
+      }, 3500)
+    );
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [toastItems]);
 
   // Cargar events + tasks 1 vez (backend con fallback a localStorage)
   React.useEffect(() => {
@@ -337,104 +385,210 @@ export default function CalendarView({ exams }: Props) {
       new Date(currentDate.getFullYear(), currentDate.getMonth() + delta, 1)
     );
   };
+  const goToday = () => {
+    const now = new Date();
+    setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    setSelectedDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+  };
 
   const monthText = currentDate.toLocaleDateString("es-ES", { month: "long" });
   const monthName = `${monthText.charAt(0).toUpperCase()}${monthText.slice(
     1
   )} del ${currentDate.getFullYear()}`;
+  const monthYearText = currentDate.toLocaleDateString("es-ES", {
+    month: "long",
+    year: "numeric",
+  });
+  const monthYearLabel = `${monthYearText.charAt(0).toUpperCase()}${monthYearText.slice(
+    1
+  )}`;
   const selectedDateLabel = selectedDate.toLocaleDateString("es-ES", {
     day: "numeric",
     month: "long",
     year: "numeric",
   });
 
-  // Estilos (sin cambios)
   const styles = {
     container: {
-      background: isDark ? "#9ca3af" : "#ffffff",
-      borderRadius: "16px",
-      border: "1px solid #e5e7eb",
-      padding: "16px",
-      height: "auto",
+      background: "transparent",
+      borderRadius: 0,
+      border: "none",
+      padding: "18px",
+      height: "100%",
       display: "flex",
       flexDirection: "column" as const,
+      minHeight: "100%",
+      flex: 1,
+      overflow: "hidden",
     },
     header: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: "16px",
+      gap: "16px",
+      marginBottom: "12px",
+      flexWrap: "wrap" as const,
     },
-    title: {
-      fontSize: "20px",
+    headerLeft: {
+      display: "flex",
+      flexDirection: "column" as const,
+      gap: "2px",
+      minWidth: 0,
+    },
+    headerTitle: {
+      fontSize: "22px",
       fontWeight: 700,
-      textTransform: "capitalize" as const,
+      color: isDark ? "#e2e8f0" : "#111827",
     },
-    navBtn: {
-      background: "transparent",
-      border: "1px solid #e5e7eb",
-      borderRadius: "8px",
-      padding: "6px 12px",
+    headerSubtitle: {
+      fontSize: "12px",
+      color: isDark ? "#cbd5e1" : "#6b7280",
+      marginTop: "2px",
+    },
+    headerActions: {
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+    },
+    headerRight: {
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+      flexWrap: "wrap" as const,
+      justifyContent: "flex-end",
+    },
+    navIconBtn: {
+      width: "34px",
+      height: "34px",
+      borderRadius: "10px",
+      border: "1px solid rgba(148,163,184,0.45)",
+      background: isDark ? "rgba(30,41,59,0.65)" : "rgba(255,255,255,0.7)",
+      color: isDark ? "#ffffff" : "#111827",
       cursor: "pointer",
-      fontSize: "14px",
-      fontWeight: 500,
+      fontSize: "16px",
+      fontWeight: 600,
+    },
+    layout: {
+      display: "flex",
+      gap: "16px",
+      flex: 1,
+      minHeight: 0,
+    },
+    calendarPane: {
+      flex: 1,
+      minWidth: 0,
+      display: "flex",
+      flexDirection: "column" as const,
+      minHeight: 0,
+    },
+    sidePanel: {
+      width: "280px",
+      flexShrink: 0,
+      display: "flex",
+      flexDirection: "column" as const,
+      gap: "12px",
+      padding: "14px",
+      borderRadius: "12px",
+      border: "1px solid rgba(148,163,184,0.35)",
+      background: isDark ? "rgba(30,41,59,0.7)" : "rgba(255,255,255,0.7)",
+      boxShadow: "0 10px 24px rgba(148,163,184,0.25)",
+      alignSelf: "stretch",
+      height: "100%",
+      overflowY: "auto" as const,
+    },
+    panelSection: {
+      display: "flex",
+      flexDirection: "column" as const,
+      gap: "8px",
+    },
+    panelTitle: {
+      fontSize: "11px",
+      textTransform: "uppercase" as const,
+      letterSpacing: "0.08em",
+      color: isDark ? "#cbd5e1" : "#6b7280",
+      fontWeight: 700,
     },
     viewTabs: {
       display: "flex",
-      gap: "8px",
+      gap: "6px",
+      flexWrap: "wrap" as const,
     },
     viewTab: (active: boolean) => ({
       padding: "6px 10px",
-      borderRadius: "8px",
-      border: active ? "1px solid #10b981" : "1px solid #e5e7eb",
-      background: active ? "#ecfdf5" : "transparent",
-      color: "#111",
-      fontSize: "12px",
-      fontWeight: 600,
-      cursor: "pointer",
-    }),
-    taskBtn: {
-      padding: "6px 12px",
       borderRadius: "999px",
-      border: "1px solid rgba(255,255,255,0.6)",
-      background: "linear-gradient(90deg, #bbf7d0, #fde68a, #fdba74)",
-      color: "#1f2933",
+      border: active
+        ? "1px solid rgba(99,102,241,0.6)"
+        : "1px solid rgba(148,163,184,0.35)",
+      background: active
+        ? "linear-gradient(135deg, rgba(191,219,254,0.7), rgba(221,214,254,0.7))"
+        : isDark
+          ? "rgba(15,23,42,0.6)"
+          : "rgba(255,255,255,0.6)",
+      color: isDark ? "#e2e8f0" : "#1f2937",
       fontSize: "12px",
       fontWeight: 700,
       cursor: "pointer",
-      boxShadow: "0 6px 16px rgba(250, 204, 21, 0.35)",
+    }),
+    notifyBtn: {
+      width: "36px",
+      height: "36px",
+      borderRadius: "12px",
+      border: "1px solid rgba(99, 102, 241, 0.25)",
+      background: isDark ? "rgba(30,41,59,0.8)" : "rgba(255,255,255,0.8)",
+      color: isDark ? "#e2e8f0" : "#1f2937",
+      fontSize: "16px",
+      fontWeight: 600,
+      cursor: "pointer",
+    },
+    notifyBtnActive: {
+      border: "1px solid rgba(99, 102, 241, 0.6)",
+      background: "linear-gradient(135deg, rgba(191,219,254,0.8), rgba(221,214,254,0.8))",
+      color: "#111827",
+    },
+    panelRow: {
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+    },
+    panelHint: {
+      fontSize: "12px",
+      color: isDark ? "#cbd5e1" : "#4b5563",
+      fontWeight: 600,
     },
     grid: {
       display: "grid",
       gridTemplateColumns: "repeat(7, 1fr)",
+      gridTemplateRows: "32px repeat(6, minmax(0, 1fr))",
       gap: "1px",
-      background: "#e5e7eb",
-      border: "1px solid #e5e7eb",
+      background: isDark ? "#334155" : "#e5e7eb",
+      border: isDark ? "1px solid #334155" : "1px solid #e5e7eb",
       borderRadius: "8px",
       overflow: "hidden",
       flex: 1,
+      minHeight: 0,
     },
     dayHeader: {
-      background: "#f9fafb",
+      background: isDark ? "#1f2937" : "#f9fafb",
       padding: "8px",
       textAlign: "center" as const,
       fontSize: "12px",
       fontWeight: 600,
-      color: "#6b7280",
+      color: isDark ? "#cbd5e1" : "#6b7280",
       textTransform: "uppercase" as const,
     },
     dayCell: {
-      background: isDark ? "#f3f4f6" : "white",
-      minHeight: "70px",
+      background: isDark ? "#0f172a" : "white",
+      minHeight: 0,
+      height: "100%",
       padding: "6px",
       position: "relative" as const,
+      display: "flex",
+      flexDirection: "column" as const,
       cursor: "pointer",
       transition: "background 0.2s",
     },
     dayNumber: {
       fontSize: "14px",
-      fontWeight: 600,
-      color: "#374151",
       marginBottom: "4px",
     },
     eventDot: {
@@ -450,11 +604,52 @@ export default function CalendarView({ exams }: Props) {
       textOverflow: "ellipsis",
       display: "block",
     },
+    monthItems: {
+      display: "flex",
+      flexDirection: "column" as const,
+      gap: 2,
+      flex: 1,
+      minHeight: 0,
+      overflow: "hidden",
+    },
+    monthItem: {
+      whiteSpace: "normal" as const,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      display: "-webkit-box",
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: "vertical" as const,
+      lineHeight: 1.2,
+      fontSize: "11px",
+    },
+    monthItemText: {
+      whiteSpace: "normal" as const,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      display: "-webkit-box",
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: "vertical" as const,
+      lineHeight: 1.2,
+      fontSize: "11px",
+      flex: 1,
+      minWidth: 0,
+    },
+    moreLabel: {
+      fontSize: "11px",
+      color: isDark ? "#cbd5e1" : "#6b7280",
+      fontWeight: 600,
+      marginTop: "2px",
+    },
     dayPanel: {
-      border: "1px solid #e5e7eb",
+      border: isDark ? "1px solid #334155" : "1px solid #e5e7eb",
       borderRadius: "8px",
       padding: "12px",
-      background: "#ffffff",
+      background: isDark ? "#0f172a" : "#ffffff",
+      display: "flex",
+      flexDirection: "column" as const,
+      flex: 1,
+      minHeight: 0,
+      overflow: "auto" as const,
     },
     dayForm: {
       display: "flex",
@@ -463,15 +658,17 @@ export default function CalendarView({ exams }: Props) {
     },
     input: {
       flex: 1,
-      border: "1px solid #e5e7eb",
+      border: isDark ? "1px solid #334155" : "1px solid #e5e7eb",
       borderRadius: "8px",
       padding: "8px 10px",
       fontSize: "13px",
+      background: isDark ? "rgba(15,23,42,0.6)" : "white",
+      color: isDark ? "#e2e8f0" : "#111827",
     },
     addBtn: {
-      border: "1px solid #10b981",
-      background: "#ecfdf5",
-      color: "#065f46",
+      border: "1px solid rgba(16,185,129,0.6)",
+      background: isDark ? "rgba(16,185,129,0.15)" : "#ecfdf5",
+      color: isDark ? "#a7f3d0" : "#065f46",
       borderRadius: "8px",
       padding: "8px 12px",
       fontWeight: 600,
@@ -480,15 +677,16 @@ export default function CalendarView({ exams }: Props) {
     },
     eventItem: {
       fontSize: "13px",
-      color: "#111",
+      color: isDark ? "#e2e8f0" : "#111",
       padding: "6px 0",
-      borderBottom: "1px dashed #e5e7eb",
+      borderBottom: isDark ? "1px dashed #334155" : "1px dashed #e5e7eb",
     },
     taskPanel: {
-      border: "1px solid #e5e7eb",
+      border: "1px solid rgba(148,163,184,0.5)",
       borderRadius: "12px",
       padding: "16px",
-      background: "linear-gradient(90deg, #bbf7d0, #fde68a, #fdba74)",
+      background:
+        "linear-gradient(135deg, rgba(191,219,254,0.95), rgba(221,214,254,0.95), rgba(254,240,138,0.85))",
       width: "100%",
       maxWidth: "420px",
       boxShadow: "0 18px 40px rgba(15, 23, 42, 0.2)",
@@ -514,7 +712,7 @@ export default function CalendarView({ exams }: Props) {
       background: "transparent",
       fontSize: "16px",
       cursor: "pointer",
-      color: "#6b7280",
+      color: isDark ? "#cbd5e1" : "#6b7280",
     },
     taskGrid: {
       display: "grid",
@@ -523,10 +721,14 @@ export default function CalendarView({ exams }: Props) {
       marginTop: "10px",
     },
     taskInput: {
-      border: "1px solid #f9fcf8",
+      border: isDark
+        ? "1px solid rgba(148,163,184,0.35)"
+        : "1px solid rgba(148,163,184,0.35)",
       borderRadius: "8px",
       padding: "8px 10px",
       fontSize: "13px",
+      background: isDark ? "rgba(15,23,42,0.55)" : "white",
+      color: isDark ? "#e2e8f0" : "#111827",
     },
     taskFull: {
       gridColumn: "1 / -1",
@@ -538,14 +740,143 @@ export default function CalendarView({ exams }: Props) {
       marginTop: "10px",
     },
     taskSave: {
-      border: "1px solid #10b981",
-      background: "#ecfdf5",
-      color: "#065f46",
+      border: "1px solid rgba(16,185,129,0.6)",
+      background: isDark ? "rgba(16,185,129,0.15)" : "#ecfdf5",
+      color: isDark ? "#a7f3d0" : "#065f46",
       borderRadius: "8px",
       padding: "8px 12px",
       fontWeight: 600,
       cursor: "pointer",
       fontSize: "13px",
+    },
+    paletteRow: {
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      flexWrap: "wrap" as const,
+      marginTop: "10px",
+    },
+    paletteDot: (active: boolean, color: string) => ({
+      width: "22px",
+      height: "22px",
+      borderRadius: "999px",
+      border: active ? "2px solid #111827" : "1px solid rgba(0,0,0,0.1)",
+      background: color,
+      cursor: "pointer",
+      boxShadow: active ? "0 0 0 2px rgba(255,255,255,0.7)" : "none",
+    }),
+    paletteLabel: {
+      fontSize: "12px",
+      fontWeight: 600,
+      color: isDark ? "#cbd5e1" : "#4b5563",
+    },
+    agendaHeader: {
+      display: "grid",
+      gridTemplateColumns: "80px repeat(7, 1fr)",
+      gap: "6px",
+      marginBottom: "8px",
+    },
+    agendaHeaderCell: {
+      fontSize: "11px",
+      fontWeight: 700,
+      color: isDark ? "#cbd5e1" : "#6b7280",
+      textTransform: "uppercase" as const,
+      letterSpacing: "0.02em",
+    },
+    agendaBody: {
+      display: "grid",
+      gridTemplateColumns: "80px repeat(7, 1fr)",
+      gap: "6px",
+    },
+    timeColumn: {
+      display: "flex",
+      flexDirection: "column" as const,
+      gap: "6px",
+    },
+    timeCell: {
+      fontSize: "11px",
+      color: isDark ? "#cbd5e1" : "#6b7280",
+      textAlign: "right" as const,
+      paddingRight: "8px",
+      height: "54px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "flex-end",
+    },
+    agendaDayColumn: {
+      display: "flex",
+      flexDirection: "column" as const,
+      gap: "6px",
+    },
+    noTimeBox: {
+      background: "rgba(255,255,255,0.7)",
+      border: "1px solid rgba(148,163,184,0.25)",
+      borderRadius: "10px",
+      padding: "8px",
+      minHeight: "48px",
+    },
+    hourCell: {
+      background: isDark ? "rgba(15,23,42,0.7)" : "rgba(255,255,255,0.7)",
+      border: isDark
+        ? "1px solid rgba(148,163,184,0.35)"
+        : "1px solid rgba(148,163,184,0.25)",
+      borderRadius: "10px",
+      padding: "6px",
+      minHeight: "54px",
+      display: "flex",
+      flexDirection: "column" as const,
+      gap: "4px",
+    },
+    agendaItem: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: "6px",
+      padding: "4px 6px",
+      borderRadius: "8px",
+      fontSize: "11px",
+      fontWeight: 600,
+      color: isDark ? "#e2e8f0" : "#1f2937",
+      background: isDark ? "rgba(30,41,59,0.85)" : "rgba(255,255,255,0.85)",
+      border: isDark ? "1px solid rgba(148,163,184,0.25)" : "1px solid rgba(0,0,0,0.05)",
+    },
+    agendaActions: {
+      display: "flex",
+      gap: "4px",
+      alignItems: "center",
+    },
+    actionBtn: {
+      border: "none",
+      background: "transparent",
+      cursor: "pointer",
+      fontSize: "12px",
+      opacity: 0.8,
+    },
+    toastStack: {
+      position: "fixed" as const,
+      right: 24,
+      top: 24,
+      zIndex: 120,
+      display: "flex",
+      flexDirection: "column" as const,
+      gap: "8px",
+    },
+    toast: {
+      background: "linear-gradient(135deg, rgba(191,219,254,0.9), rgba(221,214,254,0.9))",
+      border: "1px solid rgba(148,163,184,0.4)",
+      color: "#1f2937",
+      borderRadius: "12px",
+      padding: "10px 12px",
+      minWidth: "220px",
+      boxShadow: "0 12px 30px rgba(99, 102, 241, 0.2)",
+      fontSize: "12px",
+      fontWeight: 600,
+    },
+    toastBody: {
+      marginTop: "4px",
+      fontSize: "11px",
+      fontWeight: 500,
+      color: "#374151",
     },
   };
 
@@ -578,87 +909,913 @@ export default function CalendarView({ exams }: Props) {
     d.setDate(weekStart.getDate() + i);
     return d;
   });
+  const totalCells = startOffset + days;
+  const trailingCells = totalCells <= 42 ? 42 - totalCells : 0;
+
+  const hours = React.useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
+
+  const formatHour = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
+
+  const normalizeTimeStr = (value?: string | null) => {
+    if (!value) return null;
+    const raw = value.trim();
+    if (!raw) return null;
+    const isoMatch = raw.match(/T(\d{1,2}):(\d{2})/);
+    const candidate = isoMatch ? `${isoMatch[1]}:${isoMatch[2]}` : raw;
+    const match = candidate.match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+    return `${match[1].padStart(2, "0")}:${match[2]}`;
+  };
+  const parseTimeToMinutes = (time?: string | null) => {
+    const normalized = normalizeTimeStr(time);
+    if (!normalized) return null;
+    const [h, m] = normalized.split(":");
+    const hour = Number(h);
+    const minutes = Number(m);
+    if (
+      Number.isNaN(hour) ||
+      Number.isNaN(minutes) ||
+      hour < 0 ||
+      hour > 23 ||
+      minutes < 0 ||
+      minutes > 59
+    ) {
+      return null;
+    }
+    return hour * 60 + minutes;
+  };
+  const getEventTimeCandidate = (event: CalendarEvent) => {
+    const source = event as CalendarEvent & {
+      startTime?: string;
+      startAt?: string;
+      dateTime?: string;
+    };
+    return source.time || source.startTime || source.startAt || source.dateTime || null;
+  };
+  const getTaskTimeCandidate = (task: CalendarTask) => {
+    const source = task as CalendarTask & {
+      dueTime?: string;
+      at?: string;
+      startTime?: string;
+      dueAt?: string;
+      dateTime?: string;
+    };
+    return (
+      source.time ||
+      source.dueTime ||
+      source.at ||
+      source.startTime ||
+      source.dueAt ||
+      source.dateTime ||
+      null
+    );
+  };
+  const getRenderItemTime = (renderItem: {
+    type: "event" | "task";
+    item: CalendarEvent | CalendarTask;
+  }) =>
+    renderItem.type === "event"
+      ? getEventTimeCandidate(renderItem.item as CalendarEvent)
+      : getTaskTimeCandidate(renderItem.item as CalendarTask);
+  const getRenderItemTitle = (renderItem: {
+    item: CalendarEvent | CalendarTask;
+  }) => renderItem.item.title;
+  const getRenderItemId = (renderItem: {
+    item: CalendarEvent | CalendarTask;
+  }) => renderItem.item.id;
+  const sortByTime = <T,>(
+    items: T[],
+    getTime: (item: T) => string | null | undefined,
+    getTitle: (item: T) => string,
+    getId?: (item: T) => string | undefined
+  ) => {
+    const mapped = items.map((item, index) => {
+      const minutes = parseTimeToMinutes(getTime(item));
+      return {
+        item,
+        minutes,
+        title: getTitle(item),
+        id: getId ? getId(item) || "" : "",
+        index,
+      };
+    });
+    mapped.sort((a, b) => {
+      if (a.minutes === null && b.minutes !== null) return 1;
+      if (b.minutes === null && a.minutes !== null) return -1;
+      if (a.minutes !== null && b.minutes !== null && a.minutes !== b.minutes) {
+        return a.minutes - b.minutes;
+      }
+      const titleOrder = a.title.localeCompare(b.title);
+      if (titleOrder !== 0) return titleOrder;
+      if (a.id !== b.id) return a.id.localeCompare(b.id);
+      return a.index - b.index;
+    });
+    return mapped.map((entry) => entry.item);
+  };
+
+  const resolveColor = (color?: string) => color || sherbetColors[0];
+
+  const openEditModal = (
+    item: CalendarEvent | CalendarTask,
+    type: "event" | "task"
+  ) => {
+    const existingColor = resolveColor(item.color);
+    const isCustom = !sherbetColors.includes(existingColor);
+    setEditType(type);
+    setEditId(item.id);
+    setEditDate(item.date);
+    setEditTime(item.time || "");
+    setEditTitle(item.title);
+    setEditUseCustomColor(isCustom);
+    setEditPaletteColor(isCustom ? sherbetColors[0] : existingColor);
+    setEditCustomColor(existingColor);
+    setShowEditModal(true);
+  };
+
+  const deleteEvent = (id: string) => {
+    if (!confirm("¿Eliminar este evento?")) return;
+    setEvents((prev) => prev.filter((evt) => evt.id !== id));
+    notify("🗑️ Evento eliminado");
+  };
+
+  const deleteTask = (id: string) => {
+    if (!confirm("¿Eliminar esta tarea?")) return;
+    setTasks((prev) => prev.filter((task) => task.id !== id));
+    notify("🗑️ Tarea eliminada");
+  };
+
+  const saveEdit = () => {
+    if (!editType) return;
+    const title = editTitle.trim();
+    if (!title) return;
+    const finalColor = editUseCustomColor ? editCustomColor : editPaletteColor;
+
+    if (editType === "event") {
+      setEvents((prev) =>
+        prev.map((evt) =>
+          evt.id === editId
+            ? {
+                ...evt,
+                title,
+                date: editDate,
+                time: editTime.trim() || undefined,
+                color: finalColor,
+              }
+            : evt
+        )
+      );
+    } else {
+      setTasks((prev) =>
+        prev.map((task) =>
+          task.id === editId
+            ? {
+                ...task,
+                title,
+                date: editDate,
+                time: editTime.trim(),
+                color: finalColor,
+              }
+            : task
+        )
+      );
+    }
+
+    setShowEditModal(false);
+    notify(
+      editType === "event" ? "✏️ Evento actualizado" : "✏️ Tarea actualizada",
+      title
+    );
+  };
+
+  const enqueueToast = (title: string, body?: string) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToastItems((prev) => [...prev, { id, title, body }]);
+  };
+
+  const requestNotificationPermission = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      enqueueToast("🔔 Notificaciones no disponibles");
+      return;
+    }
+    if (Notification.permission === "granted") {
+      enqueueToast("🔔 Notificaciones activadas");
+      return;
+    }
+    if (Notification.permission === "denied") {
+      enqueueToast("🔔 Permiso de notificaciones denegado");
+      return;
+    }
+    try {
+      const result = await Notification.requestPermission();
+      enqueueToast(
+        result === "granted"
+          ? "🔔 Notificaciones activadas"
+          : "🔔 Permiso de notificaciones denegado"
+      );
+    } catch {
+      enqueueToast("🔔 No se pudo solicitar permiso");
+    }
+  };
+
+  const handleNotificationToggle = async () => {
+    if (notificationsEnabled) {
+      setNotificationsEnabled(false);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("calendar_notifications_enabled", "false");
+      }
+      enqueueToast("🔕 Notificaciones desactivadas");
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("calendar_notifications_enabled", "false");
+    }
+    await requestNotificationPermission();
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission === "granted") {
+      setNotificationsEnabled(true);
+      window.localStorage.setItem("calendar_notifications_enabled", "true");
+    } else {
+      enqueueToast("🔔 Activá el permiso para usar notificaciones");
+    }
+  };
+
+  const notify = (title: string, body?: string) => {
+    enqueueToast(title, body);
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (!notificationsEnabled) return;
+    if (Notification.permission !== "granted") return;
+    if (document.visibilityState !== "visible") return;
+    // Base para push futuro: hoy solo notificación foreground sin service worker.
+    try {
+      new Notification(title, body ? { body } : undefined);
+    } catch {
+      // Silencioso; el toast ya informa.
+    }
+  };
+
+  const renderAgendaItem = (
+    item: CalendarEvent | CalendarTask,
+    type: "event" | "task"
+  ) => {
+    const color = resolveColor(item.color);
+    const label =
+      "time" in item && item.time ? `${item.time} · ${item.title}` : item.title;
+    return (
+      <div
+        key={item.id}
+        style={{
+          ...styles.agendaItem,
+          borderLeft: `3px solid ${color}`,
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+          {label}
+        </span>
+        <span style={styles.agendaActions}>
+          <button
+            style={styles.actionBtn}
+            onClick={() => openEditModal(item, type)}
+            aria-label={`Editar ${type}`}
+          >
+            ✏️
+          </button>
+          <button
+            style={styles.actionBtn}
+            onClick={() =>
+              type === "event" ? deleteEvent(item.id) : deleteTask(item.id)
+            }
+            aria-label={`Borrar ${type}`}
+          >
+            🗑️
+          </button>
+        </span>
+      </div>
+    );
+  };
 
   const addEvent = () => {
     const title = newEventTitle.trim();
     if (!title) return;
+    const colorForNew = useCustomColor ? taskColor : selectedColor;
     const newEvent: CalendarEvent = {
       id: `evt-${Date.now()}`,
       date: selectedDateKey,
       title,
+      time: newEventTime.trim() || undefined,
+      color: colorForNew,
     };
     setEvents((prev) => [...prev, newEvent]);
     setNewEventTitle("");
+    setNewEventTime("");
+    notify("📌 Evento creado", title);
   };
 
   const saveTask = () => {
     const title = taskTitle.trim();
     if (!title || !taskDate) return;
+    const colorForNew = useCustomColor ? taskColor : selectedColor;
     const newTask: CalendarTask = {
       id: `task-${Date.now()}`,
       date: taskDate,
       time: taskTime.trim(),
       title,
-      color: taskColor,
+      color: colorForNew,
     };
     setTasks((prev) => [...prev, newTask]);
     setTaskTitle("");
     setTaskTime("");
+    setShowTaskForm(false);
+    const timeText = taskTime.trim() ? ` · ${taskTime.trim()}` : "";
+    notify("✅ Tarea creada", `${title}${timeText}`);
   };
 
   return (
     <div style={styles.container}>
-      {/* Header */}
+      {toastItems.length > 0 && (
+        <div style={styles.toastStack}>
+          {toastItems.map((toast) => (
+            <div key={toast.id} style={styles.toast}>
+              {toast.title}
+              {toast.body && <div style={styles.toastBody}>{toast.body}</div>}
+            </div>
+          ))}
+        </div>
+      )}
       <div style={styles.header}>
-        <h2 style={styles.title}>{monthName}</h2>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button style={styles.navBtn} onClick={() => changeMonth(-1)}>
-            ← Anterior
+        <div style={styles.headerLeft}>
+          <div style={styles.headerTitle}>Calendario</div>
+        </div>
+        <div style={styles.headerActions}>
+          <button
+            style={styles.navIconBtn}
+            onClick={() => changeMonth(-1)}
+            aria-label="Mes anterior"
+          >
+            ‹
           </button>
-          <button style={styles.navBtn} onClick={() => changeMonth(1)}>
-            Siguiente →
+          <button className="btn-pill-accent" onClick={goToday}>
+            {monthYearLabel}
+          </button>
+          <button
+            style={styles.navIconBtn}
+            onClick={() => changeMonth(1)}
+            aria-label="Mes siguiente"
+          >
+            ›
+          </button>
+        </div>
+        <div style={styles.headerRight}>
+          <button className="btn-pill-accent" onClick={() => router.back()}>
+            Volver
           </button>
         </div>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 12,
-        }}
-      >
-        <div style={styles.viewTabs}>
-          <button
-            style={styles.viewTab(viewMode === "day")}
-            onClick={() => setViewMode("day")}
-          >
-            Día
-          </button>
-          <button
-            style={styles.viewTab(viewMode === "week")}
-            onClick={() => setViewMode("week")}
-          >
-            Semana
-          </button>
-          <button
-            style={styles.viewTab(viewMode === "month")}
-            onClick={() => setViewMode("month")}
-          >
-            Mes
-          </button>
-          <button
-            style={styles.taskBtn}
-            onClick={() => {
-              setTaskDate(selectedDateKey);
-              setShowTaskForm((prev) => !prev);
-            }}
-          >
-            Tarea +
-          </button>
+      <div style={styles.layout}>
+        <aside style={styles.sidePanel}>
+          <div style={styles.panelSection}>
+            <div style={styles.panelTitle}>Vista</div>
+            <div style={styles.viewTabs}>
+              <button
+                style={styles.viewTab(viewMode === "day")}
+                onClick={() => setViewMode("day")}
+              >
+                Día
+              </button>
+              <button
+                style={styles.viewTab(viewMode === "week")}
+                onClick={() => setViewMode("week")}
+              >
+                Semana
+              </button>
+              <button
+                style={styles.viewTab(viewMode === "month")}
+                onClick={() => setViewMode("month")}
+              >
+                Mes
+              </button>
+            </div>
+          </div>
+
+          <div style={styles.panelSection}>
+            <div style={styles.panelTitle}>Acciones</div>
+            <button
+              className="btn-pill-accent"
+              onClick={() => {
+                setTaskDate(selectedDateKey);
+                setShowTaskForm((prev) => !prev);
+              }}
+            >
+              Tarea +
+            </button>
+          </div>
+
+          <div style={styles.panelSection}>
+            <div style={styles.panelTitle}>Colores</div>
+            <div style={styles.paletteRow}>
+              {sherbetColors.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  aria-label={`Seleccionar color ${color}`}
+                  style={styles.paletteDot(
+                    !useCustomColor && selectedColor === color,
+                    color
+                  )}
+                  onClick={() => {
+                    setSelectedColor(color);
+                    setUseCustomColor(false);
+                  }}
+                />
+              ))}
+            </div>
+            <label
+              style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}
+              className="text-slate-600 dark:text-slate-200"
+            >
+              <input
+                type="checkbox"
+                checked={useCustomColor}
+                onChange={(e) => setUseCustomColor(e.target.checked)}
+              />
+              Color personalizado
+            </label>
+            {useCustomColor && (
+              <input
+                type="color"
+                value={taskColor}
+                onChange={(e) => setTaskColor(e.target.value)}
+                style={{ width: 36, height: 28, border: "1px solid #e5e7eb" }}
+              />
+            )}
+          </div>
+
+          <div style={styles.panelSection}>
+            <div style={styles.panelRow}>
+              <button
+                style={{
+                  ...styles.notifyBtn,
+                  ...(notificationsEnabled ? styles.notifyBtnActive : {}),
+                }}
+                onClick={handleNotificationToggle}
+                aria-label="Notificaciones"
+                title="Notificaciones"
+              >
+                {notificationsEnabled ? "🔔" : "🔕"}
+              </button>
+              <span style={styles.panelHint}>Notificaciones</span>
+            </div>
+          </div>
+        </aside>
+        <div style={styles.calendarPane}>
+
+      {showEditModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.taskPanel}>
+            <div style={styles.modalHeader}>
+              <div style={{ fontWeight: 600 }}>
+                {editType === "task" ? "Editar tarea" : "Editar evento"}
+              </div>
+              <button
+                style={styles.closeBtn}
+                onClick={() => setShowEditModal(false)}
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+            <div style={styles.taskGrid}>
+              <input
+                style={styles.taskInput}
+                type="date"
+                value={editDate}
+                onChange={(e) => setEditDate(e.target.value)}
+              />
+              <input
+                style={styles.taskInput}
+                type="time"
+                value={editTime}
+                onChange={(e) => setEditTime(e.target.value)}
+              />
+              <input
+                style={{ ...styles.taskInput, ...styles.taskFull }}
+                placeholder="Título"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+              />
+              <div
+                style={{
+                  ...styles.taskFull,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                <span style={{ fontSize: 12, color: "#292a2c" }}>🎨 Color</span>
+                {!editUseCustomColor && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {sherbetColors.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        style={styles.paletteDot(editPaletteColor === color, color)}
+                        onClick={() => setEditPaletteColor(color)}
+                        aria-label={`Seleccionar color ${color}`}
+                      />
+                    ))}
+                  </div>
+                )}
+                {editUseCustomColor && (
+                  <input
+                    style={styles.taskInput}
+                    type="color"
+                    value={editCustomColor}
+                    onChange={(e) => setEditCustomColor(e.target.value)}
+                  />
+                )}
+                <label
+                  style={{ display: "flex", alignItems: "center", gap: 6 }}
+                  className="text-slate-600 dark:text-slate-200"
+                >
+                  <input
+                    type="checkbox"
+                    checked={editUseCustomColor}
+                    onChange={(e) => setEditUseCustomColor(e.target.checked)}
+                  />
+                  Color personalizado
+                </label>
+              </div>
+            </div>
+            <div style={styles.taskActions}>
+              <button style={styles.taskSave} onClick={saveEdit}>
+                Guardar cambios
+              </button>
+            </div>
+          </div>
         </div>
-        <div style={{ fontSize: 13, color: "#6b7280" }}>{selectedDateLabel}</div>
+      )}
+
+      {viewMode === "month" && (
+        <div style={styles.grid} className="calendar-grid">
+          {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
+            <div key={d} style={styles.dayHeader} className="calendar-grid-header">
+              {d}
+            </div>
+          ))}
+
+          {Array.from({ length: startOffset }).map((_, i) => (
+            <div
+              key={`empty-${i}`}
+              style={{ background: isDark ? "#f3f4f6" : "white" }}
+            />
+          ))}
+
+          {Array.from({ length: days }).map((_, i) => {
+            const dayNum = i + 1;
+            const dayExams = examsByDay[dayNum] || [];
+            const cellDate = new Date(
+              currentDate.getFullYear(),
+              currentDate.getMonth(),
+              dayNum
+            );
+            const isToday =
+              dayNum === new Date().getDate() &&
+              currentDate.getMonth() === new Date().getMonth() &&
+              currentDate.getFullYear() === new Date().getFullYear();
+            const dayBackground = isToday ? "#ecfdf5" : isDark ? "#f3f4f6" : "white";
+            const dayKey = cellDate.toISOString().slice(0, 10);
+            const dayEvents = eventsByDay[dayKey] ?? [];
+            const dayTasks = tasksByDay[dayKey] ?? [];
+
+            return (
+              <div
+                key={dayNum}
+                style={{ ...styles.dayCell, background: dayBackground }}
+                className="calendar-grid-cell"
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = isDark ? "#1e293b" : "#f0fdf4")
+                }
+                onMouseLeave={(e) => (e.currentTarget.style.background = dayBackground)}
+                onClick={() => {
+                  setSelectedDate(cellDate);
+                  setViewMode("day");
+                }}
+              >
+                <div
+                  style={styles.dayNumber}
+                  className="text-slate-600 dark:text-slate-200 font-semibold"
+                >
+                  {dayNum}
+                </div>
+
+                <div style={styles.monthItems}>
+                  {(() => {
+                    const monthItems = [
+                      ...dayExams.map((ex) => ({
+                        kind: "exam" as const,
+                        id: ex.id,
+                        title: ex.title,
+                        time: null as string | null,
+                        data: ex,
+                      })),
+                      ...dayEvents.map((evt) => ({
+                        kind: "event" as const,
+                        id: evt.id,
+                        title: evt.title,
+                        time: getEventTimeCandidate(evt),
+                        data: evt,
+                      })),
+                      ...dayTasks.map((task) => ({
+                        kind: "task" as const,
+                        id: task.id,
+                        title: task.title,
+                        time: getTaskTimeCandidate(task),
+                        data: task,
+                      })),
+                    ];
+                    const sortedMonthItems = sortByTime(
+                      monthItems,
+                      (item) => item.time,
+                      (item) => item.title,
+                      (item) => item.id
+                    );
+                    const maxItems = 3;
+                    const visibleItems = sortedMonthItems.slice(0, maxItems);
+                    const hiddenCount = sortedMonthItems.length - visibleItems.length;
+
+                    return (
+                      <>
+                        {visibleItems.map((item) => {
+                          if (item.kind === "exam") {
+                            const ex = item.data as ExamListItem;
+                            return (
+                              <span
+                                key={`exam-${ex.id}`}
+                                style={{ ...styles.eventDot, ...styles.monthItem }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/t/${ex.code}`);
+                                }}
+                                title={`${ex.title} (${ex.status})`}
+                              >
+                                {ex.title}
+                              </span>
+                            );
+                          }
+                          if (item.kind === "event") {
+                            const evt = item.data as CalendarEvent;
+                            return (
+                              <div
+                                key={`event-${evt.id}`}
+                                style={{
+                                  ...styles.eventDot,
+                                  background: resolveColor(evt.color),
+                                  color: isDark ? "#e2e8f0" : "#1f2937",
+                                  borderLeft: `2px solid ${resolveColor(evt.color)}`,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  gap: 6,
+                                }}
+                              >
+                                <span style={styles.monthItemText}>
+                                  {evt.time ? `${evt.time} · ${evt.title}` : evt.title}
+                                </span>
+                                <span style={styles.agendaActions}>
+                                  <button
+                                    style={styles.actionBtn}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditModal(evt, "event");
+                                    }}
+                                    aria-label="Editar evento"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    style={styles.actionBtn}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteEvent(evt.id);
+                                    }}
+                                    aria-label="Borrar evento"
+                                  >
+                                    🗑️
+                                  </button>
+                                </span>
+                              </div>
+                            );
+                          }
+                          const task = item.data as CalendarTask;
+                          return (
+                            <div
+                              key={`task-${task.id}`}
+                              style={{
+                                ...styles.eventDot,
+                                background: task.color,
+                                color: isDark ? "#e2e8f0" : "#1f2937",
+                                borderLeft: `2px solid ${task.color}`,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 6,
+                              }}
+                            >
+                              <span style={styles.monthItemText}>
+                                {task.time ? `${task.time} · ${task.title}` : task.title}
+                              </span>
+                              <span style={styles.agendaActions}>
+                                <button
+                                  style={styles.actionBtn}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditModal(task, "task");
+                                  }}
+                                  aria-label="Editar tarea"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  style={styles.actionBtn}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteTask(task.id);
+                                  }}
+                                  aria-label="Borrar tarea"
+                                >
+                                  🗑️
+                                </button>
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {hiddenCount > 0 && (
+                          <div style={styles.moreLabel}>+{hiddenCount} más</div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            );
+          })}
+
+          {Array.from({ length: trailingCells }).map((_, i) => (
+            <div
+              key={`trailing-${i}`}
+              style={{ background: isDark ? "#f3f4f6" : "white" }}
+            />
+          ))}
+        </div>
+      )}
+
+      {viewMode !== "month" && (
+        <div style={styles.dayPanel}>
+          {viewMode === "week" && (
+            <>
+              <div style={styles.agendaHeader}>
+                <div style={styles.agendaHeaderCell}>Hora</div>
+                {weekDays.map((day) => (
+                  <div key={day.toISOString()} style={styles.agendaHeaderCell}>
+                    {day.toLocaleDateString("es-ES", {
+                      weekday: "short",
+                      day: "numeric",
+                    })}
+                  </div>
+                ))}
+              </div>
+              <div style={styles.agendaBody}>
+                <div style={styles.timeColumn}>
+                  {hours.map((hour) => (
+                    <div key={`time-${hour}`} style={styles.timeCell}>
+                      {formatHour(hour)}
+                    </div>
+                  ))}
+                </div>
+                {weekDays.map((day) => {
+                  const dayKey = day.toISOString().slice(0, 10);
+                  const dayEvents = eventsByDay[dayKey] ?? [];
+                  const dayTasks = tasksByDay[dayKey] ?? [];
+                  const dayItems = [
+                    ...dayEvents.map((evt) => ({
+                      type: "event" as const,
+                      item: evt,
+                    })),
+                    ...dayTasks.map((task) => ({
+                      type: "task" as const,
+                      item: task,
+                    })),
+                  ];
+                  return (
+                    <div key={dayKey} style={styles.agendaDayColumn}>
+                      {hours.map((hour) => {
+                        const timedItems = sortByTime(
+                          dayItems.filter((entry) => {
+                            const minutes = parseTimeToMinutes(
+                              getRenderItemTime(entry)
+                            );
+                            return (
+                              minutes !== null && Math.floor(minutes / 60) === hour
+                            );
+                          }),
+                          (entry) => getRenderItemTime(entry),
+                          (entry) => getRenderItemTitle(entry),
+                          (entry) => getRenderItemId(entry)
+                        );
+                        return (
+                          <div key={`${dayKey}-${hour}`} style={styles.hourCell}>
+                            {timedItems.map(({ item, type }) =>
+                              renderAgendaItem(item, type)
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {viewMode === "day" && (
+            <>
+              <div style={{ fontWeight: 600, marginBottom: 8 }}>
+                {selectedDateLabel}
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "80px 1fr",
+                  gap: "6px",
+                  marginBottom: "12px",
+                }}
+              >
+                <div style={styles.timeColumn}>
+                  {hours.map((hour) => (
+                    <div key={`day-time-${hour}`} style={styles.timeCell}>
+                      {formatHour(hour)}
+                    </div>
+                  ))}
+                </div>
+                <div style={styles.agendaDayColumn}>
+                  {hours.map((hour) => {
+                    const dayItems = [
+                      ...selectedEvents.map((evt) => ({
+                        type: "event" as const,
+                        item: evt,
+                      })),
+                      ...selectedTasks.map((task) => ({
+                        type: "task" as const,
+                        item: task,
+                      })),
+                    ];
+                    const timedItems = sortByTime(
+                      dayItems.filter((entry) => {
+                        const minutes = parseTimeToMinutes(
+                          getRenderItemTime(entry)
+                        );
+                        return (
+                          minutes !== null && Math.floor(minutes / 60) === hour
+                        );
+                      }),
+                      (entry) => getRenderItemTime(entry),
+                      (entry) => getRenderItemTitle(entry),
+                      (entry) => getRenderItemId(entry)
+                    );
+                    return (
+                      <div key={`day-${hour}`} style={styles.hourCell}>
+                        {timedItems.map(({ item, type }) =>
+                          renderAgendaItem(item, type)
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div style={styles.dayForm}>
+                <input
+                  style={styles.input}
+                  value={newEventTitle}
+                  onChange={(e) => setNewEventTitle(e.target.value)}
+                  placeholder="Agregar evento"
+                />
+                <input
+                  style={{ ...styles.input, maxWidth: 120 }}
+                  type="time"
+                  value={newEventTime}
+                  onChange={(e) => setNewEventTime(e.target.value)}
+                />
+                <button style={styles.addBtn} onClick={addEvent}>
+                  Guardar
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+        </div>
       </div>
 
       {showTaskForm && (
@@ -702,12 +1859,27 @@ export default function CalendarView({ exams }: Props) {
                 }}
               >
                 <span style={{ fontSize: 12, color: "#292a2c" }}>🎨 Color</span>
-                <input
-                  style={styles.taskInput}
-                  type="color"
-                  value={taskColor}
-                  onChange={(e) => setTaskColor(e.target.value)}
-                />
+                {!useCustomColor && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {sherbetColors.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        style={styles.paletteDot(selectedColor === color, color)}
+                        onClick={() => setSelectedColor(color)}
+                        aria-label={`Seleccionar color ${color}`}
+                      />
+                    ))}
+                  </div>
+                )}
+                {useCustomColor && (
+                  <input
+                    style={styles.taskInput}
+                    type="color"
+                    value={taskColor}
+                    onChange={(e) => setTaskColor(e.target.value)}
+                  />
+                )}
               </div>
             </div>
             <div style={styles.taskActions}>
@@ -716,168 +1888,6 @@ export default function CalendarView({ exams }: Props) {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {viewMode === "month" && (
-        <div style={styles.grid}>
-          {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
-            <div key={d} style={styles.dayHeader}>
-              {d}
-            </div>
-          ))}
-
-          {Array.from({ length: startOffset }).map((_, i) => (
-            <div
-              key={`empty-${i}`}
-              style={{ background: isDark ? "#f3f4f6" : "white" }}
-            />
-          ))}
-
-          {Array.from({ length: days }).map((_, i) => {
-            const dayNum = i + 1;
-            const dayExams = examsByDay[dayNum] || [];
-            const cellDate = new Date(
-              currentDate.getFullYear(),
-              currentDate.getMonth(),
-              dayNum
-            );
-            const isToday =
-              dayNum === new Date().getDate() &&
-              currentDate.getMonth() === new Date().getMonth() &&
-              currentDate.getFullYear() === new Date().getFullYear();
-            const dayBackground = isToday ? "#ecfdf5" : isDark ? "#f3f4f6" : "white";
-            const dayKey = cellDate.toISOString().slice(0, 10);
-            const dayEvents = eventsByDay[dayKey] ?? [];
-            const dayTasks = tasksByDay[dayKey] ?? [];
-
-            return (
-              <div
-                key={dayNum}
-                style={{ ...styles.dayCell, background: dayBackground }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#f0fdf4")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = dayBackground)}
-                onClick={() => {
-                  setSelectedDate(cellDate);
-                  setViewMode("day");
-                }}
-              >
-                <div style={styles.dayNumber}>{dayNum}</div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  {dayExams.map((ex) => (
-                    <span
-                      key={ex.id}
-                      style={styles.eventDot}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/t/${ex.code}`);
-                      }}
-                      title={`${ex.title} (${ex.status})`}
-                    >
-                      {ex.title}
-                    </span>
-                  ))}
-
-                  {dayEvents.map((evt) => (
-                    <span
-                      key={evt.id}
-                      style={{
-                        ...styles.eventDot,
-                        background: "#ecfdf5",
-                        color: "#047857",
-                        borderLeft: "2px solid #10b981",
-                      }}
-                    >
-                      {evt.title}
-                    </span>
-                  ))}
-
-                  {dayTasks.map((task) => (
-                    <span
-                      key={task.id}
-                      style={{
-                        ...styles.eventDot,
-                        background: task.color,
-                        color: "#111",
-                        borderLeft: "2px solid rgba(0,0,0,0.2)",
-                      }}
-                    >
-                      {task.time ? `${task.time} · ${task.title}` : task.title}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {viewMode !== "month" && (
-        <div style={styles.dayPanel}>
-          {viewMode === "week" && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 8 }}>
-              {weekDays.map((day) => {
-                const dayKey = day.toISOString().slice(0, 10);
-                const dayEvents = eventsByDay[dayKey] ?? [];
-                const dayTasks = tasksByDay[dayKey] ?? [];
-                return (
-                  <div key={dayKey} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                    <div style={{ fontWeight: 600, fontSize: 12 }}>
-                      {day.toLocaleDateString("es-ES", { weekday: "short", day: "numeric" })}
-                    </div>
-                    {dayEvents.length === 0 && dayTasks.length === 0 ? (
-                      <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>Sin eventos</div>
-                    ) : (
-                      <>
-                        {dayEvents.map((evt) => (
-                          <div key={evt.id} style={styles.eventItem}>{evt.title}</div>
-                        ))}
-                        {dayTasks.map((task) => (
-                          <div key={task.id} style={styles.eventItem}>
-                            <span style={{ color: task.color }}>{task.time ? `${task.time} · ` : ""}</span>
-                            {task.title}
-                          </div>
-                        ))}
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {viewMode === "day" && (
-            <>
-              <div style={{ fontWeight: 600 }}>{selectedDateLabel}</div>
-              <div style={{ marginTop: 8 }}>
-                {selectedEvents.length === 0 && selectedTasks.length === 0 ? (
-                  <div style={{ fontSize: 12, color: "#6b7280" }}>Sin eventos para este día.</div>
-                ) : (
-                  <>
-                    {selectedEvents.map((evt) => (
-                      <div key={evt.id} style={styles.eventItem}>{evt.title}</div>
-                    ))}
-                    {selectedTasks.map((task) => (
-                      <div key={task.id} style={styles.eventItem}>
-                        <span style={{ color: task.color }}>{task.time ? `${task.time} · ` : ""}</span>
-                        {task.title}
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-              <div style={styles.dayForm}>
-                <input
-                  style={styles.input}
-                  value={newEventTitle}
-                  onChange={(e) => setNewEventTitle(e.target.value)}
-                  placeholder="Agregar evento"
-                />
-                <button style={styles.addBtn} onClick={addEvent}>Guardar</button>
-              </div>
-            </>
-          )}
         </div>
       )}
     </div>

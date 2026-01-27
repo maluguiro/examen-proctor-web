@@ -404,7 +404,12 @@ React.useEffect(() => {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: "📊" },
     { id: "universities", label: "Universidades", icon: "🏛️" },
-    { id: "calendar", label: "Calendario", icon: "📅" },
+    {
+      id: "calendar",
+      label: "Calendario",
+      icon: "📅",
+      action: () => router.push("/t/calendar"),
+    },
   ];
   const normalizedSearch = search.trim().toLowerCase();
 
@@ -449,7 +454,7 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
 
       case "calendar":
         return (
-          <div className="glass-panel p-8 rounded-[2rem] w-full animate-slide-up">
+          <div className="glass-panel p-8 rounded-[2rem] w-full animate-slide-up min-h-[calc(100vh-220px)] flex">
             <CalendarView exams={exams} profile={profile} />
           </div>
         );
