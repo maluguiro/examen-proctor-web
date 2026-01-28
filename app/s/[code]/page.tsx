@@ -1,11 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { API } from "@/lib/api";
 import ExamChat from "@/components/ExamChat";
 import FloatingChatShell from "@/components/FloatingChatShell";
 import NatureCaustics from "@/components/NatureCaustics";
-
-const API = process.env.NEXT_PUBLIC_API_URL!;
 
 type QKind = "MCQ" | "TRUE_FALSE" | "SHORT" | "FIB";
 

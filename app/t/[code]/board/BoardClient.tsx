@@ -1,14 +1,13 @@
 "use client";
 
 import * as React from "react";
+import { API } from "@/lib/api";
 import type {
     ExamAttemptsResponse,
     AttemptSummary,
     ExamStatus,
 } from "@/lib/types";
 import { getAuthToken } from "@/lib/api";
-
-const API = process.env.NEXT_PUBLIC_API_URL!;
 
 export function BoardClient({ code }: { code: string }) {
     const [data, setData] = React.useState<ExamAttemptsResponse | null>(null);

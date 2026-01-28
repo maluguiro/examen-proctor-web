@@ -1,9 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { API } from "@/lib/api";
 import { useParams } from "next/navigation";
-
-const API = process.env.NEXT_PUBLIC_API_URL!;
 
 type QuestionKind = "MCQ" | "TRUE_FALSE" | "SHORT_TEXT" | "FILL_IN";
 

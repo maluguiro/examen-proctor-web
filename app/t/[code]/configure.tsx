@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { API } from "@/lib/api";
 import { useParams, useRouter } from "next/navigation";
-
-const API = process.env.NEXT_PUBLIC_API_URL!;
 
 type Mode = "auto" | "manual";
 type Review = "immediate" | "after_manual";

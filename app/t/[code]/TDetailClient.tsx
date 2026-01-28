@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { API } from "@/lib/api";
 
 type QuestionType =
   | "multiple_choice"
@@ -16,13 +17,10 @@ type Exam = {
   isOpen: boolean;
 };
 
-const API = {
-  get: (p: string) =>
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}${p}`, { cache: "no-store" }).then(
-      (r) => r.json()
-    ),
+const apiClient = {
+  get: (p: string) => fetch(`${API}${p}`, { cache: "no-store" }).then((r) => r.json()),
   json: (p: string, m: "POST" | "PUT" | "PATCH" | "DELETE", b: any) =>
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}${p}`, {
+    fetch(`${API}${p}`, {
       method: m,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(b),
@@ -32,14 +30,14 @@ const API = {
 export default function TDetailClient({ code }: { code: string }) {
   const [exam, setExam] = useState<Exam | null>(null);
 
-  const load = async () => setExam((await API.get(`/exams/${code}`)).exam);
+  const load = async () => setExam((await apiClient.get(`/exams/${code}`)).exam);
   useEffect(() => {
     load();
   }, [code]);
 
   const toggle = async () => {
     if (!exam) return;
-    setExam(await API.json(`/exams/${code}`, "PUT", { isOpen: !exam.isOpen }));
+    setExam(await apiClient.json(`/exams/${code}`, "PUT", { isOpen: !exam.isOpen }));
   };
 
   if (!exam) return <div className="p-6">Cargando…</div>;

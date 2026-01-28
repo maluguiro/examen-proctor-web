@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { API } from "@/lib/api";
 import { useParams } from "next/navigation";
-
-const API = process.env.NEXT_PUBLIC_API_URL!;
 
 type Attempt = {
   id: string;

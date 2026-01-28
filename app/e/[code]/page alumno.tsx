@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { API } from "@/lib/api";
 import { useParams } from "next/navigation";
 
 type Exam = {
@@ -10,7 +11,6 @@ type Exam = {
   publicCode: string;
 };
 
-const API = process.env.NEXT_PUBLIC_API_URL!;
 const BLUR_GRACE_MS = 800; // ms de tolerancia para blur (Alt+Tab)
 const DEDUPE_MS = 1200; // ventana de dedupe por canal en el cliente (además del server)
 

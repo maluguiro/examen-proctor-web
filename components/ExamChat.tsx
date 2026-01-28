@@ -1,9 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { API } from "@/lib/api";
 import { ChatShellContext } from "./FloatingChatShell";
-
-const API = process.env.NEXT_PUBLIC_API_URL!;
 
 type ChatMessage = {
   id: string;
