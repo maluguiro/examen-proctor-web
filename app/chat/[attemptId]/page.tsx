@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { API } from "@/lib/api";
 import { useParams } from "next/navigation";
 
 type Msg = {
@@ -16,8 +17,6 @@ type AttemptInfo = {
   livesUsed: number;
   exam: { lives: number; title: string; durationMins: number };
 };
-
-const API = process.env.NEXT_PUBLIC_API_URL!;
 
 export default function TeacherChat() {
   const params = useParams<{ attemptId: string }>();

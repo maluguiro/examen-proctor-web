@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { API } from "@/lib/api";
 import { useParams, useRouter } from "next/navigation";
 import type { GradingMode, ReviewMode } from "@/lib/types";
-
-const API = process.env.NEXT_PUBLIC_API_URL!;
 
 export default function ConfigureExamPage() {
   const p = useParams();
