@@ -334,14 +334,7 @@ React.useEffect(() => {
   // Crear Examen
   async function handleCreateExam() {
     try {
-      const university = selectedUniversity.trim();
-      const subject = selectedSubject.trim();
-      if (!university || !subject) {
-        alert("Selecciona universidad y materia antes de crear el examen.");
-        return;
-      }
-
-      const exam = await createExam({ university, subject });
+      const exam = await createExam();
 
       // El backend puede devolver distintos formatos
       const code =

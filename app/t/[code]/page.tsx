@@ -225,12 +225,17 @@ export default function TeacherExamPage() {
     }
   }, [code]);
 
-  React.useEffect(() => {
-    if (!code) return;
-    loadExamAndMeta();
-    const p = loadTeacherProfile();
-    setProfile(p);
-  }, [code, loadExamAndMeta]);
+    React.useEffect(() => {
+      if (!code) return;
+      loadExamAndMeta();
+      const p = loadTeacherProfile();
+      setProfile(p);
+    }, [code, loadExamAndMeta]);
+
+    React.useEffect(() => {
+      if (step !== 1) return;
+      setProfile(loadTeacherProfile());
+    }, [step]);
 
   React.useEffect(() => {
     if (profile?.institutions && subject && !selectedUniName) {
@@ -260,12 +265,13 @@ export default function TeacherExamPage() {
     setErr(null);
     setInfo(null);
 
-    try {
-      const body: any = {
-        teacherName: teacherName.trim() || null,
-        subject: subject.trim() || null,
-        gradingMode,
-      };
+      try {
+        const body: any = {
+          teacherName: teacherName.trim() || null,
+          subject: subject.trim() || null,
+          university: selectedUniName.trim() || null,
+          gradingMode,
+        };
 
       if (maxScore !== "") {
         body.maxScore = Number(maxScore);
