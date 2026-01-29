@@ -152,9 +152,20 @@ export function clearAuthToken() {
 }
 // ⭐ Nueva función para crear examen con auth
 // ⭐ Nueva función para crear examen con auth
-export async function createExam() {
+export async function createExam(payload?: {
+  university?: string | null;
+  subject?: string | null;
+}) {
   const token = getAuthToken();
   if (!token) throw new Error("No hay sesión. Por favor logueate nuevamente.");
+
+  const body = {
+    title: "Examen sin título",
+    lives: 3,
+    durationMins: 60,
+    ...(payload?.university ? { university: payload.university } : {}),
+    ...(payload?.subject ? { subject: payload.subject } : {}),
+  };
 
   const res = await fetch(`${API}/exams`, {
     method: "POST",
@@ -162,11 +173,7 @@ export async function createExam() {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({
-      title: "Examen sin título",
-      lives: 3,
-      durationMins: 60,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {

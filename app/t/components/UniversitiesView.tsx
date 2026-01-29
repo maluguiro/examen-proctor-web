@@ -11,6 +11,7 @@ type ExamListItem = {
     status: string;
     code: string;
     createdAt: string;
+    university?: string;
     subject?: string;
 };
 
@@ -57,15 +58,18 @@ const [isDark, setIsDark] = React.useState(false);
     const activeSubject = activeInstitution?.subjects.find(s => s.id === selectedSubjectId);
 
     const filteredExams = React.useMemo(() => {
-        if (!activeSubject) return [];
-        const subjectName = activeSubject.name.toLowerCase().trim();
+        if (!activeSubject || !activeInstitution) return [];
+        const subjectName = activeSubject.name.trim();
+        const institutionName = activeInstitution.name.trim();
         return exams.filter(e => {
-            const examSubject = e.subject?.toLowerCase().trim();
-            const examTitle = e.title.toLowerCase();
-            // Match strict subject field OR title contains subject name
-            return (examSubject === subjectName) || (examTitle.includes(subjectName));
+            return (
+                e.university &&
+                e.subject &&
+                e.university === institutionName &&
+                e.subject === subjectName
+            );
         });
-    }, [exams, activeSubject]);
+    }, [exams, activeSubject, activeInstitution]);
 
     // --- Handlers (Persistence) ---
 

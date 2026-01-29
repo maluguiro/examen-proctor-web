@@ -32,6 +32,7 @@ type ExamListItem = {
   status: string;
   code: string;
   createdAt: string;
+  university?: string;
   subject?: string;
   date?: string;
   duration?: number;
@@ -62,6 +63,8 @@ export default function TeacherDashboard({
   // View State
   const [activeView, setActiveView] = React.useState<ViewState>("dashboard");
   const [search, setSearch] = React.useState("");
+  const [selectedUniversity, setSelectedUniversity] = React.useState("");
+  const [selectedSubject, setSelectedSubject] = React.useState("");
 
   // Estado local para exámenes
   const [exams, setExams] = React.useState<ExamListItem[]>([]);
@@ -75,6 +78,16 @@ const [widgetDate] = React.useState(new Date());
     []
   );
   const [calendarTasks, setCalendarTasks] = React.useState<CalendarTask[]>([]);
+
+  const institutions = profile?.institutions ?? [];
+  const selectedInstitution = institutions.find(
+    (inst) => inst.name === selectedUniversity
+  );
+  const availableSubjects = selectedInstitution?.subjects ?? [];
+
+  React.useEffect(() => {
+    setSelectedSubject("");
+  }, [selectedUniversity]);
 
   // MOCK DATA para Cards
   const fraudStats = {
@@ -321,7 +334,14 @@ React.useEffect(() => {
   // Crear Examen
   async function handleCreateExam() {
     try {
-      const exam = await createExam();
+      const university = selectedUniversity.trim();
+      const subject = selectedSubject.trim();
+      if (!university || !subject) {
+        alert("Selecciona universidad y materia antes de crear el examen.");
+        return;
+      }
+
+      const exam = await createExam({ university, subject });
 
       // El backend puede devolver distintos formatos
       const code =
@@ -461,19 +481,61 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
       case "exams": // Vista dedicada (grid completo)
         return (
           <div className="glass-panel p-8 rounded-[2rem] w-full animate-slide-up space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-gray-200/50">
-              <div>
-                <h2 className="font-festive text-gradient-sun dark:!text-slate-100 dark:!bg-none dark:!text-fill-inherit text-3xl mb-1">
-  Mis Exámenes
-</h2>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-gray-200/50">
+                <div>
+                  <h2 className="font-festive text-gradient-sun dark:!text-slate-100 dark:!bg-none dark:!text-fill-inherit text-3xl mb-1">
+                    Mis Exámenes
+                  </h2>
 
-                <p className="text-gray-500 font-medium text-sm">
-                  Gestiona tus evaluaciones y crea nuevas.
-                </p>
+                  <p className="text-gray-500 font-medium text-sm">
+                    Gestiona tus evaluaciones y crea nuevas.
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600 dark:text-slate-200">
+                    Universidad
+                  </label>
+                  <select
+                    className="px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 text-sm text-gray-800 dark:text-slate-100"
+                    value={selectedUniversity}
+                    onChange={(e) => setSelectedUniversity(e.target.value)}
+                  >
+                    <option value="">Selecciona universidad</option>
+                    {institutions.map((inst) => (
+                      <option key={inst.id} value={inst.name}>
+                        {inst.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-600 dark:text-slate-200">
+                    Materia
+                  </label>
+                  <select
+                    className="px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 text-sm text-gray-800 dark:text-slate-100"
+                    value={selectedSubject}
+                    onChange={(e) => setSelectedSubject(e.target.value)}
+                    disabled={!selectedInstitution || availableSubjects.length === 0}
+                  >
+                    <option value="">
+                      {selectedInstitution
+                        ? "Selecciona materia"
+                        : "Selecciona universidad"}
+                    </option>
+                    {availableSubjects.map((subj) => (
+                      <option key={subj.id} value={subj.name}>
+                        {subj.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Card "Crear Nuevo" rápida */}
               <div
                 onClick={handleCreateExam}
