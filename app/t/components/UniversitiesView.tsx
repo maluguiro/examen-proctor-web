@@ -79,6 +79,7 @@ const [isDark, setIsDark] = React.useState(false);
     // --- Handlers (Persistence) ---
 
     const saveChanges = async (newInsts: Institution[]) => {
+        console.log("[Universities] saveChanges", newInsts);
         setLocalInstitutions(newInsts); // Optimistic UI
         if (profile) {
             await onUpdateProfile({ ...profile, institutions: newInsts });
@@ -117,7 +118,19 @@ const [isDark, setIsDark] = React.useState(false);
     };
 
     const handleSaveModal = async () => {
-        if (!profile) return;
+        console.log("[Universities] click Guardar", {
+            profile: !!profile,
+            uniInput,
+            subjectInput,
+        });
+        if (!profile) {
+            setModalError("Perfil no cargado. Recargá e iniciá sesión de nuevo.");
+            return;
+        }
+        if (typeof onUpdateProfile !== "function") {
+            setModalError("onUpdateProfile no está conectado desde el dashboard.");
+            return;
+        }
         const uniName = uniInput.trim();
         const subjName = subjectInput.trim();
         if (!uniName || !subjName) {
@@ -412,6 +425,7 @@ const [isDark, setIsDark] = React.useState(false);
                         <div style={styles.modalActions}>
                             <button
                                 style={styles.btnSecondary}
+                                type="button"
                                 onClick={() => {
                                     setIsModalOpen(false);
                                     setModalError(null);
@@ -420,7 +434,11 @@ const [isDark, setIsDark] = React.useState(false);
                             >
                                 Cancelar
                             </button>
-                            <button style={styles.btnPrimary} onClick={handleSaveModal}>
+                            <button
+                                style={styles.btnPrimary}
+                                type="button"
+                                onClick={handleSaveModal}
+                            >
                                 Guardar
                             </button>
                         </div>
