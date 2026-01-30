@@ -40,6 +40,11 @@ export default function UniversitiesView({ profile, exams, onDeleteExam, onUpdat
     const [expandedInstIds, setExpandedInstIds] = React.useState<Set<string>>(new Set());
     const [selectedSubjectId, setSelectedSubjectId] = React.useState<string | null>(null);
 const [isDark, setIsDark] = React.useState(false);
+    const [isModalOpen, setIsModalOpen] = React.useState(false);
+    const [uniInput, setUniInput] = React.useState("");
+    const [subjectInput, setSubjectInput] = React.useState("");
+    const [modalError, setModalError] = React.useState<string | null>(null);
+    const [modalInfo, setModalInfo] = React.useState<string | null>(null);
 
     React.useEffect(() => {
         const html = document.documentElement;
@@ -74,6 +79,7 @@ const [isDark, setIsDark] = React.useState(false);
     // --- Handlers (Persistence) ---
 
     const saveChanges = async (newInsts: Institution[]) => {
+        console.log("[Universities] saveChanges", newInsts);
         setLocalInstitutions(newInsts); // Optimistic UI
         if (profile) {
             await onUpdateProfile({ ...profile, institutions: newInsts });
@@ -88,16 +94,11 @@ const [isDark, setIsDark] = React.useState(false);
     };
 
     const addUniversity = async () => {
-        const name = prompt("Nombre de la nueva universidad:");
-        if (!name) return;
-        const newInst: Institution = {
-            id: `inst-${Date.now()}`,
-            name,
-            subjects: []
-        };
-        await saveChanges([...localInstitutions, newInst]);
-        // Auto expand
-        toggleExpand(newInst.id);
+        setModalError(null);
+        setModalInfo(null);
+        setUniInput("");
+        setSubjectInput("");
+        setIsModalOpen(true);
     };
 
     const deleteUniversity = async (instId: string) => {
@@ -107,18 +108,79 @@ const [isDark, setIsDark] = React.useState(false);
     };
 
     const addSubject = async (instId: string) => {
-        const name = prompt("Nombre de la nueva materia:");
-        if (!name) return;
-        const newInsts = localInstitutions.map(i => {
-            if (i.id === instId) {
+        const inst = localInstitutions.find(i => i.id === instId);
+        if (!inst) return;
+        setModalError(null);
+        setModalInfo(null);
+        setUniInput(inst.name);
+        setSubjectInput("");
+        setIsModalOpen(true);
+    };
+
+    const handleSaveModal = async () => {
+        console.log("[Universities] click Guardar", {
+            profile: !!profile,
+            uniInput,
+            subjectInput,
+        });
+        if (!profile) {
+            setModalError("Perfil no cargado. Recargá e iniciá sesión de nuevo.");
+            return;
+        }
+        if (typeof onUpdateProfile !== "function") {
+            setModalError("onUpdateProfile no está conectado desde el dashboard.");
+            return;
+        }
+        const uniName = uniInput.trim();
+        const subjName = subjectInput.trim();
+        if (!uniName || !subjName) {
+            setModalError("Completa universidad y materia.");
+            return;
+        }
+
+        const existingInst = localInstitutions.find(
+            (i) => i.name.trim().toLowerCase() === uniName.toLowerCase()
+        );
+        const existingSubject = existingInst?.subjects.find(
+            (s) => s.name.trim().toLowerCase() === subjName.toLowerCase()
+        );
+
+        if (existingSubject) {
+            setModalError("Esa materia ya existe en la universidad.");
+            return;
+        }
+
+        let updatedInstitutions: Institution[];
+        if (existingInst) {
+            updatedInstitutions = localInstitutions.map((i) => {
+                if (i.id !== existingInst.id) return i;
                 return {
                     ...i,
-                    subjects: [...i.subjects, { id: `subj-${Date.now()}`, name }]
+                    subjects: [...i.subjects, { id: `subj-${Date.now()}`, name: subjName }],
                 };
-            }
-            return i;
-        });
-        await saveChanges(newInsts);
+            });
+        } else {
+            updatedInstitutions = [
+                ...localInstitutions,
+                {
+                    id: `inst-${Date.now()}`,
+                    name: uniName,
+                    subjects: [{ id: `subj-${Date.now()}`, name: subjName }],
+                },
+            ];
+        }
+
+        try {
+            await saveChanges(updatedInstitutions);
+            setModalInfo("Guardado.");
+            setIsModalOpen(false);
+            setUniInput("");
+            setSubjectInput("");
+            setModalError(null);
+        } catch (e) {
+            console.error(e);
+            setModalError("No se pudo guardar. Intenta nuevamente.");
+        }
     };
 
     const deleteSubject = async (instId: string, subjId: string) => {
@@ -163,6 +225,72 @@ const [isDark, setIsDark] = React.useState(false);
             alignItems: "center",
             background: "#fafafa",
             color: "#111",
+        },
+        modalOverlay: {
+            position: "fixed" as const,
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.35)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 50,
+        },
+        modalCard: {
+            width: "100%",
+            maxWidth: "520px",
+            background: "rgba(255,255,255,0.92)",
+            borderRadius: "16px",
+            border: "1px solid rgba(255,255,255,0.6)",
+            boxShadow: "0 20px 50px rgba(15, 23, 42, 0.18)",
+            padding: "20px",
+            backdropFilter: "blur(8px)",
+        },
+        modalTitle: {
+            fontWeight: 700,
+            fontSize: "16px",
+            marginBottom: "12px",
+            color: "#111",
+        },
+        input: {
+            width: "100%",
+            padding: "10px 12px",
+            borderRadius: "10px",
+            border: "1px solid #e5e7eb",
+            fontSize: "14px",
+        },
+        modalActions: {
+            display: "flex",
+            gap: "10px",
+            justifyContent: "flex-end",
+            marginTop: "16px",
+        },
+        btnSecondary: {
+            background: "transparent",
+            border: "1px solid #e5e7eb",
+            borderRadius: "10px",
+            padding: "8px 12px",
+            fontSize: "13px",
+            cursor: "pointer",
+        },
+        btnPrimary: {
+            background: "#111",
+            color: "#fff",
+            border: "none",
+            borderRadius: "10px",
+            padding: "8px 12px",
+            fontSize: "13px",
+            cursor: "pointer",
+            fontWeight: 600,
+        },
+        modalError: {
+            color: "#b91c1c",
+            fontSize: "12px",
+            marginTop: "8px",
+        },
+        modalInfo: {
+            color: "#0f766e",
+            fontSize: "12px",
+            marginTop: "8px",
         },
         btnPrimarySmall: {
             background: "#111",
@@ -239,8 +367,84 @@ const [isDark, setIsDark] = React.useState(false);
         },
     };
 
+    const existingUniversities = React.useMemo(
+        () => localInstitutions.map((i) => i.name),
+        [localInstitutions]
+    );
+    const subjectsForSelectedUni = React.useMemo(() => {
+        const inst = localInstitutions.find(
+            (i) => i.name.trim().toLowerCase() === uniInput.trim().toLowerCase()
+        );
+        return inst ? inst.subjects.map((s) => s.name) : [];
+    }, [localInstitutions, uniInput]);
+
     return (
         <div style={styles.container}>
+            {isModalOpen && (
+                <div style={styles.modalOverlay}>
+                    <div style={styles.modalCard}>
+                        <div style={styles.modalTitle}>Agregar Universidad / Materia</div>
+                        <div style={{ display: "grid", gap: 12 }}>
+                            <div>
+                                <label style={{ fontSize: 12, fontWeight: 700, color: "#111" }}>
+                                    Universidad
+                                </label>
+                                <input
+                                    list="universities-datalist"
+                                    value={uniInput}
+                                    onChange={(e) => setUniInput(e.target.value)}
+                                    style={styles.input}
+                                    placeholder="Ej: UBA"
+                                />
+                                <datalist id="universities-datalist">
+                                    {existingUniversities.map((name) => (
+                                        <option key={name} value={name} />
+                                    ))}
+                                </datalist>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: 12, fontWeight: 700, color: "#111" }}>
+                                    Nombre de la Asignatura
+                                </label>
+                                <input
+                                    list="subjects-datalist"
+                                    value={subjectInput}
+                                    onChange={(e) => setSubjectInput(e.target.value)}
+                                    style={styles.input}
+                                    placeholder="Ej: Álgebra I"
+                                />
+                                <datalist id="subjects-datalist">
+                                    {subjectsForSelectedUni.map((name) => (
+                                        <option key={name} value={name} />
+                                    ))}
+                                </datalist>
+                            </div>
+                        </div>
+                        {modalError && <div style={styles.modalError}>{modalError}</div>}
+                        {modalInfo && <div style={styles.modalInfo}>{modalInfo}</div>}
+                        <div style={styles.modalActions}>
+                            <button
+                                style={styles.btnSecondary}
+                                type="button"
+                                onClick={() => {
+                                    setIsModalOpen(false);
+                                    setModalError(null);
+                                    setModalInfo(null);
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                style={styles.btnPrimary}
+                                type="button"
+                                onClick={handleSaveModal}
+                            >
+                                Guardar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* Left: Tree */}
             <div style={styles.column}>
                 <div style={styles.header}>
