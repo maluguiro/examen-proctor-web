@@ -407,7 +407,7 @@ React.useEffect(() => {
       // 2. Guardar en LocalStorage (Frontend Sync)
       // Esto asegura que al recargar la página (F5) los datos se lean correcamente
       // ya que page.tsx usa loadTeacherProfile().
-      saveTeacherProfile(updatedFromApi ?? newProfile);
+      saveTeacherProfile(newProfile);
       console.log("SAVE_PROFILE_SUCCESS (LocalStorage)");
 
       await onProfileRefresh();

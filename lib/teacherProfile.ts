@@ -23,14 +23,28 @@ export type TeacherProfile = {
 
 const STORAGE_KEY = "teacherProfile";
 
+type RawProfileResponse =
+  | TeacherProfile
+  | { profile?: TeacherProfile | null }
+  | null
+  | undefined;
+
+function normalizeProfile(raw: RawProfileResponse): TeacherProfile | null {
+  if (!raw) return null;
+  if (typeof raw === "object" && "profile" in raw) {
+    const inner = (raw as { profile?: TeacherProfile | null }).profile ?? null;
+    return inner && typeof inner === "object" ? inner : null;
+  }
+  return typeof raw === "object" ? (raw as TeacherProfile) : null;
+}
+
 function loadTeacherProfileCache(): TeacherProfile | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return null;
-    return parsed as TeacherProfile;
+    return normalizeProfile(parsed);
   } catch {
     return null;
   }
@@ -59,8 +73,11 @@ async function loadTeacherProfileRemote(
     throw new Error("PROFILE_FAILED");
   }
 
-  const profile = (await res.json()) as TeacherProfile;
-  saveTeacherProfile(profile);
+  const raw = (await res.json()) as RawProfileResponse;
+  const profile = normalizeProfile(raw);
+  if (profile) {
+    saveTeacherProfile(profile);
+  }
   return profile;
 }
 

@@ -28,13 +28,39 @@ export default function UniversitiesView({ profile, exams, onDeleteExam, onUpdat
     // Local state for institutions (to support immediate UI feedback before/during save)
     // Initialize from props.profile, but then manage locally
     const [localInstitutions, setLocalInstitutions] = React.useState<Institution[]>([]);
+    const [isSaving, setIsSaving] = React.useState(false);
+    const lastAppliedSigRef = React.useRef<string>("");
 
     // Sync local state with profile prop when it changes (e.g. initial load)
     React.useEffect(() => {
-        if (profile?.institutions) {
-            setLocalInstitutions(profile.institutions);
+        const institutions = Array.isArray(profile?.institutions)
+            ? profile?.institutions
+            : null;
+        if (!institutions) return;
+
+        if (process.env.NODE_ENV !== "production") {
+            console.debug(
+                "[unis] profile institutions isArray",
+                Array.isArray(profile?.institutions),
+                "len",
+                profile?.institutions?.length
+            );
         }
-    }, [profile]);
+
+        const sig = `${institutions
+            .map((i) => i.id ?? i.name ?? "")
+            .join("|")}:${institutions.length}`;
+
+        if (sig === lastAppliedSigRef.current) return;
+        if (isSaving) return;
+        if (localInstitutions.length > institutions.length) return;
+
+        setLocalInstitutions(institutions);
+        lastAppliedSigRef.current = sig;
+        if (process.env.NODE_ENV !== "production") {
+            console.debug("[unis] apply sync sig", sig);
+        }
+    }, [profile?.institutions, isSaving, localInstitutions.length]);
 
     // Selection State
     const [expandedInstIds, setExpandedInstIds] = React.useState<Set<string>>(new Set());
@@ -82,7 +108,12 @@ const [isDark, setIsDark] = React.useState(false);
         console.log("[Universities] saveChanges", newInsts);
         setLocalInstitutions(newInsts); // Optimistic UI
         if (profile) {
-            await onUpdateProfile({ ...profile, institutions: newInsts });
+            setIsSaving(true);
+            try {
+                await onUpdateProfile({ ...profile, institutions: newInsts });
+            } finally {
+                setIsSaving(false);
+            }
         }
     };
 
