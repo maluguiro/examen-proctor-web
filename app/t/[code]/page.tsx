@@ -829,7 +829,7 @@ export default function TeacherExamPage() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 ml-1">
-                    Fecha de Apertura (Opcional)
+                    Fecha de Revision (Opcional)
                   </label>
                   <input
                     type="datetime-local"
