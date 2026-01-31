@@ -1,5 +1,7 @@
 // web/lib/teacherProfile.ts
 
+import { API, getAuthToken } from "@/lib/api";
+
 export type Subject = {
   id: string;
   name: string;
@@ -21,7 +23,7 @@ export type TeacherProfile = {
 
 const STORAGE_KEY = "teacherProfile";
 
-export function loadTeacherProfile(): TeacherProfile | null {
+function loadTeacherProfileCache(): TeacherProfile | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -32,6 +34,45 @@ export function loadTeacherProfile(): TeacherProfile | null {
   } catch {
     return null;
   }
+}
+
+async function loadTeacherProfileRemote(
+  token?: string | null
+): Promise<TeacherProfile | null> {
+  const authToken = token ?? getAuthToken();
+  if (!authToken) {
+    throw new Error("UNAUTHORIZED");
+  }
+
+  const res = await fetch(`${API}/teacher/profile`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+
+  if (res.status === 401) {
+    throw new Error("UNAUTHORIZED");
+  }
+  if (!res.ok) {
+    throw new Error("PROFILE_FAILED");
+  }
+
+  const profile = (await res.json()) as TeacherProfile;
+  saveTeacherProfile(profile);
+  return profile;
+}
+
+export function loadTeacherProfile(): TeacherProfile | null;
+export function loadTeacherProfile(options: {
+  remote: true;
+  token?: string | null;
+}): Promise<TeacherProfile | null>;
+export function loadTeacherProfile(options?: {
+  remote?: boolean;
+  token?: string | null;
+}) {
+  if (options?.remote) {
+    return loadTeacherProfileRemote(options.token);
+  }
+  return loadTeacherProfileCache();
 }
 
 export function saveTeacherProfile(profile: TeacherProfile) {
