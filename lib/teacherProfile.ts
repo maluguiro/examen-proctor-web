@@ -44,6 +44,10 @@ async function loadTeacherProfileRemote(
     throw new Error("UNAUTHORIZED");
   }
 
+  if (process.env.NODE_ENV !== "production") {
+    console.count("loadTeacherProfile remote");
+  }
+
   const res = await fetch(`${API}/teacher/profile`, {
     headers: { Authorization: `Bearer ${authToken}` },
   });

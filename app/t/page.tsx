@@ -34,6 +34,7 @@ export default function TeacherHomePage() {
   const [rememberMe, setRememberMe] = React.useState(false);
 
   const [profile, setProfile] = React.useState<TeacherProfile | null>(null);
+  const didFetchRef = React.useRef<string | null>(null);
 
   const refreshProfile = React.useCallback(
     async (options?: { silent?: boolean }) => {
@@ -85,13 +86,19 @@ export default function TeacherHomePage() {
 
   // Load Profile when Auth changes
   React.useEffect(() => {
-    if (!authToken) return;
+    if (!authToken) {
+      didFetchRef.current = null;
+      return;
+    }
+    if (didFetchRef.current === authToken) return;
+    didFetchRef.current = authToken;
+
     const cached = loadTeacherProfile();
-    if (cached && !profile) {
-      setProfile(cached);
+    if (cached) {
+      setProfile((prev) => prev ?? cached);
     }
     void refreshProfile({ silent: true });
-  }, [authToken, profile, refreshProfile]);
+  }, [authToken, refreshProfile]);
 
   // Auth Actions
   async function handleLogin(e: React.FormEvent) {
