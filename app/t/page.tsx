@@ -34,6 +34,34 @@ export default function TeacherHomePage() {
   const [rememberMe, setRememberMe] = React.useState(false);
 
   const [profile, setProfile] = React.useState<TeacherProfile | null>(null);
+  const didFetchRef = React.useRef<string | null>(null);
+
+  const refreshProfile = React.useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!authToken) return null;
+      try {
+        const fresh = await loadTeacherProfile({ remote: true, token: authToken });
+        setProfile(fresh);
+        return fresh;
+      } catch (e: any) {
+        if (e?.message === "UNAUTHORIZED") {
+          clearAuthToken();
+          setAuthToken(null);
+          setProfile(null);
+          if (!options?.silent) {
+            setAuthError("Sesión expirada. Inicia sesión de nuevo.");
+            setAuthMode("login");
+          }
+          return null;
+        }
+        if (!options?.silent) {
+          setAuthError("No se pudo cargar el perfil.");
+        }
+        return null;
+      }
+    },
+    [authToken]
+  );
 
   // Check Token & Remember Me on Mount
   React.useEffect(() => {
@@ -58,11 +86,19 @@ export default function TeacherHomePage() {
 
   // Load Profile when Auth changes
   React.useEffect(() => {
-    if (authToken && !profile) {
-      const p = loadTeacherProfile();
-      setProfile(p);
+    if (!authToken) {
+      didFetchRef.current = null;
+      return;
     }
-  }, [authToken, profile]);
+    if (didFetchRef.current === authToken) return;
+    didFetchRef.current = authToken;
+
+    const cached = loadTeacherProfile();
+    if (cached) {
+      setProfile((prev) => prev ?? cached);
+    }
+    void refreshProfile({ silent: true });
+  }, [authToken, refreshProfile]);
 
   // Auth Actions
   async function handleLogin(e: React.FormEvent) {
@@ -325,5 +361,11 @@ export default function TeacherHomePage() {
   }
 
   // 2) AUTENTICADO -> NUEVO DASHBOARD ProctoEtic
-  return <TeacherDashboard profile={profile} onLogout={handleLogout} />;
+  return (
+    <TeacherDashboard
+      profile={profile}
+      onLogout={handleLogout}
+      onProfileRefresh={refreshProfile}
+    />
+  );
 }

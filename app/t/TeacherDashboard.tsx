@@ -17,6 +17,7 @@ import ThemeToggle from "./components/ThemeToggle";
 type TeacherDashboardProps = {
   profile: TeacherProfile | null;
   onLogout: () => void;
+  onProfileRefresh: () => Promise<TeacherProfile | null>;
 };
 
 type ViewState =
@@ -57,6 +58,7 @@ type CalendarTask = {
 export default function TeacherDashboard({
   profile,
   onLogout,
+  onProfileRefresh,
 }: TeacherDashboardProps) {
   const router = useRouter();
 
@@ -407,6 +409,8 @@ React.useEffect(() => {
       // ya que page.tsx usa loadTeacherProfile().
       saveTeacherProfile(newProfile);
       console.log("SAVE_PROFILE_SUCCESS (LocalStorage)");
+
+      await onProfileRefresh();
     } catch (e) {
       console.error("SAVE_PROFILE_ERROR", e);
       alert("Error al guardar cambios. Verifica la consola.");
