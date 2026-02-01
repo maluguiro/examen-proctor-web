@@ -104,6 +104,7 @@ export default function TeacherExamPage() {
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState<string | null>(null);
   const [info, setInfo] = React.useState<string | null>(null);
+  const infoTimerRef = React.useRef<number | null>(null);
 
   const [savingMeta, setSavingMeta] = React.useState(false);
   const [savingExam, setSavingExam] = React.useState(false);
@@ -157,6 +158,23 @@ export default function TeacherExamPage() {
   const [profile, setProfile] = React.useState<TeacherProfile | null>(null);
   const [selectedUniName, setSelectedUniName] = React.useState("");
   const [manualSubjectMode, setManualSubjectMode] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!info) return;
+    if (infoTimerRef.current !== null) {
+      window.clearTimeout(infoTimerRef.current);
+    }
+    infoTimerRef.current = window.setTimeout(() => {
+      setInfo(null);
+      infoTimerRef.current = null;
+    }, 2500);
+    return () => {
+      if (infoTimerRef.current !== null) {
+        window.clearTimeout(infoTimerRef.current);
+        infoTimerRef.current = null;
+      }
+    };
+  }, [info]);
 
   // ----------------- carga inicial -----------------
 
@@ -676,7 +694,7 @@ export default function TeacherExamPage() {
           {/* ERROR / INFO TOASTS */}
           {(info || err) && (
             <div
-              className={`mb-6 p-4 rounded-xl text-sm font-bold flex items-center gap-3 shadow-sm ${
+              className={`mb-6 p-4 rounded-xl text-sm font-bold flex items-center gap-3 shadow-sm pointer-events-none ${
                 err
                   ? "bg-red-50 text-red-600 border border-red-100"
                   : "bg-emerald-50 text-emerald-600 border border-emerald-100"
