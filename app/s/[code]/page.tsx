@@ -99,6 +99,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
   const [questions, setQuestions] = React.useState<PaperQuestion[]>([]);
   const [loadingPaper, setLoadingPaper] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
+  const [reloadKey, setReloadKey] = React.useState(0);
 
   const [lives, setLives] = React.useState<number | null>(null);
   const [secondsLeft, setSecondsLeft] = React.useState<number | null>(null);
@@ -124,6 +125,21 @@ export default function StudentPage({ params }: { params: { code: string } }) {
   );
   const [score, setScore] = React.useState<number | null>(null);
   const [maxScore, setMaxScore] = React.useState<number | null>(null);
+
+  function logDevError(label: string, detail?: any) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error(label, detail);
+    }
+  }
+
+  function setFriendlyError(detail?: any) {
+    setErr("Hubo un error. Reintentá.");
+    logDevError("STUDENT_ERROR_DETAIL", detail);
+  }
+
+  const retryLoad = React.useCallback(() => {
+    setReloadKey((k) => k + 1);
+  }, []);
 
   const handleReturnToExam = React.useCallback(() => {
     const target = document.documentElement;
@@ -275,8 +291,8 @@ export default function StudentPage({ params }: { params: { code: string } }) {
           }))
         );
       } catch (e: any) {
-        console.error(e);
-        if (!cancelled) setErr(e?.message || "ERROR_PAPER");
+        logDevError("PAPER_LOAD_ERROR", e);
+        if (!cancelled) setFriendlyError(e);
       } finally {
         if (!cancelled) setLoadingPaper(false);
       }
@@ -286,7 +302,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     return () => {
       cancelled = true;
     };
-  }, [code]);
+  }, [code, reloadKey]);
 
   // Summary (vidas/time)
   const refreshSummary = React.useCallback(async () => {
@@ -352,10 +368,18 @@ export default function StudentPage({ params }: { params: { code: string } }) {
       setStep("exam");
       await refreshSummary();
     } catch (e: any) {
-      console.error(e);
-      setErr(e?.message || "ERROR_START");
+      logDevError("START_ATTEMPT_ERROR", e);
+      setFriendlyError(e);
     }
   }, [code, studentName, refreshSummary]);
+
+  const handleRetry = React.useCallback(() => {
+    if (step === "name") {
+      startAttempt();
+      return;
+    }
+    retryLoad();
+  }, [retryLoad, startAttempt, step]);
 
   const submitAttempt = React.useCallback(
     async (reason: "manual" | "time" | "lives") => {
@@ -404,8 +428,8 @@ export default function StudentPage({ params }: { params: { code: string } }) {
         setMaxScore(data.maxScore ?? null);
         setStep("submitted");
       } catch (e: any) {
-        console.error(e);
-        setErr(e?.message || "Error al enviar el intento");
+        logDevError("SUBMIT_ATTEMPT_ERROR", e);
+        setFriendlyError(e);
         setStep("exam");
       }
     },
@@ -754,6 +778,15 @@ export default function StudentPage({ params }: { params: { code: string } }) {
               {err && (
                 <div className="mt-4 text-red-500 bg-red-50 p-2 rounded-lg text-sm">
                   {err}
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={handleRetry}
+                      className="btn-aurora px-4 py-2 rounded-lg text-xs font-bold"
+                    >
+                      Reintentar
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -809,6 +842,15 @@ export default function StudentPage({ params }: { params: { code: string } }) {
               {err && (
                 <div className="text-center text-red-500 mt-4 bg-white/50 p-2 rounded">
                   {err}
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={handleRetry}
+                      className="btn-aurora px-4 py-2 rounded-lg text-xs font-bold"
+                    >
+                      Reintentar
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
