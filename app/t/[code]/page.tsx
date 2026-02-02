@@ -1282,6 +1282,12 @@ export default function TeacherExamPage() {
                   <span className="text-lg">{linkCopied ? "✅" : "🔗"}</span>
                   {linkCopied ? "¡Link Copiado!" : "Copiar Link Examen"}
                 </button>
+                <Link
+                  href={`/t/exams/${code}/grading`}
+                  className="btn-aurora px-5 py-2.5 rounded-full font-bold text-sm transition-all"
+                >
+                  Correcci�n manual
+                </Link>
               </div>
 
               <div className="flex-1 glass-panel p-0 rounded-3xl overflow-hidden flex flex-col border border-white/50">
@@ -1315,3 +1321,7 @@ export default function TeacherExamPage() {
     </div>
   );
 }
+
+
+
+
