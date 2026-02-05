@@ -184,7 +184,11 @@ export async function createExam(payload?: {
   return res.json();
 }
 
-export async function createInvite(code: string, email: string) {
+export async function createInvite(
+  code: string,
+  email: string,
+  role: "GRADER" | "PROCTOR"
+) {
   const token = getAuthToken();
   if (!token) throw new Error("UNAUTHORIZED");
 
@@ -194,7 +198,7 @@ export async function createInvite(code: string, email: string) {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, role }),
   });
 
   if (!res.ok) {

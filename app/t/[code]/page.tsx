@@ -159,11 +159,15 @@ export default function TeacherExamPage() {
   const [inviteLoading, setInviteLoading] = React.useState(false);
   const [inviteError, setInviteError] = React.useState<string | null>(null);
   const [inviteCopied, setInviteCopied] = React.useState(false);
+  const [inviteRole, setInviteRole] = React.useState<"GRADER" | "PROCTOR">(
+    "GRADER"
+  );
 
   // Perfil Docente
   const [profile, setProfile] = React.useState<TeacherProfile | null>(null);
   const [selectedUniName, setSelectedUniName] = React.useState("");
   const [manualSubjectMode, setManualSubjectMode] = React.useState(false);
+  const isManual = gradingMode === "manual";
 
   React.useEffect(() => {
     if (!info) return;
@@ -588,7 +592,7 @@ export default function TeacherExamPage() {
     setInviteError(null);
     setInviteLink("");
     try {
-      const res = await createInvite(code, inviteEmail.trim());
+      const res = await createInvite(code, inviteEmail.trim(), inviteRole);
       const link = res?.inviteLink || res?.link || "";
       if (!link) {
         setInviteError("No se pudo generar el link.");
@@ -678,26 +682,52 @@ export default function TeacherExamPage() {
           {/* ID del examen oculto a pedido del usuario */}
         </div>
 
-        <nav className="flex flex-col gap-2">
+        <nav className="flex flex-col gap-2 overflow-visible">
           {steps.map((s) => {
             const isActive = step === s.id;
             return (
-              <button
-                key={s.id}
-                onClick={() => setStep(s.id)}
-                className={`text-left px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-3 ${
-                  isActive
-                    ? "btn-aurora shadow-sm"
-                    : "text-gray-500 hover:bg-white/20 hover:text-gray-700 hover:pl-5"
-                }`}
-              >
-                <div
-                  className={`w-2 h-2 rounded-full transition-colors ${
-                    isActive ? "bg-indigo-500" : "bg-gray-300"
+              <div key={s.id} className="relative">
+                <button
+                  onClick={() => setStep(s.id)}
+                  className={`text-left px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-3 ${
+                    isActive
+                      ? "btn-aurora shadow-sm"
+                      : "text-gray-500 hover:bg-white/20 hover:text-gray-700 hover:pl-5"
                   }`}
-                />
-                {s.label}
-              </button>
+                >
+                  <div
+                    className={`w-2 h-2 rounded-full transition-colors ${
+                      isActive ? "bg-indigo-500" : "bg-gray-300"
+                    }`}
+                  />
+                  {s.label}
+                </button>
+                {step === 4 && s.id === 4 && (
+                  <div className="pointer-events-none absolute right-0 top-full mt-2 z-30 flex flex-col gap-2 items-start">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInviteOpen(true);
+                        setInviteError(null);
+                        setInviteCopied(false);
+                      }}
+                      className="btn-pill-accent pointer-events-auto inline-flex w-fit items-center gap-2 rounded-full text-xs font-bold"
+                      style={{ padding: "6px 10px", fontSize: "11px" }}
+                    >
+                      Invitar docente
+                    </button>
+                    {isManual && (
+                      <Link
+                        href={`/t/exams/${code}/grading`}
+                        className="btn-pill-accent pointer-events-auto inline-flex w-fit items-center gap-2 rounded-full text-xs font-bold"
+                        style={{ padding: "6px 10px", fontSize: "11px" }}
+                      >
+                        Corrección manual
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
@@ -1322,29 +1352,12 @@ export default function TeacherExamPage() {
                 </div>
                 <button
                   onClick={copyStudentLink}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-xs transition-all ${
                     linkCopied ? "btn-aurora-primary" : "btn-aurora"
                   }`}
                 >
-                  <span className="text-lg">{linkCopied ? "✅" : "🔗"}</span>
+                  <span className="text-base">{linkCopied ? "✅" : "🔗"}</span>
                   {linkCopied ? "¡Link Copiado!" : "Copiar Link Examen"}
-                </button>
-                <Link
-                  href={`/t/exams/${code}/grading`}
-                  className="btn-aurora px-5 py-2.5 rounded-full font-bold text-sm transition-all"
-                >
-                  Corrección manual
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setInviteOpen(true);
-                    setInviteError(null);
-                    setInviteCopied(false);
-                  }}
-                  className="btn-aurora px-5 py-2.5 rounded-full font-bold text-sm transition-all"
-                >
-                  Invitar docente
                 </button>
               </div>
 
@@ -1384,6 +1397,34 @@ export default function TeacherExamPage() {
                 >
                   X
                 </button>
+              </div>
+
+              <label className="text-xs font-bold text-gray-600 ml-1">
+                Acceso
+              </label>
+              <div className="flex flex-col gap-2 mt-2 mb-3">
+                <label className="flex items-center gap-2 text-xs text-gray-700">
+                  <input
+                    type="radio"
+                    name="invite-role"
+                    value="GRADER"
+                    checked={inviteRole === "GRADER"}
+                    onChange={() => setInviteRole("GRADER")}
+                    className="accent-emerald-500"
+                  />
+                  Solo correccion
+                </label>
+                <label className="flex items-center gap-2 text-xs text-gray-700">
+                  <input
+                    type="radio"
+                    name="invite-role"
+                    value="PROCTOR"
+                    checked={inviteRole === "PROCTOR"}
+                    onChange={() => setInviteRole("PROCTOR")}
+                    className="accent-emerald-500"
+                  />
+                  Monitoreo + correccion (durante examen)
+                </label>
               </div>
 
               <label className="text-xs font-bold text-gray-600 ml-1">
