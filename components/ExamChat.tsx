@@ -28,6 +28,10 @@ export default function ExamChat({ code, role, defaultName }: Props) {
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
+  const [lastErrorAction, setLastErrorAction] = React.useState<
+    "fetch" | "send" | null
+  >(null);
+  const [isPollingPaused, setIsPollingPaused] = React.useState(false);
   const [asBroadcast, setAsBroadcast] = React.useState(false); // solo docente
 
   const canBroadcast = role === "teacher";
@@ -38,6 +42,8 @@ export default function ExamChat({ code, role, defaultName }: Props) {
 
   // Ref para auto-scroll
   const listRef = React.useRef<HTMLDivElement | null>(null);
+  const pollIdRef = React.useRef<number | null>(null);
+  const consecutiveFailuresRef = React.useRef(0);
 
   // Cargar sonido una vez
   React.useEffect(() => {
@@ -47,15 +53,36 @@ export default function ExamChat({ code, role, defaultName }: Props) {
     }
   }, []);
 
+  function logDevError(label: string, detail?: any) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error(label, detail);
+    }
+  }
+
+  function setFriendlyError(action: "fetch" | "send", detail?: any) {
+    setErr("Hubo un error. Reintentá.");
+    setLastErrorAction(action);
+    logDevError("CHAT_ERROR_DETAIL", detail);
+  }
+
   const fetchMessages = React.useCallback(async () => {
     if (!code) return;
     try {
       const r = await fetch(`${API}/exams/${code}/chat`, {
         cache: "no-store",
       });
-      if (!r.ok) return;
+      if (!r.ok) {
+        const text = await r.text().catch(() => "");
+        setFriendlyError("fetch", text || r.status);
+        consecutiveFailuresRef.current += 1;
+        if (consecutiveFailuresRef.current >= 3) {
+          setIsPollingPaused(true);
+        }
+        return;
+      }
       const data = await r.json();
       if (Array.isArray(data.items)) {
+        consecutiveFailuresRef.current = 0;
         const list: ChatMessage[] = data.items;
 
         // Detectar si hay un mensaje nuevo
@@ -89,16 +116,33 @@ export default function ExamChat({ code, role, defaultName }: Props) {
         setMessages(list);
       }
     } catch (e) {
-      console.error("CHAT_FETCH_ERROR", e);
+      setFriendlyError("fetch", e);
+      consecutiveFailuresRef.current += 1;
+      if (consecutiveFailuresRef.current >= 3) {
+        setIsPollingPaused(true);
+      }
     }
   }, [code, name, role]);
 
   // Polling SIEMPRE (así hay notificaciones aunque el chat esté cerrado)
   React.useEffect(() => {
+    if (isPollingPaused) {
+      if (pollIdRef.current !== null) {
+        window.clearInterval(pollIdRef.current);
+        pollIdRef.current = null;
+      }
+      return;
+    }
     fetchMessages();
     const id = window.setInterval(fetchMessages, 3000);
-    return () => window.clearInterval(id);
-  }, [fetchMessages]);
+    pollIdRef.current = id;
+    return () => {
+      window.clearInterval(id);
+      if (pollIdRef.current === id) {
+        pollIdRef.current = null;
+      }
+    };
+  }, [fetchMessages, isPollingPaused]);
 
   // Auto-scroll al final cuando hay mensajes nuevos
   React.useEffect(() => {
@@ -138,7 +182,9 @@ export default function ExamChat({ code, role, defaultName }: Props) {
       });
 
       if (!r.ok) {
-        throw new Error(await r.text());
+        const text = await r.text().catch(() => "");
+        setFriendlyError("send", text || r.status);
+        return;
       }
 
       setInput("");
@@ -146,8 +192,7 @@ export default function ExamChat({ code, role, defaultName }: Props) {
       // refrescamos la lista
       await fetchMessages();
     } catch (e: any) {
-      console.error("CHAT_SEND_ERROR", e);
-      setErr(e?.message || "No se pudo enviar el mensaje");
+      setFriendlyError("send", e);
     } finally {
       setSending(false);
     }
@@ -387,6 +432,31 @@ export default function ExamChat({ code, role, defaultName }: Props) {
             }}
           >
             {err}
+            <div style={{ marginTop: 6 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (sending) return;
+                  consecutiveFailuresRef.current = 0;
+                  setIsPollingPaused(false);
+                  if (lastErrorAction === "send") {
+                    sendMessage();
+                  } else {
+                    fetchMessages();
+                  }
+                }}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  border: "1px solid rgba(0,0,0,0.08)",
+                  background: "rgba(255,255,255,0.7)",
+                  fontSize: 11,
+                  cursor: "pointer",
+                }}
+              >
+                Reintentar
+              </button>
+            </div>
           </div>
         )}
       </div>

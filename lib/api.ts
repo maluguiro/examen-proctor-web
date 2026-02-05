@@ -183,3 +183,49 @@ export async function createExam(payload?: {
 
   return res.json();
 }
+
+export async function createInvite(
+  code: string,
+  email: string,
+  role: "GRADER" | "PROCTOR"
+) {
+  const token = getAuthToken();
+  if (!token) throw new Error("UNAUTHORIZED");
+
+  const res = await fetch(`${API}/exams/${code}/invites`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ email, role }),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(txt || "INVITE_FAILED");
+  }
+
+  return res.json();
+}
+
+export async function acceptInvite(tokenParam: string) {
+  const token = getAuthToken();
+  if (!token) throw new Error("UNAUTHORIZED");
+
+  const res = await fetch(`${API}/invites/accept`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ token: tokenParam }),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(txt || "INVITE_ACCEPT_FAILED");
+  }
+
+  return res.json();
+}

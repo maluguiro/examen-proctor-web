@@ -336,7 +336,10 @@ React.useEffect(() => {
   // Crear Examen
   async function handleCreateExam() {
     try {
-      const exam = await createExam();
+      const exam = await createExam({
+        university: selectedUniversity || null,
+        subject: selectedSubject || null,
+      });
 
       // El backend puede devolver distintos formatos
       const code =
@@ -531,6 +534,11 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
                   </select>
                 </div>
               </div>
+              {institutions.length === 0 && (
+                <div className="text-xs text-gray-500 dark:text-slate-300">
+                  Primero cre� universidades en /t
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Card "Crear Nuevo" rápida */}
@@ -591,9 +599,11 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
     <h3 className="font-bold !text-grey leading-tight mb-1 text-base">
       {exam.title || "Sin título"}
     </h3>
-    {exam.subject && (
+    {(exam.university || exam.subject) && (
       <p className="text-[11px] !text-grey mt-0.5">
-        {exam.subject}
+        {exam.university && exam.subject
+          ? `${exam.university} • ${exam.subject}`
+          : exam.university || exam.subject}
       </p>
     )}
   </div>
@@ -715,9 +725,12 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
                               </span>
 
                               {/* Materia solo si existe */}
-                              {exam.subject && (
+                              {(exam.university || exam.subject) && (
                                 <span className="font-medium">
-                                  • {exam.subject}
+                                  •{" "}
+                                  {exam.university && exam.subject
+                                    ? `${exam.university} � ${exam.subject}`
+                                    : exam.university || exam.subject}
                                 </span>
                               )}
 
@@ -1023,8 +1036,12 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
                           </div>
 
                           <div className="flex items-center gap-2 text-[10px] text-gray-500">
-                            {exam.subject && (
-                              <span className="truncate">{exam.subject}</span>
+                            {(exam.university || exam.subject) && (
+                              <span className="truncate">
+                                {exam.university && exam.subject
+                                  ? `${exam.university} � ${exam.subject}`
+                                  : exam.university || exam.subject}
+                              </span>
                             )}
                             {exam.createdAt && (
                               <span className="text-gray-400">
@@ -1065,3 +1082,6 @@ border border-white/60
     </div>
   );
 }
+
+
+

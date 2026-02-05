@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { API } from "@/lib/api";
+import { API, createInvite } from "@/lib/api";
 import { ExamMeta } from "@/lib/types";
 import { loadTeacherProfile, type TeacherProfile } from "@/lib/teacherProfile";
 import { BoardClient } from "./board/BoardClient";
@@ -104,6 +104,7 @@ export default function TeacherExamPage() {
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState<string | null>(null);
   const [info, setInfo] = React.useState<string | null>(null);
+  const infoTimerRef = React.useRef<number | null>(null);
 
   const [savingMeta, setSavingMeta] = React.useState(false);
   const [savingExam, setSavingExam] = React.useState(false);
@@ -152,11 +153,38 @@ export default function TeacherExamPage() {
   const [fillDistractorsText, setFillDistractorsText] = React.useState("");
 
   const [linkCopied, setLinkCopied] = React.useState(false);
+  const [inviteOpen, setInviteOpen] = React.useState(false);
+  const [inviteEmail, setInviteEmail] = React.useState("");
+  const [inviteLink, setInviteLink] = React.useState("");
+  const [inviteLoading, setInviteLoading] = React.useState(false);
+  const [inviteError, setInviteError] = React.useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = React.useState(false);
+  const [inviteRole, setInviteRole] = React.useState<"GRADER" | "PROCTOR">(
+    "GRADER"
+  );
 
   // Perfil Docente
   const [profile, setProfile] = React.useState<TeacherProfile | null>(null);
   const [selectedUniName, setSelectedUniName] = React.useState("");
   const [manualSubjectMode, setManualSubjectMode] = React.useState(false);
+  const isManual = gradingMode === "manual";
+
+  React.useEffect(() => {
+    if (!info) return;
+    if (infoTimerRef.current !== null) {
+      window.clearTimeout(infoTimerRef.current);
+    }
+    infoTimerRef.current = window.setTimeout(() => {
+      setInfo(null);
+      infoTimerRef.current = null;
+    }, 2500);
+    return () => {
+      if (infoTimerRef.current !== null) {
+        window.clearTimeout(infoTimerRef.current);
+        infoTimerRef.current = null;
+      }
+    };
+  }, [info]);
 
   // ----------------- carga inicial -----------------
 
@@ -555,6 +583,47 @@ export default function TeacherExamPage() {
     }
   }
 
+  async function handleGenerateInvite() {
+    if (!inviteEmail.trim()) {
+      setInviteError("Ingresá un email.");
+      return;
+    }
+    setInviteLoading(true);
+    setInviteError(null);
+    setInviteLink("");
+    try {
+      const res = await createInvite(code, inviteEmail.trim(), inviteRole);
+      const link = res?.inviteLink || res?.link || "";
+      if (!link) {
+        setInviteError("No se pudo generar el link.");
+        return;
+      }
+      setInviteLink(link);
+    } catch (e: any) {
+      if (e?.message === "UNAUTHORIZED") {
+        setInviteError("Sesión expirada. Iniciá sesión nuevamente.");
+      } else {
+        setInviteError("No se pudo generar el link.");
+      }
+      if (process.env.NODE_ENV !== "production") {
+        console.error("INVITE_CREATE_ERROR", e);
+      }
+    } finally {
+      setInviteLoading(false);
+    }
+  }
+
+  function handleCopyInvite() {
+    if (!inviteLink) return;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(inviteLink);
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2000);
+      return;
+    }
+    window.prompt("Copiá el link:", inviteLink);
+  }
+
   // ----------------- render -----------------
 
   if (loading) {
@@ -613,26 +682,52 @@ export default function TeacherExamPage() {
           {/* ID del examen oculto a pedido del usuario */}
         </div>
 
-        <nav className="flex flex-col gap-2">
+        <nav className="flex flex-col gap-2 overflow-visible">
           {steps.map((s) => {
             const isActive = step === s.id;
             return (
-              <button
-                key={s.id}
-                onClick={() => setStep(s.id)}
-                className={`text-left px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-3 ${
-                  isActive
-                    ? "btn-aurora shadow-sm"
-                    : "text-gray-500 hover:bg-white/20 hover:text-gray-700 hover:pl-5"
-                }`}
-              >
-                <div
-                  className={`w-2 h-2 rounded-full transition-colors ${
-                    isActive ? "bg-indigo-500" : "bg-gray-300"
+              <div key={s.id} className="relative">
+                <button
+                  onClick={() => setStep(s.id)}
+                  className={`text-left px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-3 ${
+                    isActive
+                      ? "btn-aurora shadow-sm"
+                      : "text-gray-500 hover:bg-white/20 hover:text-gray-700 hover:pl-5"
                   }`}
-                />
-                {s.label}
-              </button>
+                >
+                  <div
+                    className={`w-2 h-2 rounded-full transition-colors ${
+                      isActive ? "bg-indigo-500" : "bg-gray-300"
+                    }`}
+                  />
+                  {s.label}
+                </button>
+                {step === 4 && s.id === 4 && (
+                  <div className="pointer-events-none absolute right-0 top-full mt-2 z-30 flex flex-col gap-2 items-start">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInviteOpen(true);
+                        setInviteError(null);
+                        setInviteCopied(false);
+                      }}
+                      className="btn-pill-accent pointer-events-auto inline-flex w-fit items-center gap-2 rounded-full text-xs font-bold"
+                      style={{ padding: "6px 10px", fontSize: "11px" }}
+                    >
+                      Invitar docente
+                    </button>
+                    {isManual && (
+                      <Link
+                        href={`/t/exams/${code}/grading`}
+                        className="btn-pill-accent pointer-events-auto inline-flex w-fit items-center gap-2 rounded-full text-xs font-bold"
+                        style={{ padding: "6px 10px", fontSize: "11px" }}
+                      >
+                        Corrección manual
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
@@ -676,7 +771,7 @@ export default function TeacherExamPage() {
           {/* ERROR / INFO TOASTS */}
           {(info || err) && (
             <div
-              className={`mb-6 p-4 rounded-xl text-sm font-bold flex items-center gap-3 shadow-sm ${
+              className={`mb-6 p-4 rounded-xl text-sm font-bold flex items-center gap-3 shadow-sm pointer-events-none ${
                 err
                   ? "bg-red-50 text-red-600 border border-red-100"
                   : "bg-emerald-50 text-emerald-600 border border-emerald-100"
@@ -829,7 +924,7 @@ export default function TeacherExamPage() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 ml-1">
-                    Fecha de Apertura (Opcional)
+                    Fecha de Revisión (Opcional)
                   </label>
                   <input
                     type="datetime-local"
@@ -1257,11 +1352,11 @@ export default function TeacherExamPage() {
                 </div>
                 <button
                   onClick={copyStudentLink}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-xs transition-all ${
                     linkCopied ? "btn-aurora-primary" : "btn-aurora"
                   }`}
                 >
-                  <span className="text-lg">{linkCopied ? "✅" : "🔗"}</span>
+                  <span className="text-base">{linkCopied ? "✅" : "🔗"}</span>
                   {linkCopied ? "¡Link Copiado!" : "Copiar Link Examen"}
                 </button>
               </div>
@@ -1281,6 +1376,118 @@ export default function TeacherExamPage() {
             </div>
           )}
         </div>
+
+        {inviteOpen && (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/40 p-4">
+            <div className="glass-panel p-6 rounded-3xl w-full max-w-md">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-800">
+                  Invitar docente
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInviteOpen(false);
+                    setInviteEmail("");
+                    setInviteLink("");
+                    setInviteError(null);
+                    setInviteCopied(false);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  X
+                </button>
+              </div>
+
+              <label className="text-xs font-bold text-gray-600 ml-1">
+                Acceso
+              </label>
+              <div className="flex flex-col gap-2 mt-2 mb-3">
+                <label className="flex items-center gap-2 text-xs text-gray-700">
+                  <input
+                    type="radio"
+                    name="invite-role"
+                    value="GRADER"
+                    checked={inviteRole === "GRADER"}
+                    onChange={() => setInviteRole("GRADER")}
+                    className="accent-emerald-500"
+                  />
+                  Solo correccion
+                </label>
+                <label className="flex items-center gap-2 text-xs text-gray-700">
+                  <input
+                    type="radio"
+                    name="invite-role"
+                    value="PROCTOR"
+                    checked={inviteRole === "PROCTOR"}
+                    onChange={() => setInviteRole("PROCTOR")}
+                    className="accent-emerald-500"
+                  />
+                  Monitoreo + correccion (durante examen)
+                </label>
+              </div>
+
+              <label className="text-xs font-bold text-gray-600 ml-1">
+                Email
+              </label>
+              <input
+                type="email"
+                className="input-aurora w-full p-3 rounded-xl mt-1"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="docente@correo.com"
+              />
+
+              {inviteError && (
+                <div className="text-xs font-bold text-red-500 bg-red-50 p-2 rounded-lg text-center mt-3">
+                  {inviteError}
+                </div>
+              )}
+
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleGenerateInvite}
+                  disabled={inviteLoading}
+                  className="btn-aurora-primary px-4 py-2 rounded-lg text-xs font-bold"
+                >
+                  {inviteLoading ? "Generando..." : "Generar link"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInviteOpen(false);
+                  }}
+                  className="btn-aurora px-4 py-2 rounded-lg text-xs font-bold"
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              {inviteLink && (
+                <div className="mt-4">
+                  <label className="text-xs font-bold text-gray-600 ml-1">
+                    Link
+                  </label>
+                  <div className="flex gap-2 mt-1">
+                    <input
+                      readOnly
+                      value={inviteLink}
+                      className="input-aurora w-full p-2 rounded-xl text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyInvite}
+                      className="btn-aurora px-3 py-2 rounded-lg text-xs font-bold"
+                    >
+                      {inviteCopied ? "Copiado" : "Copiar"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
       {/* CHAT FLOTANTE: SOLO EN STEP 4 */}
       {step === 4 && (
@@ -1297,3 +1504,7 @@ export default function TeacherExamPage() {
     </div>
   );
 }
+
+
+
+

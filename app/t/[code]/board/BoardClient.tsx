@@ -14,29 +14,75 @@ export function BoardClient({ code }: { code: string }) {
     const [loading, setLoading] = React.useState(false);
     const [err, setErr] = React.useState<string | null>(null);
     const [info, setInfo] = React.useState<string | null>(null);
+    const inFlightRef = React.useRef(false);
+    const pollIdRef = React.useRef<number | null>(null);
+    const requestSeqRef = React.useRef(0);
+
+    function logDevError(label: string, detail?: any) {
+        if (process.env.NODE_ENV !== "production") {
+            console.error(label, detail);
+        }
+    }
 
     // ====== Cargar tablero ======
     async function load() {
+        if (inFlightRef.current) return;
+        inFlightRef.current = true;
+        const reqId = ++requestSeqRef.current;
         setLoading(true);
         setErr(null);
         try {
+            const token = getAuthToken();
+            if (!token) {
+                setErr("Sesión expirada. Iniciá sesión nuevamente.");
+                return;
+            }
+
             const r = await fetch(`${API}/exams/${code}/attempts?t=${Date.now()}`, {
                 cache: "no-store",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
             });
-            if (!r.ok) throw new Error(await r.text());
+            if (!r.ok) {
+                if (r.status === 401 || r.status === 403) {
+                    setErr("No tenés permisos o tu sesión expiró.");
+                } else {
+                    setErr("No se pudo cargar el tablero.");
+                }
+                const text = await r.text().catch(() => "");
+                logDevError("ATTEMPTS_LOAD_ERROR", text || r.status);
+                return;
+            }
             const json: ExamAttemptsResponse = await r.json();
             setData(json);
         } catch (e: any) {
-            setErr(e?.message || "No se pudo cargar el tablero");
+            setErr("No se pudo cargar el tablero.");
+            logDevError("ATTEMPTS_LOAD_ERROR", e);
         } finally {
-            setLoading(false);
+            if (requestSeqRef.current === reqId) {
+                setLoading(false);
+            }
+            inFlightRef.current = false;
         }
     }
 
     React.useEffect(() => {
         load();
-        const t = setInterval(load, 4000);
-        return () => clearInterval(t);
+        const maybePoll = () => {
+            if (!document.hidden) load();
+        };
+        const t = window.setInterval(maybePoll, 4000);
+        pollIdRef.current = t;
+        const handleVisibility = () => {
+            if (!document.hidden) load();
+        };
+        document.addEventListener("visibilitychange", handleVisibility);
+        return () => {
+            window.clearInterval(t);
+            if (pollIdRef.current === t) pollIdRef.current = null;
+            document.removeEventListener("visibilitychange", handleVisibility);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [code]);
 
