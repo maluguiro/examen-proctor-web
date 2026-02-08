@@ -45,12 +45,37 @@ export default function TeacherHomePage() {
         return fresh;
       } catch (e: any) {
         if (e?.message === "UNAUTHORIZED") {
-          clearAuthToken();
-          setAuthToken(null);
-          setProfile(null);
+          let shouldClear = false;
+          try {
+            const res = await fetch(`${API}/teacher/profile`, {
+              headers: { Authorization: `Bearer ${authToken}` },
+            });
+            let body: any = null;
+            try {
+              body = await res.json();
+            } catch {
+              body = null;
+            }
+            if (body?.error === "INVALID_OR_EXPIRED_TOKEN") {
+              shouldClear = true;
+            }
+          } catch {
+            shouldClear = false;
+          }
+
+          if (shouldClear) {
+            clearAuthToken();
+            setAuthToken(null);
+            setProfile(null);
+            if (!options?.silent) {
+              setAuthError("Sesión expirada. Inicia sesión de nuevo.");
+              setAuthMode("login");
+            }
+            return null;
+          }
+
           if (!options?.silent) {
-            setAuthError("Sesión expirada. Inicia sesión de nuevo.");
-            setAuthMode("login");
+            setAuthError("No se pudo validar la sesión, reintentar.");
           }
           return null;
         }
@@ -369,3 +394,4 @@ export default function TeacherHomePage() {
     />
   );
 }
+

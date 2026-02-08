@@ -27,6 +27,27 @@ type GradingResponse = {
   };
 };
 
+type ReviewResponse = {
+  exam?: {
+    title?: string | null;
+    code?: string | null;
+  };
+  attempt?: {
+    id?: string | null;
+    studentName?: string | null;
+  };
+  questions?: Array<{
+    id: string;
+    kind?: string | null;
+    stem?: string | null;
+    choices?: string[] | null;
+    points?: number | null;
+    correct?: any;
+    given?: any;
+    score?: number | null;
+  }>;
+};
+
 type LocalGrade = {
   score: string;
   feedback: string;
@@ -39,14 +60,18 @@ export default function GradingDetailPage() {
   const attemptId = (params?.attemptId || "").toString();
 
   const [loading, setLoading] = React.useState(true);
+  const [reviewLoading, setReviewLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [reviewError, setReviewError] = React.useState<string | null>(null);
   const [info, setInfo] = React.useState<string | null>(null);
   const [reloadKey, setReloadKey] = React.useState(0);
 
   const [attempt, setAttempt] = React.useState<GradingResponse["attempt"] | null>(null);
   const [questions, setQuestions] = React.useState<QuestionItem[]>([]);
+  const [reviewData, setReviewData] = React.useState<ReviewResponse | null>(null);
   const [localGrades, setLocalGrades] = React.useState<Record<string, LocalGrade>>({});
+  const [openCommentId, setOpenCommentId] = React.useState<string | null>(null);
 
   const infoTimerRef = React.useRef<number | null>(null);
 
@@ -84,35 +109,54 @@ export default function GradingDetailPage() {
     const run = async () => {
       try {
         setLoading(true);
+        setReviewLoading(true);
         setError(null);
+        setReviewError(null);
         const token = getAuthToken();
         if (!token) {
           setError("Sesion expirada. Inicia sesion nuevamente.");
           return;
         }
 
-        const res = await fetch(
-          `${API}/exams/${code}/attempts/${attemptId}/grading`,
-          {
+        const [gradingRes, reviewRes] = await Promise.all([
+          fetch(`${API}/exams/${code}/attempts/${attemptId}/grading`, {
             cache: "no-store",
             headers: {
               Authorization: `Bearer ${token}`,
             },
-          }
-        );
+          }),
+          fetch(`${API}/attempts/${attemptId}/review`, {
+            cache: "no-store",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+        ]);
 
-        if (!res.ok) {
-          if (res.status === 401 || res.status === 403) {
+        if (!gradingRes.ok) {
+          if (gradingRes.status === 401 || gradingRes.status === 403) {
             setError("No tenes permisos o tu sesion expiro.");
           } else {
             setError("Hubo un error. Reintenta.");
           }
-          const text = await res.text().catch(() => "");
-          logDevError("GRADING_LOAD_ERROR", text || res.status);
+          const text = await gradingRes.text().catch(() => "");
+          logDevError("GRADING_LOAD_ERROR", text || gradingRes.status);
           return;
         }
 
-        const data = (await res.json()) as GradingResponse;
+        if (!reviewRes.ok) {
+          if (reviewRes.status === 401 || reviewRes.status === 403) {
+            setReviewError("Sesion expirada. Inicia sesion nuevamente.");
+          } else {
+            setReviewError("Hubo un error. Reintenta.");
+          }
+          const text = await reviewRes.text().catch(() => "");
+          logDevError("REVIEW_LOAD_ERROR", text || reviewRes.status);
+          return;
+        }
+
+        const data = (await gradingRes.json()) as GradingResponse;
+        const review = (await reviewRes.json()) as ReviewResponse;
         if (cancelled) return;
 
         const qList = Array.isArray(data?.questions)
@@ -123,11 +167,15 @@ export default function GradingDetailPage() {
 
         setAttempt(data.attempt ?? null);
         setQuestions(qList);
+        setReviewData(review);
 
         const incoming =
           data?.perQuestion ?? data?.grading?.perQuestion ?? [];
         const nextGrades: Record<string, LocalGrade> = {};
-        qList.forEach((q) => {
+        const reviewQuestions = Array.isArray(review?.questions)
+          ? review.questions
+          : [];
+        reviewQuestions.forEach((q) => {
           const found = incoming.find((g) => g.questionId === q.id);
           nextGrades[q.id] = {
             score:
@@ -143,6 +191,7 @@ export default function GradingDetailPage() {
         if (!cancelled) setError("Hubo un error. Reintenta.");
       } finally {
         if (!cancelled) setLoading(false);
+        if (!cancelled) setReviewLoading(false);
       }
     };
 
@@ -153,28 +202,37 @@ export default function GradingDetailPage() {
   }, [code, attemptId, reloadKey]);
 
   const maxScore = React.useMemo(() => {
-    return questions.reduce((acc, q) => {
+    const reviewQuestions = Array.isArray(reviewData?.questions)
+      ? reviewData.questions
+      : [];
+    return reviewQuestions.reduce((acc, q) => {
       const pts = typeof q.points === "number" ? q.points : 0;
       return acc + pts;
     }, 0);
-  }, [questions]);
+  }, [reviewData]);
 
   const totalScore = React.useMemo(() => {
-    return questions.reduce((acc, q) => {
+    const reviewQuestions = Array.isArray(reviewData?.questions)
+      ? reviewData.questions
+      : [];
+    return reviewQuestions.reduce((acc, q) => {
       const raw = localGrades[q.id]?.score;
       const val = Number(raw);
       if (raw === "" || Number.isNaN(val)) return acc;
       return acc + val;
     }, 0);
-  }, [localGrades, questions]);
+  }, [localGrades, reviewData]);
 
   const hasMissingScores = React.useMemo(() => {
-    return questions.some((q) => {
+    const reviewQuestions = Array.isArray(reviewData?.questions)
+      ? reviewData.questions
+      : [];
+    return reviewQuestions.some((q) => {
       const raw = localGrades[q.id]?.score;
       if (raw === "" || raw == null) return true;
       return Number.isNaN(Number(raw));
     });
-  }, [localGrades, questions]);
+  }, [localGrades, reviewData]);
 
   const hasOverMax = totalScore > maxScore;
 
@@ -203,15 +261,20 @@ export default function GradingDetailPage() {
     setError(null);
 
     try {
-      const perQuestion = questions.map((q) => {
-        const raw = localGrades[q.id]?.score;
-        const scoreVal = raw === "" ? null : Number(raw);
-        return {
-          questionId: q.id,
-          score: Number.isNaN(scoreVal as number) ? null : scoreVal,
-          feedback: localGrades[q.id]?.feedback ?? "",
-        };
-      });
+      const reviewQuestions = Array.isArray(reviewData?.questions)
+        ? reviewData.questions
+        : [];
+      const perQuestion = reviewQuestions
+        .map((q) => {
+          const raw = localGrades[q.id]?.score;
+          const scoreVal = raw === "" ? null : Number(raw);
+          return {
+            questionId: q.id,
+            score: Number.isNaN(scoreVal as number) ? null : scoreVal,
+            feedback: localGrades[q.id]?.feedback ?? "",
+          };
+        })
+        .filter((item) => finalize || item.score !== null);
 
       const res = await fetch(
         `${API}/exams/${code}/attempts/${attemptId}/grading`,
@@ -296,15 +359,18 @@ export default function GradingDetailPage() {
               Respuestas del alumno
             </h2>
 
-            {loading ? (
+            {loading || reviewLoading ? (
               <div className="text-sm text-gray-500">Cargando...</div>
-            ) : questions.length === 0 ? (
+            ) : reviewError ? (
+              <div className="text-sm text-gray-500">{reviewError}</div>
+            ) : Array.isArray(reviewData?.questions) &&
+              reviewData.questions.length === 0 ? (
               <div className="text-sm text-gray-500">
                 No hay respuestas para mostrar.
               </div>
             ) : (
               <div className="space-y-4">
-                {questions.map((q, idx) => (
+                {(reviewData?.questions ?? []).map((q, idx) => (
                   <div
                     key={q.id}
                     className="border border-white/60 bg-white/40 rounded-2xl p-4"
@@ -320,8 +386,11 @@ export default function GradingDetailPage() {
                         Opciones: {q.choices.join(" - ")}
                       </div>
                     )}
+                    <div className="text-xs text-gray-500 mb-1">
+                      Correcta: {stringifyAnswer(q.correct)}
+                    </div>
                     <div className="text-sm text-gray-700 mb-3">
-                      Respuesta: {stringifyAnswer(q.studentAnswer ?? q.answer)}
+                      Respuesta: {stringifyAnswer(q.given)}
                     </div>
                     <div className="flex flex-col md:flex-row gap-3">
                       <div className="flex flex-col gap-1">
@@ -346,25 +415,55 @@ export default function GradingDetailPage() {
                           className="input-aurora w-32 p-2 rounded-xl text-sm"
                         />
                       </div>
-                      <div className="flex-1 flex flex-col gap-1">
-                        <label className="text-xs font-bold text-gray-600">
-                          Feedback (opcional)
-                        </label>
-                        <textarea
-                          value={localGrades[q.id]?.feedback ?? ""}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setLocalGrades((prev) => ({
-                              ...prev,
-                              [q.id]: {
-                                score: prev[q.id]?.score ?? "",
-                                feedback: val,
-                              },
-                            }));
-                          }}
-                          rows={2}
-                          className="input-aurora w-full p-2 rounded-xl text-sm"
-                        />
+                      <div className="flex-1 flex items-end justify-start relative">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenCommentId((prev) =>
+                              prev === q.id ? null : q.id
+                            )
+                          }
+                          className="btn-aurora px-3 py-2 rounded-xl text-xs font-bold relative"
+                          title="Agregar comentario"
+                        >
+                          💬
+                          {localGrades[q.id]?.feedback ? (
+                            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500" />
+                          ) : null}
+                        </button>
+                        {openCommentId === q.id && (
+                          <div className="pointer-events-none absolute left-0 top-full mt-2 z-20">
+                            <div className="pointer-events-auto bg-white/95 border border-white/60 shadow-lg rounded-xl p-3 w-64">
+                              <div className="text-xs font-bold text-gray-600 mb-2">
+                                Comentario
+                              </div>
+                              <textarea
+                                value={localGrades[q.id]?.feedback ?? ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setLocalGrades((prev) => ({
+                                    ...prev,
+                                    [q.id]: {
+                                      score: prev[q.id]?.score ?? "",
+                                      feedback: val,
+                                    },
+                                  }));
+                                }}
+                                rows={3}
+                                className="input-aurora w-full p-2 rounded-xl text-xs"
+                              />
+                              <div className="mt-2 flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => setOpenCommentId(null)}
+                                  className="btn-aurora px-3 py-1.5 rounded-lg text-xs font-bold"
+                                >
+                                  Cerrar
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

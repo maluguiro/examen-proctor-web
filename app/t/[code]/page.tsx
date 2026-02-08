@@ -718,7 +718,7 @@ export default function TeacherExamPage() {
                     </button>
                     {isManual && (
                       <Link
-                        href={`/t/exams/${code}/grading`}
+                        href="/t/grading"
                         className="btn-pill-accent pointer-events-auto inline-flex w-fit items-center gap-2 rounded-full text-xs font-bold"
                         style={{ padding: "6px 10px", fontSize: "11px" }}
                       >
@@ -795,13 +795,6 @@ export default function TeacherExamPage() {
               </div>
 
               <div className="space-y-5">
-                {selectedUniName && (
-                  <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 text-indigo-800 text-sm font-medium flex items-center gap-2">
-                    🏛️ <span className="font-bold">Institución:</span>{" "}
-                    {selectedUniName}
-                  </div>
-                )}
-
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 ml-1">
                     Nombre del Docente
