@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -7,6 +7,8 @@ import {
   deleteExam as apiDeleteExam,
   updateTeacherProfile,
   createExam,
+  getAuthToken,
+  clearAuthToken,
 } from "@/lib/api";
 import { TeacherProfile, saveTeacherProfile } from "@/lib/teacherProfile";
 import UniversitiesView from "./components/UniversitiesView";
@@ -71,6 +73,8 @@ export default function TeacherDashboard({
   // Estado local para exámenes
   const [exams, setExams] = React.useState<ExamListItem[]>([]);
   const [loadingExams, setLoadingExams] = React.useState(true);
+  const [sessionExpired, setSessionExpired] = React.useState(false);
+  const [sessionMessage, setSessionMessage] = React.useState<string | null>(null);
   const [lastActionMessage, setLastActionMessage] = React.useState<{
     text: string;
     type: "success" | "error";
@@ -124,10 +128,55 @@ const [widgetDate] = React.useState(new Date());
   // Fetch Exámenes Real
   const fetchExams = React.useCallback(() => {
     setLoadingExams(true);
-    fetch(`${API}/exams`, { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => {
-        setExams(Array.isArray(data) ? data : []);
+    setSessionExpired(false);
+    setSessionMessage(null);
+
+    const token = getAuthToken();
+    if (!token) {
+      setSessionExpired(true);
+      setSessionMessage("Sesión expirada. Iniciá sesión nuevamente.");
+      setLoadingExams(false);
+      return;
+    }
+
+    fetch(`${API}/teacher/exams`, {
+      cache: "no-store",
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (res) => {
+        if (res.status === 401 || res.status === 403) {
+          let body: any = null;
+          try {
+            body = await res.json();
+          } catch {
+            body = null;
+          }
+          if (body?.error === "INVALID_OR_EXPIRED_TOKEN") {
+            clearAuthToken();
+          }
+          setSessionExpired(true);
+          setSessionMessage("Sesión expirada. Iniciá sesión nuevamente.");
+          return { authError: true };
+        }
+        const data = await res.json();
+        return { data };
+      })
+      .then((result) => {
+        if (!result || (result as any).authError) return;
+        const data = (result as any).data;
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.exams)
+            ? data.exams
+            : [];
+        if (
+          !Array.isArray(data) &&
+          !Array.isArray(data?.exams) &&
+          process.env.NODE_ENV !== "production"
+        ) {
+          console.warn("teacher/exams unexpected shape", data);
+        }
+        setExams(list);
       })
       .catch((e) => console.error("Error loading exams:", e))
       .finally(() => setLoadingExams(false));
@@ -536,7 +585,7 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
               </div>
               {institutions.length === 0 && (
                 <div className="text-xs text-gray-500 dark:text-slate-300">
-                  Primero cre� universidades en /t
+                  Primero creá universidades en /t
                 </div>
               )}
 
@@ -554,7 +603,21 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
                 </span>
               </div>
 
-              {loadingExams ? (
+              {sessionExpired ? (
+                <div className="col-span-full py-10 text-center text-gray-500 font-medium border border-dashed border-gray-200 rounded-3xl">
+                  <div className="mb-3">
+                    {sessionMessage || "Sesión expirada. Iniciá sesión nuevamente."}
+                  </div>
+                  <button
+                    onClick={() =>
+                      router.push(`/t?returnUrl=${encodeURIComponent("/t")}`)
+                    }
+                    className="btn-aurora px-5 py-2 rounded-xl text-sm font-bold shadow-sm"
+                  >
+                    Iniciar sesión
+                  </button>
+                </div>
+              ) : loadingExams ? (
                 <div className="col-span-full py-10 text-center text-gray-500 animate-pulse font-medium">
                   Cargando exámenes...
                 </div>
@@ -681,7 +744,21 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
               {/* Box 2: Lista Contenida */}
               <div className="glass-panel p-6 rounded-[2.5rem] min-h-[400px]">
                 <div className="space-y-3 max-w-2xl mx-auto">
-                  {loadingExams ? (
+                  {sessionExpired ? (
+                    <div className="py-12 text-center text-gray-400 font-medium border border-dashed border-gray-200 rounded-3xl">
+                      <div className="mb-3">
+                        {sessionMessage || "Sesión expirada. Iniciá sesión nuevamente."}
+                      </div>
+                      <button
+                        onClick={() =>
+                          router.push(`/t?returnUrl=${encodeURIComponent("/t")}`)
+                        }
+                        className="btn-aurora px-5 py-2 rounded-xl text-sm font-bold shadow-sm"
+                      >
+                        Iniciar sesión
+                      </button>
+                    </div>
+                  ) : loadingExams ? (
                     <div className="py-12 text-center text-gray-400 font-medium">
                       Cargando exámenes...
                     </div>
@@ -729,7 +806,7 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
                                 <span className="font-medium">
                                   •{" "}
                                   {exam.university && exam.subject
-                                    ? `${exam.university} � ${exam.subject}`
+                                    ? `${exam.university} • ${exam.subject}`
                                     : exam.university || exam.subject}
                                 </span>
                               )}
@@ -794,7 +871,7 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
                       dayNum === new Date().getDate() &&
                       widgetMonthData.month === new Date().getMonth() &&
                       widgetMonthData.year === new Date().getFullYear();
-                     const dayEvents =
+                    const dayEvents =
                       widgetMonthData.eventItemsByDay[dayNum] ?? [];
                     const dayTasks =
                       widgetMonthData.taskItemsByDay[dayNum] ?? [];
@@ -1038,9 +1115,9 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
                           <div className="flex items-center gap-2 text-[10px] text-gray-500">
                             {(exam.university || exam.subject) && (
                               <span className="truncate">
-                                {exam.university && exam.subject
-                                  ? `${exam.university} � ${exam.subject}`
-                                  : exam.university || exam.subject}
+                          {exam.university && exam.subject
+                            ? `${exam.university} • ${exam.subject}`
+                            : exam.university || exam.subject}
                               </span>
                             )}
                             {exam.createdAt && (
@@ -1082,6 +1159,7 @@ border border-white/60
     </div>
   );
 }
+
 
 
 

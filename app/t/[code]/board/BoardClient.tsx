@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { API, clearAuthToken } from "@/lib/api";
@@ -393,7 +393,7 @@ export function BoardClient({ code }: { code: string }) {
                             cursor: "pointer",
                         }}
                     >
-                        Iniciar sesiÃ³n
+                        Iniciar sesión
                     </button>
                 </div>
             )}
@@ -764,5 +764,6 @@ export function BoardClient({ code }: { code: string }) {
         </section>
     );
 }
+
 
 
