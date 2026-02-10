@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Inter, Roboto_Mono, Syne } from "next/font/google"; // [NEW] Syne
 import "./globals.css";
 
@@ -37,3 +37,4 @@ export default function RootLayout({
     </html>
   );
 }
+

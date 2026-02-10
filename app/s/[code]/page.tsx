@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { API } from "@/lib/api";
@@ -34,7 +34,7 @@ function mapKind(raw: string): QKind {
   return "SHORT";
 }
 
-// Divide el enunciado de FIB en partes: texto y “huecos”
+// Divide el enunciado de FIB en partes: texto y huecos.
 function fibParseToParts(stem: string) {
   const parts: Array<{ type: "text" | "box"; idx?: number; text?: string }> =
     [];

@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
-import { API } from "@/lib/api";
+import { API, clearAuthToken } from "@/lib/api";
 import type {
     ExamAttemptsResponse,
     AttemptSummary,
@@ -14,9 +14,11 @@ export function BoardClient({ code }: { code: string }) {
     const [loading, setLoading] = React.useState(false);
     const [err, setErr] = React.useState<string | null>(null);
     const [info, setInfo] = React.useState<string | null>(null);
+    const [sessionExpired, setSessionExpired] = React.useState(false);
     const inFlightRef = React.useRef(false);
     const pollIdRef = React.useRef<number | null>(null);
     const requestSeqRef = React.useRef(0);
+    const stopPollingRef = React.useRef(false);
 
     function logDevError(label: string, detail?: any) {
         if (process.env.NODE_ENV !== "production") {
@@ -26,6 +28,7 @@ export function BoardClient({ code }: { code: string }) {
 
     // ====== Cargar tablero ======
     async function load() {
+        if (stopPollingRef.current) return;
         if (inFlightRef.current) return;
         inFlightRef.current = true;
         const reqId = ++requestSeqRef.current;
@@ -34,7 +37,8 @@ export function BoardClient({ code }: { code: string }) {
         try {
             const token = getAuthToken();
             if (!token) {
-                setErr("Sesión expirada. Iniciá sesión nuevamente.");
+                setSessionExpired(true);
+                setErr("Tu sesión expiró. Iniciá sesión nuevamente.");
                 return;
             }
 
@@ -46,7 +50,21 @@ export function BoardClient({ code }: { code: string }) {
             });
             if (!r.ok) {
                 if (r.status === 401 || r.status === 403) {
-                    setErr("No tenés permisos o tu sesión expiró.");
+                    try {
+                        const json = await r.json();
+                        if (json?.error === "INVALID_OR_EXPIRED_TOKEN") {
+                            clearAuthToken();
+                        }
+                    } catch {
+                        // ignore invalid json
+                    }
+                    setSessionExpired(true);
+                    setErr("Tu sesión expiró. Iniciá sesión nuevamente.");
+                    stopPollingRef.current = true;
+                    if (pollIdRef.current !== null) {
+                        window.clearInterval(pollIdRef.current);
+                        pollIdRef.current = null;
+                    }
                 } else {
                     setErr("No se pudo cargar el tablero.");
                 }
@@ -68,6 +86,7 @@ export function BoardClient({ code }: { code: string }) {
     }
 
     React.useEffect(() => {
+        if (sessionExpired) return;
         load();
         const maybePoll = () => {
             if (!document.hidden) load();
@@ -84,7 +103,7 @@ export function BoardClient({ code }: { code: string }) {
             document.removeEventListener("visibilitychange", handleVisibility);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [code]);
+    }, [code, sessionExpired]);
 
     // ====== Acciones del docente (pausa, perdonar vida, +tiempo) ======
     async function modAttempt(
@@ -354,6 +373,28 @@ export function BoardClient({ code }: { code: string }) {
             {err && (
                 <div style={{ color: "crimson", marginBottom: 12, fontSize: 13 }}>
                     Error: {err}
+                </div>
+            )}
+            {sessionExpired && (
+                <div style={{ marginBottom: 12, fontSize: 13 }}>
+                    <button
+                        onClick={() => {
+                            const returnUrl = `/t/${code}`;
+                            window.location.href = `/t?returnUrl=${encodeURIComponent(
+                                returnUrl
+                            )}`;
+                        }}
+                        style={{
+                            padding: "6px 10px",
+                            borderRadius: 8,
+                            border: "1px solid #e5e7eb",
+                            background: "#f9fafb",
+                            fontSize: 12,
+                            cursor: "pointer",
+                        }}
+                    >
+                        Iniciar sesión
+                    </button>
                 </div>
             )}
             {info && (
@@ -723,3 +764,6 @@ export function BoardClient({ code }: { code: string }) {
         </section>
     );
 }
+
+
+

@@ -51,6 +51,7 @@ export default function GradingInboxPage() {
     if (!code) return;
     if (searchParams?.get("updated") !== "1") return;
     setInfo("Corrección guardada.");
+    setReloadKey((k) => k + 1);
     router.replace(`/t/exams/${code}/grading`);
   }, [code, router, searchParams]);
 

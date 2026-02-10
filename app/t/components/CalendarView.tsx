@@ -16,7 +16,7 @@ type ExamListItem = {
 
 type Props = {
   exams: ExamListItem[];
-  profile: { email?: string | null; name?: string | null } | null;
+  profile: { id?: string | null; email?: string | null; name?: string | null } | null;
 };
 
 type ViewMode = "day" | "week" | "month";
@@ -37,7 +37,7 @@ type CalendarTask = {
   color: string;
 };
 
-export default function CalendarView({ exams }: Props) {
+export default function CalendarView({ exams, profile }: Props) {
   const router = useRouter();
   const [currentDate, setCurrentDate] = React.useState(new Date());
   const [isDark, setIsDark] = React.useState(false);
@@ -93,49 +93,54 @@ export default function CalendarView({ exams }: Props) {
     window.dispatchEvent(new Event("teacher_calendar_updated"));
   }, []);
 
+  const normalizeProfileKey = React.useCallback((value?: string | null) => {
+    if (!value) return "";
+    return String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  }, []);
+
+  const getProfileKeyFromToken = React.useCallback(() => {
+    if (typeof window === "undefined") return "";
+    const token = window.localStorage.getItem("examproctor_token");
+    if (!token) return "";
+    const parts = token.split(".");
+    if (parts.length < 2) return "";
+    try {
+      const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const padded = payload.padEnd(
+        payload.length + ((4 - (payload.length % 4)) % 4),
+        "="
+      );
+      const decoded = atob(padded);
+      const data = JSON.parse(decoded);
+      const keyCandidate =
+        data?.id || data?.userId || data?.sub || data?.email || "";
+      return normalizeProfileKey(keyCandidate);
+    } catch {
+      return "";
+    }
+  }, [normalizeProfileKey]);
+
+  const getProfileKey = React.useCallback(() => {
+    if (profile?.id) return normalizeProfileKey(profile.id);
+    if (profile?.email) return normalizeProfileKey(profile.email);
+    return getProfileKeyFromToken();
+  }, [getProfileKeyFromToken, normalizeProfileKey, profile]);
+
   // Mantener MISMAS KEYS que TeacherDashboard (por perfil)
   const getCalendarStorageKeys = React.useCallback(() => {
-    // legacy (global) keys
-    const legacyEventsKey = "teacher_calendar_events";
-    const legacyTasksKey = "teacher_calendar_tasks";
-
     if (typeof window === "undefined") {
       return {
-        eventsKey: legacyEventsKey,
-        tasksKey: legacyTasksKey,
-        legacyEventsKey,
-        legacyTasksKey,
+        eventsKey: "teacher_unknown_teacher_calendar_events",
+        tasksKey: "teacher_unknown_teacher_calendar_tasks",
+        profileKey: "unknown",
       };
     }
 
-    const rawProfile = window.localStorage.getItem("teacherProfile");
-    let profileKey = "";
-
-    if (rawProfile) {
-      try {
-        const parsed = JSON.parse(rawProfile);
-        // Usar email primero (más estable), si no name.
-        const identifier = `${parsed?.email || parsed?.name || ""}`
-          .trim()
-          .toLowerCase();
-        if (identifier) {
-          // Normalización más estable (evita espacios, símbolos, etc.)
-          profileKey = identifier.replace(/[^a-z0-9]+/g, "_");
-        }
-      } catch {
-        profileKey = "";
-      }
-    }
-
-    const eventsKey = profileKey
-      ? `teacher_${profileKey}_teacher_calendar_events`
-      : legacyEventsKey;
-    const tasksKey = profileKey
-      ? `teacher_${profileKey}_teacher_calendar_tasks`
-      : legacyTasksKey;
-
-    return { eventsKey, tasksKey, legacyEventsKey, legacyTasksKey };
-  }, []);
+    const profileKey = getProfileKey() || "unknown";
+    const eventsKey = `teacher_${profileKey}_teacher_calendar_events`;
+    const tasksKey = `teacher_${profileKey}_teacher_calendar_tasks`;
+    return { eventsKey, tasksKey, profileKey };
+  }, [getProfileKey]);
 
   const getAuthToken = React.useCallback(() => {
     if (typeof window === "undefined") return "";
@@ -226,8 +231,10 @@ export default function CalendarView({ exams }: Props) {
     if (typeof window === "undefined") return;
 
     const controller = new AbortController();
-    const { eventsKey, tasksKey, legacyEventsKey, legacyTasksKey } =
-      getCalendarStorageKeys();
+    const { eventsKey, tasksKey, profileKey } = getCalendarStorageKeys();
+    const legacyEventsKey = "teacher_calendar_events";
+    const legacyTasksKey = "teacher_calendar_tasks";
+    const migratedFlagKey = `teacher_${profileKey}_calendar_migrated_v1`;
 
     const readArray = (key: string) => {
       const raw = window.localStorage.getItem(key);
@@ -243,28 +250,45 @@ export default function CalendarView({ exams }: Props) {
     const loadFromStorage = () => {
       const currentEvents = readArray(eventsKey);
       const legacyEvents = readArray(legacyEventsKey);
-      const loadedEvents = currentEvents ?? legacyEvents ?? [];
-      setEvents(loadedEvents);
-
-      if (
-        (!currentEvents || currentEvents.length === 0) &&
-        loadedEvents.length > 0 &&
-        eventsKey !== legacyEventsKey
-      ) {
-        window.localStorage.setItem(eventsKey, JSON.stringify(loadedEvents));
+      let loadedEvents = currentEvents ?? [];
+      const hasMigrated = window.localStorage.getItem(migratedFlagKey) === "true";
+      let didMigrate = false;
+      if (!hasMigrated && (!currentEvents || currentEvents.length === 0)) {
+        if (legacyEvents && legacyEvents.length > 0) {
+          loadedEvents = legacyEvents;
+          try {
+            window.localStorage.setItem(eventsKey, JSON.stringify(legacyEvents));
+            window.localStorage.removeItem(legacyEventsKey);
+          } catch {
+            // ignore
+          }
+          didMigrate = true;
+        }
       }
+      setEvents(loadedEvents);
 
       const currentTasks = readArray(tasksKey);
       const legacyTasks = readArray(legacyTasksKey);
-      const loadedTasks = currentTasks ?? legacyTasks ?? [];
+      let loadedTasks = currentTasks ?? [];
+      if (!hasMigrated && (!currentTasks || currentTasks.length === 0)) {
+        if (legacyTasks && legacyTasks.length > 0) {
+          loadedTasks = legacyTasks;
+          try {
+            window.localStorage.setItem(tasksKey, JSON.stringify(legacyTasks));
+            window.localStorage.removeItem(legacyTasksKey);
+          } catch {
+            // ignore
+          }
+          didMigrate = true;
+        }
+      }
       setTasks(loadedTasks);
-
-      if (
-        (!currentTasks || currentTasks.length === 0) &&
-        loadedTasks.length > 0 &&
-        tasksKey !== legacyTasksKey
-      ) {
-        window.localStorage.setItem(tasksKey, JSON.stringify(loadedTasks));
+      if (!hasMigrated) {
+        try {
+          window.localStorage.setItem(migratedFlagKey, "true");
+        } catch {
+          // ignore
+        }
       }
     };
 
@@ -311,15 +335,12 @@ export default function CalendarView({ exams }: Props) {
 
     const controller = new AbortController();
    saveTimeoutRef.current = setTimeout(async () => {
-  const { eventsKey, tasksKey, legacyEventsKey, legacyTasksKey } =
-    getCalendarStorageKeys();
+  const { eventsKey, tasksKey } = getCalendarStorageKeys();
 
   // 1) Guardado local SIEMPRE (así al refrescar no se pierde)
   try {
     window.localStorage.setItem(eventsKey, JSON.stringify(events));
     window.localStorage.setItem(tasksKey, JSON.stringify(tasks));
-    window.localStorage.setItem(legacyEventsKey, JSON.stringify(events));
-    window.localStorage.setItem(legacyTasksKey, JSON.stringify(tasks));
     notifyCalendarUpdate();
   } catch (err) {
     console.error("LocalStorage write failed.", err);

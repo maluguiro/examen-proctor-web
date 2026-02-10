@@ -10,7 +10,14 @@ import {
   getAuthToken,
   clearAuthToken,
 } from "@/lib/api";
-import { loadTeacherProfile, type TeacherProfile } from "@/lib/teacherProfile";
+import {
+  deriveProfileKeyFromToken,
+  loadTeacherProfile,
+  loadTeacherProfileCache,
+  maybeMigrateLegacyTeacherProfile,
+  saveTeacherProfile,
+  type TeacherProfile,
+} from "@/lib/teacherProfile";
 import TeacherDashboard from "./TeacherDashboard";
 
 export default function TeacherHomePage() {
@@ -41,16 +48,45 @@ export default function TeacherHomePage() {
       if (!authToken) return null;
       try {
         const fresh = await loadTeacherProfile({ remote: true, token: authToken });
+        const profileKey = deriveProfileKeyFromToken(authToken);
+        if (fresh) {
+          saveTeacherProfile(fresh, profileKey || fresh.email || null);
+        }
         setProfile(fresh);
         return fresh;
       } catch (e: any) {
         if (e?.message === "UNAUTHORIZED") {
-          clearAuthToken();
-          setAuthToken(null);
-          setProfile(null);
+          let shouldClear = false;
+          try {
+            const res = await fetch(`${API}/teacher/profile`, {
+              headers: { Authorization: `Bearer ${authToken}` },
+            });
+            let body: any = null;
+            try {
+              body = await res.json();
+            } catch {
+              body = null;
+            }
+            if (body?.error === "INVALID_OR_EXPIRED_TOKEN") {
+              shouldClear = true;
+            }
+          } catch {
+            shouldClear = false;
+          }
+
+          if (shouldClear) {
+            clearAuthToken();
+            setAuthToken(null);
+            setProfile(null);
+            if (!options?.silent) {
+              setAuthError("Sesión expirada. Inicia sesión de nuevo.");
+              setAuthMode("login");
+            }
+            return null;
+          }
+
           if (!options?.silent) {
-            setAuthError("Sesión expirada. Inicia sesión de nuevo.");
-            setAuthMode("login");
+            setAuthError("No se pudo validar la sesión, reintentar.");
           }
           return null;
         }
@@ -93,7 +129,10 @@ export default function TeacherHomePage() {
     if (didFetchRef.current === authToken) return;
     didFetchRef.current = authToken;
 
-    const cached = loadTeacherProfile();
+    const profileKey = deriveProfileKeyFromToken(authToken);
+    const cached =
+      loadTeacherProfileCache(profileKey) ||
+      maybeMigrateLegacyTeacherProfile(profileKey);
     if (cached) {
       setProfile((prev) => prev ?? cached);
     }
@@ -369,3 +408,4 @@ export default function TeacherHomePage() {
     />
   );
 }
+
