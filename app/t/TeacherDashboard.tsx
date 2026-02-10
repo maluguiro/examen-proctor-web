@@ -10,7 +10,12 @@ import {
   getAuthToken,
   clearAuthToken,
 } from "@/lib/api";
-import { TeacherProfile, saveTeacherProfile } from "@/lib/teacherProfile";
+import {
+  TeacherProfile,
+  deriveProfileKeyFromToken,
+  loadTeacherProfileCache,
+  saveTeacherProfile,
+} from "@/lib/teacherProfile";
 import UniversitiesView from "./components/UniversitiesView";
 import CalendarView from "./components/CalendarView";
 import ThemeToggle from "./components/ThemeToggle";
@@ -194,16 +199,19 @@ const [widgetDate] = React.useState(new Date());
     };
   }
 
-  const rawProfile = window.localStorage.getItem("teacherProfile");
   let profileKey = "";
-
-  if (rawProfile) {
-    try {
-      const parsed = JSON.parse(rawProfile);
-      const identifier = `${parsed?.email || parsed?.name || ""}`.trim();
-      profileKey = identifier ? identifier.toLowerCase().replace(/\s+/g, "_") : "";
-    } catch {
-      profileKey = "";
+  const profileId = (profile as any)?.id;
+  if (profileId) {
+    profileKey = String(profileId).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  } else if (profile?.email) {
+    profileKey = String(profile.email).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  } else {
+    const token = getAuthToken();
+    profileKey = deriveProfileKeyFromToken(token) || "";
+    if (!profileKey) {
+      const cached = loadTeacherProfileCache(token ? deriveProfileKeyFromToken(token) : null);
+      const candidate = cached?.email || (cached as any)?.id || "";
+      profileKey = String(candidate).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
     }
   }
 
@@ -227,17 +235,19 @@ const loadCalendarData = React.useCallback(() => {
   const token = window.localStorage.getItem("examproctor_token");
 
   // keys por perfil (misma normalización que CalendarView)
-  const rawProfile = window.localStorage.getItem("teacherProfile");
   let profileKey = "";
-  if (rawProfile) {
-    try {
-      const parsed = JSON.parse(rawProfile);
-      const identifier = `${parsed?.email || parsed?.name || ""}`
-        .trim()
-        .toLowerCase();
-      if (identifier) profileKey = identifier.replace(/[^a-z0-9]+/g, "_");
-    } catch {
-      profileKey = "";
+  const profileId = (profile as any)?.id;
+  if (profileId) {
+    profileKey = String(profileId).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  } else if (profile?.email) {
+    profileKey = String(profile.email).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  } else {
+    const token = getAuthToken();
+    profileKey = deriveProfileKeyFromToken(token) || "";
+    if (!profileKey) {
+      const cached = loadTeacherProfileCache(token ? deriveProfileKeyFromToken(token) : null);
+      const candidate = cached?.email || (cached as any)?.id || "";
+      profileKey = String(candidate).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
     }
   }
 

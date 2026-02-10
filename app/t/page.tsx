@@ -10,7 +10,14 @@ import {
   getAuthToken,
   clearAuthToken,
 } from "@/lib/api";
-import { loadTeacherProfile, type TeacherProfile } from "@/lib/teacherProfile";
+import {
+  deriveProfileKeyFromToken,
+  loadTeacherProfile,
+  loadTeacherProfileCache,
+  maybeMigrateLegacyTeacherProfile,
+  saveTeacherProfile,
+  type TeacherProfile,
+} from "@/lib/teacherProfile";
 import TeacherDashboard from "./TeacherDashboard";
 
 export default function TeacherHomePage() {
@@ -41,6 +48,10 @@ export default function TeacherHomePage() {
       if (!authToken) return null;
       try {
         const fresh = await loadTeacherProfile({ remote: true, token: authToken });
+        const profileKey = deriveProfileKeyFromToken(authToken);
+        if (fresh) {
+          saveTeacherProfile(fresh, profileKey || fresh.email || null);
+        }
         setProfile(fresh);
         return fresh;
       } catch (e: any) {
@@ -118,7 +129,10 @@ export default function TeacherHomePage() {
     if (didFetchRef.current === authToken) return;
     didFetchRef.current = authToken;
 
-    const cached = loadTeacherProfile();
+    const profileKey = deriveProfileKeyFromToken(authToken);
+    const cached =
+      loadTeacherProfileCache(profileKey) ||
+      maybeMigrateLegacyTeacherProfile(profileKey);
     if (cached) {
       setProfile((prev) => prev ?? cached);
     }

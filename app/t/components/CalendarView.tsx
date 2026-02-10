@@ -123,19 +123,6 @@ export default function CalendarView({ exams, profile }: Props) {
   const getProfileKey = React.useCallback(() => {
     if (profile?.id) return normalizeProfileKey(profile.id);
     if (profile?.email) return normalizeProfileKey(profile.email);
-    if (typeof window === "undefined") return "";
-    const rawProfile = window.localStorage.getItem("teacherProfile");
-    if (rawProfile) {
-      try {
-        const parsed = JSON.parse(rawProfile);
-        const fromProfile =
-          parsed?.id || parsed?.email || parsed?.userId || parsed?.name || "";
-        const normalized = normalizeProfileKey(fromProfile);
-        if (normalized) return normalized;
-      } catch {
-        // ignore invalid profile cache
-      }
-    }
     return getProfileKeyFromToken();
   }, [getProfileKeyFromToken, normalizeProfileKey, profile]);
 

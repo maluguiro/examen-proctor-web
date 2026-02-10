@@ -21,7 +21,12 @@ export type TeacherProfile = {
   institutions?: Institution[]; // New hierarchical structure
 };
 
-const STORAGE_KEY = "teacherProfile";
+const LEGACY_KEY = "teacherProfile";
+const NS_PREFIX = "teacherProfile:";
+
+function nsKey(profileKey: string) {
+  return `${NS_PREFIX}${profileKey}`;
+}
 
 type RawProfileResponse =
   | TeacherProfile
@@ -38,10 +43,35 @@ function normalizeProfile(raw: RawProfileResponse): TeacherProfile | null {
   return typeof raw === "object" ? (raw as TeacherProfile) : null;
 }
 
-function loadTeacherProfileCache(): TeacherProfile | null {
-  if (typeof window === "undefined") return null;
+export function deriveProfileKeyFromToken(
+  token: string | null | undefined
+): string | null {
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = payload.padEnd(
+      payload.length + ((4 - (payload.length % 4)) % 4),
+      "="
+    );
+    const decoded = atob(padded);
+    const data = JSON.parse(decoded);
+    const candidate = data?.id || data?.userId || data?.sub || data?.email || "";
+    if (!candidate) return null;
+    return String(candidate).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  } catch {
+    return null;
+  }
+}
+
+export function loadTeacherProfileCache(
+  profileKey: string | null
+): TeacherProfile | null {
+  if (typeof window === "undefined") return null;
+  if (!profileKey) return null;
+  try {
+    const raw = window.localStorage.getItem(nsKey(profileKey));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     return normalizeProfile(parsed);
@@ -93,14 +123,66 @@ export function loadTeacherProfile(options?: {
   if (options?.remote) {
     return loadTeacherProfileRemote(options.token);
   }
-  return loadTeacherProfileCache();
+  const token = getAuthToken();
+  const profileKey = deriveProfileKeyFromToken(token);
+  return (
+    loadTeacherProfileCache(profileKey) ||
+    maybeMigrateLegacyTeacherProfile(profileKey)
+  );
 }
 
-export function saveTeacherProfile(profile: TeacherProfile) {
+export function saveTeacherProfile(
+  profile: TeacherProfile,
+  profileKey?: string | null
+) {
   if (typeof window === "undefined") return;
+  const key =
+    profileKey ||
+    (profile as any)?.id ||
+    profile?.email ||
+    (profile as any)?.userId ||
+    "";
+  const normalizedKey = String(key)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_");
+  if (!normalizedKey) return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+    window.localStorage.setItem(nsKey(normalizedKey), JSON.stringify(profile));
   } catch {
     // ignore
+  }
+}
+
+export function maybeMigrateLegacyTeacherProfile(
+  profileKey: string | null
+): TeacherProfile | null {
+  if (typeof window === "undefined") return null;
+  if (!profileKey) return null;
+  try {
+    const legacyRaw = window.localStorage.getItem(LEGACY_KEY);
+    if (!legacyRaw) return null;
+    const parsed = JSON.parse(legacyRaw);
+    const legacy = normalizeProfile(parsed);
+    if (!legacy) return null;
+    const legacyId = String(
+      (legacy as any)?.id || (legacy as any)?.userId || legacy?.email || ""
+    )
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_");
+    if (!legacyId || legacyId !== profileKey) return null;
+    window.localStorage.setItem(nsKey(profileKey), JSON.stringify(legacy));
+    window.localStorage.removeItem(LEGACY_KEY);
+    return legacy;
+  } catch {
+    return null;
+  }
+}
+
+export function clearTeacherProfileCache(profileKey?: string | null) {
+  if (typeof window === "undefined") return;
+  if (profileKey) {
+    window.localStorage.removeItem(nsKey(profileKey));
   }
 }
