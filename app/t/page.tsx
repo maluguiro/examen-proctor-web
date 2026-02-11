@@ -20,6 +20,13 @@ import {
 } from "@/lib/teacherProfile";
 import TeacherDashboard from "./TeacherDashboard";
 
+type DashboardView =
+  | "dashboard"
+  | "universities"
+  | "calendar"
+  | "profile"
+  | "exams";
+
 export default function TeacherHomePage() {
   const router = useRouter();
 
@@ -42,6 +49,8 @@ export default function TeacherHomePage() {
 
   const [profile, setProfile] = React.useState<TeacherProfile | null>(null);
   const didFetchRef = React.useRef<string | null>(null);
+  const [initialView, setInitialView] = React.useState<DashboardView>("dashboard");
+  const [returnUrl, setReturnUrl] = React.useState("");
 
   const refreshProfile = React.useCallback(
     async (options?: { silent?: boolean }) => {
@@ -138,6 +147,26 @@ export default function TeacherHomePage() {
     }
     void refreshProfile({ silent: true });
   }, [authToken, refreshProfile]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get("view") || "";
+    const ret = params.get("returnUrl") || "";
+    const allowed: DashboardView[] = [
+      "dashboard",
+      "universities",
+      "calendar",
+      "profile",
+      "exams",
+    ];
+    if (allowed.includes(view as DashboardView)) {
+      setInitialView(view as DashboardView);
+    } else {
+      setInitialView("dashboard");
+    }
+    setReturnUrl(ret);
+  }, []);
 
   // Auth Actions
   async function handleLogin(e: React.FormEvent) {
@@ -401,11 +430,13 @@ export default function TeacherHomePage() {
 
   // 2) AUTENTICADO -> NUEVO DASHBOARD ProctoEtic
   return (
-    <TeacherDashboard
-      profile={profile}
-      onLogout={handleLogout}
-      onProfileRefresh={refreshProfile}
-    />
+      <TeacherDashboard
+        profile={profile}
+        onLogout={handleLogout}
+        onProfileRefresh={refreshProfile}
+        initialView={initialView}
+        returnUrl={returnUrl}
+      />
   );
 }
 

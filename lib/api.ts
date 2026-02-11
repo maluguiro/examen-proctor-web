@@ -115,9 +115,18 @@ export async function deleteExam(id: string) {
   });
 
   if (!res.ok) {
-    // Intentamos leer el cuerpo por si viene un mensaje más específico
-    const text = await res.text().catch(() => "");
-    throw new Error(text || "DELETE_FAILED");
+    let text = "";
+    let body: any = null;
+    try {
+      body = await res.json();
+      text = body?.error || body?.message || "";
+    } catch {
+      text = await res.text().catch(() => "");
+    }
+    const err: any = new Error(text || "DELETE_FAILED");
+    err.status = res.status;
+    err.body = body;
+    throw err;
   }
 
   // El backend devuelve { ok: true } o podría devolver 204.
@@ -229,3 +238,4 @@ export async function acceptInvite(tokenParam: string) {
 
   return res.json();
 }
+

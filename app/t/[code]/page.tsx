@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { API, createInvite } from "@/lib/api";
 import { ExamMeta } from "@/lib/types";
@@ -96,6 +96,7 @@ function buildRawFromStudentStem(stem: string, answers: string[]): string {
 
 export default function TeacherExamPage() {
   const params = useParams<{ code: string }>();
+  const router = useRouter();
   const code = (params?.code || "").toString().toUpperCase();
 
   const [step, setStep] = React.useState<Step>(1);
@@ -167,6 +168,7 @@ export default function TeacherExamPage() {
   const [profile, setProfile] = React.useState<TeacherProfile | null>(null);
   const [selectedUniName, setSelectedUniName] = React.useState("");
   const [manualSubjectMode, setManualSubjectMode] = React.useState(false);
+  const hasInstitutions = !!profile?.institutions?.length;
   const isManual = gradingMode === "manual";
 
   React.useEffect(() => {
@@ -808,78 +810,98 @@ export default function TeacherExamPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700 ml-1">
-                    Materia / Asignatura
-                  </label>
-
-                  {profile?.institutions &&
-                  profile.institutions.length > 0 &&
-                  !manualSubjectMode ? (
-                    <div className="bg-white/50 p-4 rounded-2xl border border-white/60 space-y-4">
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-black-500 ml-1">
-                          Universidad
-                        </label>
-                        <select
-                          className="input-aurora w-full p-3 rounded-xl text-sm"
-                          value={selectedUniName}
-                          onChange={(e) => {
-                            setSelectedUniName(e.target.value);
-                            setSubject("");
-                          }}
-                        >
-                          <option value="">-- Seleccionar --</option>
-                          {profile.institutions.map((i) => (
-                            <option key={i.id} value={i.name}>
-                              {i.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-black-500 ml-1">
-                          Materia
-                        </label>
-                        <select
-                          className="input-aurora w-full p-3 rounded-xl text-sm"
-                          value={subject}
-                          onChange={(e) => setSubject(e.target.value)}
-                        >
-                          <option value="">-- Seleccionar --</option>
-                          {profile.institutions
-                            .find((i) => i.name === selectedUniName)
-                            ?.subjects.map((s) => (
-                              <option key={s.id} value={s.name}>
-                                {s.name}
-                              </option>
-                            ))}
-                        </select>
+                  {!hasInstitutions ? (
+                    <div className="bg-amber-50/80 border border-amber-100 text-amber-700 rounded-2xl p-4 text-sm font-medium flex flex-col gap-3">
+                      <div>
+                        Debes ingresar universidades y materias para esta opción.
                       </div>
                       <button
-                        onClick={() => setManualSubjectMode(true)}
-                        className="text-xs text-black-500 font-bold hover:underline pl-1"
+                        onClick={() =>
+                          router.push(
+                            `/t?view=universities&returnUrl=${encodeURIComponent(
+                              `/t/${code}`
+                            )}`
+                          )
+                        }
+                        className="btn-aurora px-4 py-2 rounded-xl text-xs font-bold shadow-sm w-fit"
                       >
-                        No encuentro mi materia (Ingresar manual)
+                        Ir a Universidades
                       </button>
                     </div>
                   ) : (
-                    <div className="flex gap-2">
-                      <input
-                        className="input-aurora w-full p-4 rounded-2xl"
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        placeholder="Ej: Matemática II"
-                      />
-                      {profile?.institutions && (
-                        <button
-                          onClick={() => setManualSubjectMode(false)}
-                          className="btn-aurora w-12 flex items-center justify-center rounded-2xl text-lg backdrop-blur-md"
-                          title="Volver a la lista"
-                        >
-                          📋
-                        </button>
+                    <>
+                      <label className="text-sm font-bold text-gray-700 ml-1">
+                        Materia / Asignatura
+                      </label>
+
+                      {!manualSubjectMode ? (
+                        <div className="bg-white/50 p-4 rounded-2xl border border-white/60 space-y-4">
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-black-500 ml-1">
+                              Universidad
+                            </label>
+                            <select
+                              className="input-aurora w-full p-3 rounded-xl text-sm"
+                              value={selectedUniName}
+                              onChange={(e) => {
+                                setSelectedUniName(e.target.value);
+                                setSubject("");
+                              }}
+                            >
+                              <option value="">-- Seleccionar --</option>
+                              {(profile?.institutions ?? []).map((i) => (
+                                <option key={i.id} value={i.name}>
+                                  {i.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-black-500 ml-1">
+                              Materia
+                            </label>
+                            <select
+                              className="input-aurora w-full p-3 rounded-xl text-sm"
+                              value={subject}
+                              onChange={(e) => setSubject(e.target.value)}
+                            >
+                              <option value="">-- Seleccionar --</option>
+                              {(profile?.institutions ?? [])
+                                .find((i) => i.name === selectedUniName)
+                                ?.subjects.map((s) => (
+                                  <option key={s.id} value={s.name}>
+                                    {s.name}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                          <button
+                            onClick={() => setManualSubjectMode(true)}
+                            className="text-xs text-black-500 font-bold hover:underline pl-1"
+                          >
+                            No encuentro mi materia (Ingresar manual)
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <input
+                            className="input-aurora w-full p-4 rounded-2xl"
+                            value={subject}
+                            onChange={(e) => setSubject(e.target.value)}
+                            placeholder="Ej: Matemática II"
+                          />
+                          {profile?.institutions && (
+                            <button
+                              onClick={() => setManualSubjectMode(false)}
+                              className="btn-aurora w-12 flex items-center justify-center rounded-2xl text-lg backdrop-blur-md"
+                              title="Volver a la lista"
+                            >
+                              📋
+                            </button>
+                          )}
+                        </div>
                       )}
-                    </div>
+                    </>
                   )}
                 </div>
 
@@ -1056,12 +1078,6 @@ export default function TeacherExamPage() {
                   <p className="text-gray-500 font-medium">
                     Carga las preguntas y respuestas correctas.
                   </p>
-                  <button
-                    onClick={reloadQuestions}
-                    className="text-xs text-gray-500 font-bold hover:underline mt-1 bg-transparent border-none p-0 cursor-pointer"
-                  >
-                    🔄 Recargar lista
-                  </button>
                 </div>
               </div>
 
