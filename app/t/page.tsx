@@ -15,6 +15,7 @@ import {
   loadTeacherProfile,
   loadTeacherProfileCache,
   maybeMigrateLegacyTeacherProfile,
+  normalizeTeacherProfile,
   saveTeacherProfile,
   type TeacherProfile,
 } from "@/lib/teacherProfile";
@@ -42,8 +43,8 @@ export default function TeacherHomePage() {
   // Form State
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
-  const [fullName, setFullName] = React.useState("");
-  const [firstName, setFirstName] = React.useState(""); // Not used, removing if present or adapting
+  const [firstName, setFirstName] = React.useState("");
+  const [lastName, setLastName] = React.useState("");
   // Remember Me State
   const [rememberMe, setRememberMe] = React.useState(false);
 
@@ -189,6 +190,15 @@ export default function TeacherHomePage() {
 
       saveAuthToken(res.token);
       setAuthToken(res.token);
+      const profileKey = deriveProfileKeyFromToken(res.token);
+      const cached =
+        loadTeacherProfileCache(profileKey) ||
+        maybeMigrateLegacyTeacherProfile(profileKey);
+      if (cached) {
+        setProfile(cached);
+      }
+      const remote = await loadTeacherProfile({ remote: true, token: res.token });
+      setProfile(normalizeTeacherProfile(remote));
     } catch (e: any) {
       setAuthError(e.message);
     } finally {
@@ -201,9 +211,22 @@ export default function TeacherHomePage() {
     setAuthLoading(true);
     setAuthError(null);
     try {
-      const res = await registerTeacher({ name: fullName, email, password });
+      const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+      const res = await registerTeacher({ name, email, password });
       saveAuthToken(res.token);
       setAuthToken(res.token);
+      const profileKey = deriveProfileKeyFromToken(res.token);
+      const localProfile = normalizeTeacherProfile({
+        name,
+        email,
+        institutions: [],
+      });
+      if (localProfile) {
+        setProfile(localProfile);
+        saveTeacherProfile(localProfile, profileKey);
+      }
+      const remote = await loadTeacherProfile({ remote: true, token: res.token });
+      setProfile(normalizeTeacherProfile(remote));
     } catch (e: any) {
       setAuthError(e.message);
     } finally {
@@ -342,15 +365,26 @@ export default function TeacherHomePage() {
               {authMode === "register" && (
                 <div className="text-left">
                   <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">
-                    Nombre completo
+                    Nombre
                   </label>
                   <input
                     type="text"
                     required
                     className="input-aurora w-full p-4 rounded-xl"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Juan Pérez"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="Juan"
+                  />
+                  <label className="block text-sm font-bold text-gray-700 mb-2 ml-1 mt-4">
+                    Apellido
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="input-aurora w-full p-4 rounded-xl"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Pérez"
                   />
                 </div>
               )}
