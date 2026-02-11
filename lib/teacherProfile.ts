@@ -34,13 +34,26 @@ type RawProfileResponse =
   | null
   | undefined;
 
+export function normalizeTeacherProfile(data: any): TeacherProfile | null {
+  if (!data || typeof data !== "object") return null;
+  const name = data.name ?? data.fullName ?? data.teacherName ?? "";
+  const email = data.email ?? "";
+  const institutions = data.institutions ?? [];
+  return {
+    ...data,
+    name,
+    email,
+    institutions,
+  } as TeacherProfile;
+}
+
 function normalizeProfile(raw: RawProfileResponse): TeacherProfile | null {
   if (!raw) return null;
   if (typeof raw === "object" && "profile" in raw) {
     const inner = (raw as { profile?: TeacherProfile | null }).profile ?? null;
-    return inner && typeof inner === "object" ? inner : null;
+    return normalizeTeacherProfile(inner);
   }
-  return typeof raw === "object" ? (raw as TeacherProfile) : null;
+  return normalizeTeacherProfile(raw);
 }
 
 export function deriveProfileKeyFromToken(

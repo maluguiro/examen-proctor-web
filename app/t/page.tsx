@@ -15,10 +15,18 @@ import {
   loadTeacherProfile,
   loadTeacherProfileCache,
   maybeMigrateLegacyTeacherProfile,
+  normalizeTeacherProfile,
   saveTeacherProfile,
   type TeacherProfile,
 } from "@/lib/teacherProfile";
 import TeacherDashboard from "./TeacherDashboard";
+
+type DashboardView =
+  | "dashboard"
+  | "universities"
+  | "calendar"
+  | "profile"
+  | "exams";
 
 export default function TeacherHomePage() {
   const router = useRouter();
@@ -35,13 +43,15 @@ export default function TeacherHomePage() {
   // Form State
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
-  const [fullName, setFullName] = React.useState("");
-  const [firstName, setFirstName] = React.useState(""); // Not used, removing if present or adapting
+  const [firstName, setFirstName] = React.useState("");
+  const [lastName, setLastName] = React.useState("");
   // Remember Me State
   const [rememberMe, setRememberMe] = React.useState(false);
 
   const [profile, setProfile] = React.useState<TeacherProfile | null>(null);
   const didFetchRef = React.useRef<string | null>(null);
+  const [initialView, setInitialView] = React.useState<DashboardView>("dashboard");
+  const [returnUrl, setReturnUrl] = React.useState("");
 
   const refreshProfile = React.useCallback(
     async (options?: { silent?: boolean }) => {
@@ -139,6 +149,26 @@ export default function TeacherHomePage() {
     void refreshProfile({ silent: true });
   }, [authToken, refreshProfile]);
 
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get("view") || "";
+    const ret = params.get("returnUrl") || "";
+    const allowed: DashboardView[] = [
+      "dashboard",
+      "universities",
+      "calendar",
+      "profile",
+      "exams",
+    ];
+    if (allowed.includes(view as DashboardView)) {
+      setInitialView(view as DashboardView);
+    } else {
+      setInitialView("dashboard");
+    }
+    setReturnUrl(ret);
+  }, []);
+
   // Auth Actions
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -160,6 +190,15 @@ export default function TeacherHomePage() {
 
       saveAuthToken(res.token);
       setAuthToken(res.token);
+      const profileKey = deriveProfileKeyFromToken(res.token);
+      const cached =
+        loadTeacherProfileCache(profileKey) ||
+        maybeMigrateLegacyTeacherProfile(profileKey);
+      if (cached) {
+        setProfile(cached);
+      }
+      const remote = await loadTeacherProfile({ remote: true, token: res.token });
+      setProfile(normalizeTeacherProfile(remote));
     } catch (e: any) {
       setAuthError(e.message);
     } finally {
@@ -172,9 +211,22 @@ export default function TeacherHomePage() {
     setAuthLoading(true);
     setAuthError(null);
     try {
-      const res = await registerTeacher({ name: fullName, email, password });
+      const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+      const res = await registerTeacher({ name, email, password });
       saveAuthToken(res.token);
       setAuthToken(res.token);
+      const profileKey = deriveProfileKeyFromToken(res.token);
+      const localProfile = normalizeTeacherProfile({
+        name,
+        email,
+        institutions: [],
+      });
+      if (localProfile) {
+        setProfile(localProfile);
+        saveTeacherProfile(localProfile, profileKey);
+      }
+      const remote = await loadTeacherProfile({ remote: true, token: res.token });
+      setProfile(normalizeTeacherProfile(remote));
     } catch (e: any) {
       setAuthError(e.message);
     } finally {
@@ -313,15 +365,26 @@ export default function TeacherHomePage() {
               {authMode === "register" && (
                 <div className="text-left">
                   <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">
-                    Nombre completo
+                    Nombre
                   </label>
                   <input
                     type="text"
                     required
                     className="input-aurora w-full p-4 rounded-xl"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Juan Pérez"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="Juan"
+                  />
+                  <label className="block text-sm font-bold text-gray-700 mb-2 ml-1 mt-4">
+                    Apellido
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="input-aurora w-full p-4 rounded-xl"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Pérez"
                   />
                 </div>
               )}
@@ -401,11 +464,13 @@ export default function TeacherHomePage() {
 
   // 2) AUTENTICADO -> NUEVO DASHBOARD ProctoEtic
   return (
-    <TeacherDashboard
-      profile={profile}
-      onLogout={handleLogout}
-      onProfileRefresh={refreshProfile}
-    />
+      <TeacherDashboard
+        profile={profile}
+        onLogout={handleLogout}
+        onProfileRefresh={refreshProfile}
+        initialView={initialView}
+        returnUrl={returnUrl}
+      />
   );
 }
 

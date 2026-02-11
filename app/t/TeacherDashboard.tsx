@@ -25,6 +25,8 @@ type TeacherDashboardProps = {
   profile: TeacherProfile | null;
   onLogout: () => void;
   onProfileRefresh: () => Promise<TeacherProfile | null>;
+  initialView?: ViewState;
+  returnUrl?: string;
 };
 
 type ViewState =
@@ -66,11 +68,13 @@ export default function TeacherDashboard({
   profile,
   onLogout,
   onProfileRefresh,
+  initialView = "dashboard",
+  returnUrl = "",
 }: TeacherDashboardProps) {
   const router = useRouter();
 
   // View State
-  const [activeView, setActiveView] = React.useState<ViewState>("dashboard");
+  const [activeView, setActiveView] = React.useState<ViewState>(initialView);
   const [search, setSearch] = React.useState("");
   const [selectedUniversity, setSelectedUniversity] = React.useState("");
   const [selectedSubject, setSelectedSubject] = React.useState("");
@@ -190,6 +194,12 @@ const [widgetDate] = React.useState(new Date());
   React.useEffect(() => {
     fetchExams();
   }, [fetchExams]);
+
+  React.useEffect(() => {
+    if (initialView) {
+      setActiveView(initialView);
+    }
+  }, [initialView]);
 
   const getCalendarStorageKeys = React.useCallback(() => {
   if (typeof window === "undefined") {
@@ -441,7 +451,25 @@ React.useEffect(() => {
         type: "success",
       });
       setTimeout(() => setLastActionMessage(null), 3000);
+      fetchExams();
     } catch (err) {
+      const status = (err as any)?.status;
+      const body = (err as any)?.body;
+      const msg = (err as any)?.message || "";
+      const isAuthError =
+        status === 401 ||
+        status === 403 ||
+        msg.includes("UNAUTHORIZED") ||
+        msg.includes("INVALID_OR_EXPIRED_TOKEN");
+      if (isAuthError) {
+        if (body?.error === "INVALID_OR_EXPIRED_TOKEN" || msg.includes("INVALID_OR_EXPIRED_TOKEN")) {
+          clearAuthToken();
+          router.push(`/t?returnUrl=${encodeURIComponent("/t")}`);
+        }
+        setSessionExpired(true);
+        setSessionMessage("Sesión expirada. Iniciá sesión nuevamente.");
+        return;
+      }
       console.error(err);
       setLastActionMessage({
         text: "No se pudo eliminar el examen. Intenta nuevamente.",
@@ -1078,6 +1106,14 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
               </p>
             </div>
             <div className="flex gap-4 w-full md:w-auto relative">
+              {activeView === "universities" && returnUrl ? (
+                <button
+                  onClick={() => router.push(returnUrl)}
+                  className="btn-aurora px-4 py-2 rounded-xl text-xs font-bold shadow-sm"
+                >
+                  Volver al examen
+                </button>
+              ) : null}
               {/* Contenedor del buscador con resultados debajo */}
               <div className="relative w-full md:w-80">
                 <input
