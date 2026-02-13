@@ -125,6 +125,11 @@ export default function StudentPage({ params }: { params: { code: string } }) {
   );
   const [score, setScore] = React.useState<number | null>(null);
   const [maxScore, setMaxScore] = React.useState<number | null>(null);
+  const [blockedStart, setBlockedStart] = React.useState<{
+    reason: "EXAM_NOT_OPEN" | "EXAM_CLOSED";
+    startsAt?: string | null;
+    endsAt?: string | null;
+  } | null>(null);
 
   function logDevError(label: string, detail?: any) {
     if (process.env.NODE_ENV !== "production") {
@@ -197,6 +202,24 @@ export default function StudentPage({ params }: { params: { code: string } }) {
   function formatReviewDate(openAt?: string | null) {
     if (!openAt) return "Próximamente";
     const d = new Date(openAt);
+    return (
+      d
+        .toLocaleString("es-AR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })
+        .replace(",", " · ") + " hs"
+    );
+  }
+
+  function formatStartDate(startsAt?: string | null) {
+    if (!startsAt) return "Próximamente";
+    const d = new Date(startsAt);
+    if (isNaN(d.getTime())) return "Próximamente";
     return (
       d
         .toLocaleString("es-AR", {
@@ -341,6 +364,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
       return;
     }
     setErr(null);
+    setBlockedStart(null);
 
     try {
       try {
@@ -358,12 +382,34 @@ export default function StudentPage({ params }: { params: { code: string } }) {
       });
 
       if (!r.ok) {
+        if (r.status === 403) {
+          let body: any = null;
+          try {
+            body = await r.json();
+          } catch {
+            body = null;
+          }
+          const reason = body?.error;
+          if (reason === "EXAM_NOT_OPEN") {
+            setBlockedStart({
+              reason,
+              startsAt: body?.startsAt ?? null,
+              endsAt: body?.endsAt ?? null,
+            });
+            return;
+          }
+          if (reason === "EXAM_CLOSED") {
+            setBlockedStart({ reason });
+            return;
+          }
+        }
         throw new Error(`No se pudo iniciar el intento (${r.status})`);
       }
 
       const data = await r.json();
       const at = data.attempt;
 
+      setBlockedStart(null);
       setAttemptId(at.id);
       setStep("exam");
       await refreshSummary();
@@ -775,6 +821,18 @@ export default function StudentPage({ params }: { params: { code: string } }) {
               >
                 ¡Comenzar Aventura!
               </button>
+              {blockedStart && (
+                <div className="mt-4 text-amber-700 bg-amber-50 p-3 rounded-lg text-sm">
+                  {blockedStart.reason === "EXAM_NOT_OPEN" ? (
+                    <>
+                      El examen aún no está disponible. Apertura:{" "}
+                      {formatStartDate(blockedStart.startsAt)}
+                    </>
+                  ) : (
+                    <>El examen ya cerró.</>
+                  )}
+                </div>
+              )}
               {err && (
                 <div className="mt-4 text-red-500 bg-red-50 p-2 rounded-lg text-sm">
                   {err}

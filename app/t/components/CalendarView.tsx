@@ -12,6 +12,11 @@ type ExamListItem = {
   code: string;
   createdAt: string; // Usaremos createdAt como fecha de evento por ahora
   status: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  openAt?: string | null;
+  examOpenAt?: string | null;
+  gradingMode?: "auto" | "manual";
 };
 
 type Props = {
@@ -384,22 +389,73 @@ export default function CalendarView({ exams, profile }: Props) {
   // Ajuste para empezar la semana en Lunes
   const startOffset = firstDay === 0 ? 6 : firstDay - 1;
 
-  // Mapear exámenes a días
-  const examsByDay = React.useMemo(() => {
-    const map: Record<number, ExamListItem[]> = {};
+  const dateKeyLocal = React.useCallback((value?: string | Date | null) => {
+    if (!value) return null;
+    const d = value instanceof Date ? value : new Date(value);
+    if (isNaN(d.getTime())) return null;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }, []);
+
+  const examCalendarItemsByDay = React.useMemo(() => {
+    const map: Record<string, Array<{
+      id: string;
+      code: string;
+      title: string;
+      kind: "open" | "review";
+      status?: string;
+    }>> = {};
+    const addItem = (
+      dateValue: string | null,
+      item: {
+        id: string;
+        code: string;
+        title: string;
+        kind: "open" | "review";
+        status?: string;
+      }
+    ) => {
+      const key = dateKeyLocal(dateValue);
+      if (!key) return;
+      if (!map[key]) map[key] = [];
+      map[key].push(item);
+    };
     exams.forEach((ex) => {
-      const d = new Date(ex.createdAt);
-      if (
-        d.getMonth() === currentDate.getMonth() &&
-        d.getFullYear() === currentDate.getFullYear()
-      ) {
-        const dayNum = d.getDate();
-        if (!map[dayNum]) map[dayNum] = [];
-        map[dayNum].push(ex);
+      const title = ex.title || "Examen";
+      addItem(ex.startsAt ?? ex.examOpenAt ?? null, {
+        id: `open-${ex.id}`,
+        code: ex.code,
+        title,
+        kind: "open",
+        status: ex.status,
+      });
+      if (String(ex.gradingMode || "").toLowerCase() === "manual" && ex.openAt) {
+        addItem(ex.openAt, {
+          id: `review-${ex.id}`,
+          code: ex.code,
+          title,
+          kind: "review",
+          status: ex.status,
+        });
       }
     });
     return map;
-  }, [exams, currentDate]);
+  }, [exams, dateKeyLocal]);
+
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    if (exams.length === 0) return;
+    const first = exams[0];
+    const key = dateKeyLocal(first.startsAt ?? first.examOpenAt ?? null);
+    console.debug("exam dateKeyLocal (calendar)", {
+      startsAt: first.startsAt,
+      examOpenAt: first.examOpenAt,
+      key,
+      dayKey: dateKeyLocal(currentDate),
+    });
+  }, [exams, currentDate, dateKeyLocal]);
 
   const changeMonth = (delta: number) => {
     setCurrentDate(
@@ -919,9 +975,12 @@ export default function CalendarView({ exams, profile }: Props) {
     return map;
   }, [tasks]);
 
-  const selectedDateKey = selectedDate.toISOString().slice(0, 10);
-  const selectedEvents = eventsByDay[selectedDateKey] ?? [];
-  const selectedTasks = tasksByDay[selectedDateKey] ?? [];
+  const selectedDateKey = dateKeyLocal(selectedDate) || "";
+  const selectedEvents = selectedDateKey ? eventsByDay[selectedDateKey] ?? [] : [];
+  const selectedTasks = selectedDateKey ? tasksByDay[selectedDateKey] ?? [] : [];
+  const selectedExams = selectedDateKey
+    ? examCalendarItemsByDay[selectedDateKey] ?? []
+    : [];
 
   const weekStart = new Date(selectedDate);
   weekStart.setDate(selectedDate.getDate() - ((selectedDate.getDay() + 6) % 7));
@@ -992,18 +1051,46 @@ export default function CalendarView({ exams, profile }: Props) {
     );
   };
   const getRenderItemTime = (renderItem: {
-    type: "event" | "task";
-    item: CalendarEvent | CalendarTask;
-  }) =>
-    renderItem.type === "event"
-      ? getEventTimeCandidate(renderItem.item as CalendarEvent)
-      : getTaskTimeCandidate(renderItem.item as CalendarTask);
+    type: "event" | "task" | "exam";
+    item: CalendarEvent | CalendarTask | {
+      id: string;
+      code: string;
+      title: string;
+      kind: "open" | "review";
+    };
+  }) => {
+    if (renderItem.type === "event") {
+      return getEventTimeCandidate(renderItem.item as CalendarEvent);
+    }
+    if (renderItem.type === "task") {
+      return getTaskTimeCandidate(renderItem.item as CalendarTask);
+    }
+    return null;
+  };
   const getRenderItemTitle = (renderItem: {
-    item: CalendarEvent | CalendarTask;
-  }) => renderItem.item.title;
+    type: "event" | "task" | "exam";
+    item: CalendarEvent | CalendarTask | {
+      id: string;
+      code: string;
+      title: string;
+      kind: "open" | "review";
+    };
+  }) => {
+    if (renderItem.type === "exam") {
+      const exam = renderItem.item as { title: string; kind: "open" | "review" };
+      return `${exam.kind === "review" ? "Revisión" : "Examen"}: ${exam.title}`;
+    }
+    return (renderItem.item as CalendarEvent | CalendarTask).title;
+  };
   const getRenderItemId = (renderItem: {
-    item: CalendarEvent | CalendarTask;
-  }) => renderItem.item.id;
+    type: "event" | "task" | "exam";
+    item: CalendarEvent | CalendarTask | {
+      id: string;
+      code: string;
+      title: string;
+      kind: "open" | "review";
+    };
+  }) => (renderItem.item as any).id;
   const sortByTime = <T,>(
     items: T[],
     getTime: (item: T) => string | null | undefined,
@@ -1176,12 +1263,20 @@ export default function CalendarView({ exams, profile }: Props) {
   };
 
   const renderAgendaItem = (
-    item: CalendarEvent | CalendarTask,
-    type: "event" | "task"
+    item:
+      | CalendarEvent
+      | CalendarTask
+      | { id: string; title: string; kind: "open" | "review"; code: string },
+    type: "event" | "task" | "exam"
   ) => {
-    const color = resolveColor(item.color);
+    const color =
+      type === "exam" ? "#f59e0b" : resolveColor((item as CalendarEvent | CalendarTask).color);
     const label =
-      "time" in item && item.time ? `${item.time} · ${item.title}` : item.title;
+      type === "exam"
+        ? `${(item as any).kind === "review" ? "Revisión" : "Examen"}: ${(item as any).title}`
+        : "time" in (item as any) && (item as any).time
+          ? `${(item as any).time} · ${(item as any).title}`
+          : (item as any).title;
     return (
       <div
         key={item.id}
@@ -1193,24 +1288,28 @@ export default function CalendarView({ exams, profile }: Props) {
         <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
           {label}
         </span>
-        <span style={styles.agendaActions}>
-          <button
-            style={styles.actionBtn}
-            onClick={() => openEditModal(item, type)}
-            aria-label={`Editar ${type}`}
-          >
-            ✏️
-          </button>
-          <button
-            style={styles.actionBtn}
-            onClick={() =>
-              type === "event" ? deleteEvent(item.id) : deleteTask(item.id)
-            }
-            aria-label={`Borrar ${type}`}
-          >
-            🗑️
-          </button>
-        </span>
+        {type !== "exam" && (
+          <span style={styles.agendaActions}>
+            <button
+              style={styles.actionBtn}
+              onClick={() => openEditModal(item as any, type)}
+              aria-label={`Editar ${type}`}
+            >
+              ✏️
+            </button>
+            <button
+              style={styles.actionBtn}
+              onClick={() =>
+                type === "event"
+                  ? deleteEvent((item as any).id)
+                  : deleteTask((item as any).id)
+              }
+              aria-label={`Borrar ${type}`}
+            >
+              🗑️
+            </button>
+          </span>
+        )}
       </div>
     );
   };
@@ -1495,7 +1594,6 @@ export default function CalendarView({ exams, profile }: Props) {
 
           {Array.from({ length: days }).map((_, i) => {
             const dayNum = i + 1;
-            const dayExams = examsByDay[dayNum] || [];
             const cellDate = new Date(
               currentDate.getFullYear(),
               currentDate.getMonth(),
@@ -1506,15 +1604,16 @@ export default function CalendarView({ exams, profile }: Props) {
               currentDate.getMonth() === new Date().getMonth() &&
               currentDate.getFullYear() === new Date().getFullYear();
             const dayBackground = isToday ? "#ecfdf5" : isDark ? "#f3f4f6" : "white";
-            const dayKey = cellDate.toISOString().slice(0, 10);
-            const dayEvents = eventsByDay[dayKey] ?? [];
-            const dayTasks = tasksByDay[dayKey] ?? [];
+            const dayKey = dateKeyLocal(cellDate);
+            const dayExams = dayKey ? examCalendarItemsByDay[dayKey] || [] : [];
+            const dayEvents = dayKey ? eventsByDay[dayKey] ?? [] : [];
+            const dayTasks = dayKey ? tasksByDay[dayKey] ?? [] : [];
 
             return (
               <div
                 key={dayNum}
                 style={{ ...styles.dayCell, background: dayBackground }}
-                className="calendar-grid-cell"
+                className="calendar-grid-cell relative"
                 onMouseEnter={(e) =>
                   (e.currentTarget.style.background = isDark ? "#1e293b" : "#f0fdf4")
                 }
@@ -1530,6 +1629,11 @@ export default function CalendarView({ exams, profile }: Props) {
                 >
                   {dayNum}
                 </div>
+                {dayExams.length > 0 && (
+                  <div className="absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded-full border border-black/10 bg-white/70 backdrop-blur">
+                    📝 {dayExams.length}
+                  </div>
+                )}
 
                 <div style={styles.monthItems}>
                   {(() => {
@@ -1570,18 +1674,34 @@ export default function CalendarView({ exams, profile }: Props) {
                       <>
                         {visibleItems.map((item) => {
                           if (item.kind === "exam") {
-                            const ex = item.data as ExamListItem;
+                            const ex = item.data as {
+                              id: string;
+                              code: string;
+                              title: string;
+                              kind: "open" | "close" | "review";
+                              status?: string;
+                            };
+                            const prefix =
+                              ex.kind === "review"
+                                ? "Revisión"
+                                : "Examen";
                             return (
                               <span
                                 key={`exam-${ex.id}`}
-                                style={{ ...styles.eventDot, ...styles.monthItem }}
+                                style={{
+                                  ...styles.eventDot,
+                                  ...styles.monthItem,
+                                  background: "#fef9c3",
+                                  borderLeft: "2px solid #f59e0b",
+                                  color: "#92400e",
+                                }}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   router.push(`/t/${ex.code}`);
                                 }}
-                                title={`${ex.title} (${ex.status})`}
+                                title={`${prefix}: ${ex.title}${ex.status ? ` (${ex.status})` : ""}`}
                               >
-                                {ex.title}
+                                {prefix}: {ex.title}
                               </span>
                             );
                           }
@@ -1716,10 +1836,15 @@ export default function CalendarView({ exams, profile }: Props) {
                   ))}
                 </div>
                 {weekDays.map((day) => {
-                  const dayKey = day.toISOString().slice(0, 10);
-                  const dayEvents = eventsByDay[dayKey] ?? [];
-                  const dayTasks = tasksByDay[dayKey] ?? [];
+                  const dayKey = dateKeyLocal(day);
+                  const dayEvents = dayKey ? eventsByDay[dayKey] ?? [] : [];
+                  const dayTasks = dayKey ? tasksByDay[dayKey] ?? [] : [];
+                  const dayExams = dayKey ? examCalendarItemsByDay[dayKey] ?? [] : [];
                   const dayItems = [
+                    ...dayExams.map((ex) => ({
+                      type: "exam" as const,
+                      item: ex,
+                    })),
                     ...dayEvents.map((evt) => ({
                       type: "event" as const,
                       item: evt,
@@ -1783,6 +1908,10 @@ export default function CalendarView({ exams, profile }: Props) {
                 <div style={styles.agendaDayColumn}>
                   {hours.map((hour) => {
                     const dayItems = [
+                      ...selectedExams.map((ex) => ({
+                        type: "exam" as const,
+                        item: ex,
+                      })),
                       ...selectedEvents.map((evt) => ({
                         type: "event" as const,
                         item: evt,
