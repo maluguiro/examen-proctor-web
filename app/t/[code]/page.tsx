@@ -722,7 +722,7 @@ export default function TeacherExamPage() {
                     </button>
                     {isManual && (
                       <Link
-                        href="/t/grading"
+                        href={`/t/exams/${code}/grading`}
                         className="btn-pill-accent pointer-events-auto inline-flex w-fit items-center gap-2 rounded-full text-xs font-bold"
                         style={{ padding: "6px 10px", fontSize: "11px" }}
                       >

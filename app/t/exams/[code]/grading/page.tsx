@@ -58,11 +58,7 @@ export default function GradingInboxPage() {
   function mapStatus(status?: string | null) {
     const raw = String(status || "").toLowerCase();
     if (raw === "graded" || raw === "corrected") return "Corregido";
-    if (raw === "in_review" || raw === "in-review") return "En revisión";
-    if (raw === "submitted") return "Pendiente";
-    if (raw === "in_progress" || raw === "in-progress") return "En curso";
-    if (raw === "pending") return "Pendiente";
-    return status || "Pendiente";
+    return "Pendiente";
   }
 
   React.useEffect(() => {
@@ -157,7 +153,7 @@ export default function GradingInboxPage() {
                   <th className="py-2 px-2">Enviado</th>
                   <th className="py-2 px-2">Estado</th>
                   <th className="py-2 px-2">Nota</th>
-                  <th className="py-2 px-2">Accion</th>
+                    <th className="py-2 px-2">Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -184,20 +180,22 @@ export default function GradingInboxPage() {
                           ? new Date(row.submittedAt).toLocaleString()
                           : "-"}
                       </td>
-                      <td className="py-3 px-2 text-gray-500">
-                        {mapStatus(row.status)}
-                      </td>
+                        <td className="py-3 px-2 text-gray-500">
+                          {mapStatus(row.status)}
+                        </td>
                       <td className="py-3 px-2 text-gray-500">
                         {row.score != null ? row.score : "-"}
                       </td>
-                      <td className="py-3 px-2">
-                        <Link
-                          href={`/t/exams/${code}/grading/${row.id}`}
-                          className="btn-aurora px-3 py-1.5 rounded-lg text-xs font-bold"
-                        >
-                          Corregir
-                        </Link>
-                      </td>
+                        <td className="py-3 px-2">
+                          <Link
+                            href={`/t/exams/${code}/grading/${row.id}`}
+                            className="btn-aurora px-3 py-1.5 rounded-lg text-xs font-bold"
+                          >
+                            {mapStatus(row.status) === "Corregido"
+                              ? "Ver"
+                              : "Corregir"}
+                          </Link>
+                        </td>
                     </tr>
                   ))
                 )}

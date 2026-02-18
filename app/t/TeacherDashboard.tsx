@@ -615,6 +615,12 @@ React.useEffect(() => {
       icon: "📅",
       action: () => router.push("/t/calendar"),
     },
+    {
+      id: "grading",
+      label: "Correcciones",
+      icon: "📝",
+      action: () => router.push("/t/grading"),
+    },
   ];
   const normalizedSearch = search.trim().toLowerCase();
 
