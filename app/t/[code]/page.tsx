@@ -126,6 +126,8 @@ export default function TeacherExamPage() {
     "auto"
   );
   const [maxScore, setMaxScore] = React.useState<string | number>("");
+  const [startsAt, setStartsAt] = React.useState("");
+  const [endsAt, setEndsAt] = React.useState("");
   const [openAt, setOpenAt] = React.useState("");
 
   // preguntas
@@ -229,18 +231,18 @@ export default function TeacherExamPage() {
         setMaxScore(
           typeof m.maxScore === "number" && !isNaN(m.maxScore) ? m.maxScore : ""
         );
-        if (m.openAt) {
-          const d = new Date(m.openAt);
-          if (!isNaN(d.getTime())) {
-            // Construimos manualmente el string local para datetime-local
-            // evitando conversiones automáticas de zona horaria
-            const pad = (n: number) => n.toString().padStart(2, "0");
-            const localIso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
-              d.getDate()
-            )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-            setOpenAt(localIso);
-          }
-        }
+        const toLocalDateTime = (value?: string | null) => {
+          if (!value) return "";
+          const d = new Date(value);
+          if (isNaN(d.getTime())) return "";
+          const pad = (n: number) => n.toString().padStart(2, "0");
+          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
+            d.getDate()
+          )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        };
+        setStartsAt(toLocalDateTime((m as any).startsAt));
+        setEndsAt(toLocalDateTime((m as any).endsAt));
+        setOpenAt(toLocalDateTime(m.openAt));
       }
 
       if (questionsRes.ok) {
@@ -307,9 +309,9 @@ export default function TeacherExamPage() {
         body.maxScore = Number(maxScore);
       }
 
-      if (openAt) {
-        body.openAt = new Date(openAt).toISOString();
-      }
+      body.startsAt = startsAt ? new Date(startsAt).toISOString() : null;
+      body.endsAt = endsAt ? new Date(endsAt).toISOString() : null;
+      body.openAt = openAt ? new Date(openAt).toISOString() : null;
 
       const r = await fetch(`${API}/exams/${code}/meta`, {
         method: "PUT",
@@ -720,7 +722,7 @@ export default function TeacherExamPage() {
                     </button>
                     {isManual && (
                       <Link
-                        href="/t/grading"
+                        href={`/t/exams/${code}/grading`}
                         className="btn-pill-accent pointer-events-auto inline-flex w-fit items-center gap-2 rounded-full text-xs font-bold"
                         style={{ padding: "6px 10px", fontSize: "11px" }}
                       >
@@ -934,6 +936,39 @@ export default function TeacherExamPage() {
                       onChange={(e) => setMaxScore(e.target.value)}
                       placeholder="100"
                     />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 ml-1">
+                    Ventana del examen
+                  </label>
+                  <p className="text-xs text-gray-500 font-medium ml-1">
+                    Define cuándo se habilita rendir y hasta cuándo se puede iniciar.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-700 ml-1">
+                        Apertura del examen
+                      </label>
+                      <input
+                        type="datetime-local"
+                        className="input-aurora w-full p-4 rounded-2xl text-gray-600"
+                        value={startsAt}
+                        onChange={(e) => setStartsAt(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-700 ml-1">
+                        Cierre del examen
+                      </label>
+                      <input
+                        type="datetime-local"
+                        className="input-aurora w-full p-4 rounded-2xl text-gray-600"
+                        value={endsAt}
+                        onChange={(e) => setEndsAt(e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
 

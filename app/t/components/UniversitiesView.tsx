@@ -81,6 +81,15 @@ const [isDark, setIsDark] = React.useState(false);
         return () => observer.disconnect();
     }, []);
 
+    const normalizeKey = React.useCallback((value?: string | null) => {
+        if (!value) return "";
+        return value
+            .trim()
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+    }, []);
+
     // Filter Logic
     const activeInstitutionId = Array.from(expandedInstIds).find(id =>
         localInstitutions.find(i => i.id === id)?.subjects.some(s => s.id === selectedSubjectId)
@@ -90,17 +99,27 @@ const [isDark, setIsDark] = React.useState(false);
 
     const filteredExams = React.useMemo(() => {
         if (!activeSubject || !activeInstitution) return [];
-        const subjectName = activeSubject.name.trim();
-        const institutionName = activeInstitution.name.trim();
+        const subjectName = normalizeKey(activeSubject.name);
+        const institutionName = normalizeKey(activeInstitution.name);
         return exams.filter(e => {
             return (
                 e.university &&
                 e.subject &&
-                e.university === institutionName &&
-                e.subject === subjectName
+                normalizeKey(e.university) === institutionName &&
+                normalizeKey(e.subject) === subjectName
             );
         });
-    }, [exams, activeSubject, activeInstitution]);
+    }, [exams, activeSubject, activeInstitution, normalizeKey]);
+
+    const missingMetaCount = React.useMemo(() => {
+        if (!activeSubject || !activeInstitution) return 0;
+        const subjectName = normalizeKey(activeSubject.name);
+        const institutionName = normalizeKey(activeInstitution.name);
+        return exams.filter(e => {
+            if (e.university && e.subject) return false;
+            return true;
+        }).length;
+    }, [exams, activeSubject, activeInstitution, normalizeKey]);
 
     // --- Handlers (Persistence) ---
 
@@ -569,6 +588,11 @@ const [isDark, setIsDark] = React.useState(false);
                             {filteredExams.length === 0 ? (
                                 <div style={styles.emptyState}>
                                     No se encontraron exámenes asociados a {activeSubject.name}.
+                                    {missingMetaCount > 0 && (
+                                        <div style={{ marginTop: 8 }}>
+                                            Hay exámenes sin universidad/materia configurada.
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 filteredExams.map(ex => (

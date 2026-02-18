@@ -47,6 +47,10 @@ type ExamListItem = {
   date?: string;
   duration?: number;
   registeredCount?: number;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  openAt?: string | null;
+  examOpenAt?: string | null;
 };
 
 type CalendarEvent = {
@@ -93,12 +97,77 @@ const [widgetDate] = React.useState(new Date());
     []
   );
   const [calendarTasks, setCalendarTasks] = React.useState<CalendarTask[]>([]);
+  const getExamOpenAt = React.useCallback((exam: ExamListItem) => {
+    return exam.startsAt ?? exam.examOpenAt ?? null;
+  }, []);
+  const getExamCloseAt = React.useCallback((exam: ExamListItem) => {
+    return exam.endsAt ?? null;
+  }, []);
+  const getExamReviewAt = React.useCallback((exam: ExamListItem) => {
+    return exam.openAt ?? null;
+  }, []);
+  const formatDate = React.useCallback((value?: string | null) => {
+    if (!value) return "";
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString();
+  }, []);
+
+  const dateKeyLocal = React.useCallback((value?: string | Date | null) => {
+    if (!value) return "";
+    const dt = typeof value === "string" ? new Date(value) : value;
+    if (isNaN(dt.getTime())) return "";
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, "0");
+    const day = String(dt.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }, []);
 
   const institutions = profile?.institutions ?? [];
-  const selectedInstitution = institutions.find(
-    (inst) => inst.name === selectedUniversity
-  );
-  const availableSubjects = selectedInstitution?.subjects ?? [];
+  const normalizeKey = React.useCallback((value?: string | null) => {
+    if (!value) return "";
+    return value
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+  }, []);
+  const universityOptions = React.useMemo(() => {
+    if (institutions.length > 0) {
+      return institutions.map((inst) => inst.name).filter(Boolean);
+    }
+    const map = new Map<string, string>();
+    exams.forEach((exam) => {
+      if (!exam.university) return;
+      const key = normalizeKey(exam.university);
+      if (!key) return;
+      if (!map.has(key)) {
+        map.set(key, exam.university.trim());
+      }
+    });
+    return Array.from(map.values());
+  }, [institutions, exams, normalizeKey]);
+  const subjectOptions = React.useMemo(() => {
+    if (!selectedUniversity) return [];
+    const selectedKey = normalizeKey(selectedUniversity);
+    if (institutions.length > 0) {
+      const inst = institutions.find(
+        (i) => normalizeKey(i.name) === selectedKey
+      );
+      return inst ? inst.subjects.map((s) => s.name) : [];
+    }
+    const map = new Map<string, string>();
+    exams.forEach((exam) => {
+      if (!exam.subject || !exam.university) return;
+      if (normalizeKey(exam.university) !== selectedKey) return;
+      const key = normalizeKey(exam.subject);
+      if (!key) return;
+      if (!map.has(key)) {
+        map.set(key, exam.subject.trim());
+      }
+    });
+    return Array.from(map.values());
+  }, [institutions, exams, normalizeKey, selectedUniversity]);
 
   React.useEffect(() => {
     setSelectedSubject("");
@@ -178,6 +247,10 @@ const [widgetDate] = React.useState(new Date());
           : Array.isArray(data?.exams)
             ? data.exams
             : [];
+        const normalized = list.map((e: any) => ({
+          ...e,
+          code: e.code ?? e.publicCode ?? e.public_code ?? "",
+        }));
         if (
           !Array.isArray(data) &&
           !Array.isArray(data?.exams) &&
@@ -185,7 +258,16 @@ const [widgetDate] = React.useState(new Date());
         ) {
           console.warn("teacher/exams unexpected shape", data);
         }
-        setExams(list);
+        setExams(normalized);
+        if (process.env.NODE_ENV !== "production" && normalized.length > 0) {
+          const first = normalized[0];
+          const key = dateKeyLocal(getExamOpenAt(first));
+          console.debug("exam dateKeyLocal (dashboard)", {
+            startsAt: first.startsAt,
+            examOpenAt: first.examOpenAt,
+            key,
+          });
+        }
       })
       .catch((e) => console.error("Error loading exams:", e))
       .finally(() => setLoadingExams(false));
@@ -353,12 +435,27 @@ React.useEffect(() => {
     const startOffset = firstDay === 0 ? 6 : firstDay - 1;
 
     const examDays = new Set<number>();
-    exams.forEach((exam) => {
-      const date = new Date(exam.createdAt);
+    const examItemsByDay: Record<number, { label: string; key: string }[]> = {};
+    const addExamItem = (dateStr: string | null, label: string) => {
+      if (!dateStr) return;
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return;
       if (date.getFullYear() === year && date.getMonth() === month) {
-        examDays.add(date.getDate());
+        const day = date.getDate();
+        examDays.add(day);
+        const key = dateKeyLocal(date);
+        if (!key) return;
+        if (!examItemsByDay[day]) examItemsByDay[day] = [];
+        examItemsByDay[day].push({ label, key });
       }
-   });
+    };
+    exams.forEach((exam) => {
+      const title = exam.title || "Examen";
+      addExamItem(getExamOpenAt(exam), `Examen: ${title}`);
+      if (String((exam as any).gradingMode || "").toLowerCase() === "manual") {
+        addExamItem(getExamReviewAt(exam), `Revisión: ${title}`);
+      }
+    });
 
     const eventItemsByDay: Record<number, CalendarEvent[]> = {};
     const eventDays = new Set<number>();
@@ -398,8 +495,9 @@ React.useEffect(() => {
       taskDays,
       eventItemsByDay,
       taskItemsByDay,
+      examItemsByDay,
     };
-  }, [calendarEvents, calendarTasks, exams, widgetDate]);
+  }, [calendarEvents, calendarTasks, exams, widgetDate, dateKeyLocal]);
 
   // Crear Examen
   // Crear Examen
@@ -433,10 +531,10 @@ React.useEffect(() => {
 
   // Borrar Examen
   // Borrar Examen
-  async function handleDeleteExam(id: string) {
+  async function handleDeleteExam(id: string, title?: string) {
     if (
       !confirm(
-        "¿Seguro que querés eliminar este examen? Esta acción no se puede deshacer."
+        `¿Eliminar examen '${title || "Sin título"}'? Esta acción no se puede deshacer.`
       )
     ) {
       return;
@@ -517,25 +615,38 @@ React.useEffect(() => {
       icon: "📅",
       action: () => router.push("/t/calendar"),
     },
+    {
+      id: "grading",
+      label: "Correcciones",
+      icon: "📝",
+      action: () => router.push("/t/grading"),
+    },
   ];
   const normalizedSearch = search.trim().toLowerCase();
 
-  const filteredExams = React.useMemo(
-    () =>
-      !normalizedSearch
-        ? exams
-        : exams.filter((exam) => {
-          const title = exam.title?.toLowerCase() || "";
-          const subject = exam.subject?.toLowerCase() || "";
-          const code = exam.code?.toLowerCase() || "";
-          return (
-            title.includes(normalizedSearch) ||
-            subject.includes(normalizedSearch) ||
-            code.includes(normalizedSearch)
-          );
-        }),
-    [exams, normalizedSearch]
-  );
+  const filteredExams = React.useMemo(() => {
+    const normalizedUniversity = normalizeKey(selectedUniversity);
+    const normalizedSubject = normalizeKey(selectedSubject);
+    return exams.filter((exam) => {
+      if (normalizedUniversity) {
+        if (!exam.university) return false;
+        if (normalizeKey(exam.university) !== normalizedUniversity) return false;
+      }
+      if (normalizedSubject) {
+        if (!exam.subject) return false;
+        if (normalizeKey(exam.subject) !== normalizedSubject) return false;
+      }
+      if (!normalizedSearch) return true;
+      const title = exam.title?.toLowerCase() || "";
+      const subject = exam.subject?.toLowerCase() || "";
+      const code = exam.code?.toLowerCase() || "";
+      return (
+        title.includes(normalizedSearch) ||
+        subject.includes(normalizedSearch) ||
+        code.includes(normalizedSearch)
+      );
+    });
+  }, [exams, normalizeKey, normalizedSearch, selectedSubject, selectedUniversity]);
 
 const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
     month: "long",
@@ -585,40 +696,36 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
                   <label className="text-xs font-semibold text-gray-600 dark:text-slate-200">
                     Universidad
                   </label>
-                  <select
-                    className="px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 text-sm text-gray-800 dark:text-slate-100"
-                    value={selectedUniversity}
-                    onChange={(e) => setSelectedUniversity(e.target.value)}
-                  >
-                    <option value="">Selecciona universidad</option>
-                    {institutions.map((inst) => (
-                      <option key={inst.id} value={inst.name}>
-                        {inst.name}
-                      </option>
-                    ))}
-                  </select>
+                        <select
+                          className="px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 text-sm text-gray-800 dark:text-slate-100"
+                          value={selectedUniversity}
+                          onChange={(e) => setSelectedUniversity(e.target.value)}
+                        >
+                          <option value="">Selecciona universidad</option>
+                          {universityOptions.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-semibold text-gray-600 dark:text-slate-200">
                     Materia
                   </label>
-                  <select
-                    className="px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 text-sm text-gray-800 dark:text-slate-100"
-                    value={selectedSubject}
-                    onChange={(e) => setSelectedSubject(e.target.value)}
-                    disabled={!selectedInstitution || availableSubjects.length === 0}
-                  >
-                    <option value="">
-                      {selectedInstitution
-                        ? "Selecciona materia"
-                        : "Selecciona universidad"}
-                    </option>
-                    {availableSubjects.map((subj) => (
-                      <option key={subj.id} value={subj.name}>
-                        {subj.name}
-                      </option>
-                    ))}
-                  </select>
+                        <select
+                          className="px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 text-sm text-gray-800 dark:text-slate-100"
+                          value={selectedSubject}
+                          onChange={(e) => setSelectedSubject(e.target.value)}
+                          disabled={!selectedUniversity}
+                        >
+                          <option value="">Selecciona materia</option>
+                          {subjectOptions.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
                 </div>
               </div>
               {institutions.length === 0 && (
@@ -665,7 +772,7 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
                 </div>
               ) : (
                 filteredExams.map((exam) => (
-              <div
+      <div
   key={exam.id}
   onClick={() => router.push(`/t/${exam.code}`)}
   className="bg-white/70 dark:bg-slate-800/60 border border-white/70 dark:border-slate-700 p-5 rounded-3xl hover:bg-white dark:hover:bg-slate-800 transition-all flex flex-col gap-3 group relative shadow-sm dark:text-slate-200"
@@ -686,7 +793,7 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
     <button
       onClick={(e) => {
         e.stopPropagation();
-        handleDeleteExam(exam.id);
+        handleDeleteExam(exam.id, exam.title);
       }}
       className="p-1.5 rounded-lg text-black dark:!text-black hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
       title="Eliminar examen"
@@ -709,11 +816,16 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
     )}
   </div>
 
-  {/* Fecha de creación + código */}
+  {/* Fecha de apertura + código */}
   <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center text-[11px] font-medium !text-black">
     <span>
-      Creado el{" "}
-      {new Date(exam.createdAt).toLocaleDateString()}
+      Apertura:{" "}
+      {getExamOpenAt(exam)
+        ? formatDate(getExamOpenAt(exam))
+        : "Sin programar"}
+      {!getExamOpenAt(exam) && exam.createdAt
+        ? ` · Creado: ${formatDate(exam.createdAt)}`
+        : ""}
     </span>
     <span className="font-mono !text-black">
       Código: {exam.code}
@@ -849,15 +961,12 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
                                 </span>
                               )}
 
-                              {/* Fecha de creación si existe */}
-                              {exam.createdAt && (
-                                <span className="text-[10px] text-gray-400">
-                                  •{" "}
-                                  {new Date(
-                                    exam.createdAt
-                                  ).toLocaleDateString()}
-                                </span>
-                              )}
+                              <span className="text-[10px] text-gray-400">
+                                •{" "}
+                                {getExamOpenAt(exam)
+                                  ? `Apertura: ${formatDate(getExamOpenAt(exam))}`
+                                  : "Apertura: Sin programar"}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -913,11 +1022,14 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
                       widgetMonthData.eventItemsByDay[dayNum] ?? [];
                     const dayTasks =
                       widgetMonthData.taskItemsByDay[dayNum] ?? [];
-                      const hasItem =
+                    const dayExamItems =
+                      widgetMonthData.examItemsByDay[dayNum] ?? [];
+                    const hasItem =
                       widgetMonthData.examDays.has(dayNum) ||
                        dayEvents.length > 0 ||
                       dayTasks.length > 0;
                     const tooltipLines = [
+                      ...dayExamItems.map((item) => `• ${item.label}`),
                       ...dayTasks.map((task) =>
                         task.time
                           ? `• ${task.time} · ${task.title}`
@@ -936,6 +1048,9 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
                         <span>{dayNum}</span>
                         {hasItem && (
                           <span className="flex items-center gap-0.5">
+                            {dayExamItems.length > 0 && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                            )}
                             {dayTasks.map((task) => (
                               <span
                                 key={task.id}
@@ -1166,12 +1281,12 @@ const widgetMonthText = widgetDate.toLocaleDateString("es-ES", {
                             : exam.university || exam.subject}
                               </span>
                             )}
-                            {exam.createdAt && (
-                              <span className="text-gray-400">
-                                •{" "}
-                                {new Date(exam.createdAt).toLocaleDateString()}
-                              </span>
-                            )}
+                            <span className="text-gray-400">
+                              •{" "}
+                              {getExamOpenAt(exam)
+                                ? `Apertura: ${formatDate(getExamOpenAt(exam))}`
+                                : "Apertura: Sin programar"}
+                            </span>
                             <span className="font-mono text-gray-400 ml-auto">
                               {exam.code}
                             </span>

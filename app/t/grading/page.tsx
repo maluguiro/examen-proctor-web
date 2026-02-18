@@ -109,7 +109,7 @@ export default function GlobalManualGradingPage() {
             <div className="text-sm text-gray-500">Cargando...</div>
           ) : items.length === 0 ? (
             <div className="text-sm text-gray-500">
-              No hay exámenes pendientes de corrección.
+              No hay exámenes manuales con entregas pendientes.
             </div>
           ) : (
             <div className="overflow-x-auto">

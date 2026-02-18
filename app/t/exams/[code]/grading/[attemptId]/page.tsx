@@ -503,7 +503,7 @@ export default function GradingDetailPage() {
                 disabled={saving || hasMissingScores}
                 className="btn-aurora-primary px-4 py-2 rounded-lg text-xs font-bold"
               >
-                {saving ? "Guardando..." : "Finalizar"}
+                {saving ? "Guardando..." : "Finalizar y publicar"}
               </button>
             </div>
           </div>
