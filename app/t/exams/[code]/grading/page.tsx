@@ -91,7 +91,16 @@ export default function GradingInboxPage() {
         }
         const data = await res.json();
         if (cancelled) return;
-        const items = Array.isArray(data?.items) ? data.items : [];
+        const items = Array.isArray(data?.items)
+          ? data.items
+          : Array.isArray(data?.attempts)
+          ? data.attempts
+          : Array.isArray(data)
+          ? data
+          : [];
+        if (process.env.NODE_ENV !== "production" && items.length === 0) {
+          console.warn("Bandeja attempts empty; response shape:", data);
+        }
         setAttempts(items);
       } catch {
         if (!cancelled) {
