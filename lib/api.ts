@@ -29,6 +29,38 @@ export async function getEvents(examId: string, since: number) {
 
 // ====== Auth Client ======
 
+async function parseErrorResponse(res: Response) {
+  let raw = "";
+  try {
+    const data: any = await res.clone().json();
+    raw =
+      data?.error ||
+      data?.message ||
+      data?.details ||
+      JSON.stringify(data);
+  } catch {
+    raw = await res.text().catch(() => "");
+  }
+  return { raw: raw || "", status: res.status };
+}
+
+function mapAuthErrorToFriendly(status: number, raw: string) {
+  const msg = String(raw || "");
+  if (status === 401 || /invalid|credentials/i.test(msg)) {
+    return "Credenciales inválidas. Revisá tu correo y contraseña.";
+  }
+  if (status === 409 || /already|exists/i.test(msg)) {
+    return "Ese correo ya está registrado. Probá iniciar sesión.";
+  }
+  if (
+    status === 503 ||
+    /prisma|authentication failed|can't reach database server/i.test(msg)
+  ) {
+    return "Servicio no disponible. Intentalo nuevamente en unos minutos.";
+  }
+  return "No se pudo completar la operación. Intentalo nuevamente.";
+}
+
 export async function registerTeacher(payload: {
   name: string;
   email: string;
@@ -40,8 +72,11 @@ export async function registerTeacher(payload: {
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(txt || "Error al registrarse");
+    const { raw, status } = await parseErrorResponse(res);
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[AUTH API ERROR] register", { status, raw });
+    }
+    throw new Error(mapAuthErrorToFriendly(status, raw));
   }
   return res.json();
 }
@@ -56,8 +91,11 @@ export async function loginTeacher(payload: {
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(txt || "Error al iniciar sesión");
+    const { raw, status } = await parseErrorResponse(res);
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[AUTH API ERROR] login", { status, raw });
+    }
+    throw new Error(mapAuthErrorToFriendly(status, raw));
   }
   return res.json();
 }
