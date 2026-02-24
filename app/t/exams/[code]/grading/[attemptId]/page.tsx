@@ -84,10 +84,21 @@ export default function GradingDetailPage() {
   const [questions, setQuestions] = React.useState<QuestionItem[]>([]);
   const [reviewData, setReviewData] = React.useState<ReviewResponse | null>(null);
   const [localGrades, setLocalGrades] = React.useState<Record<string, LocalGrade>>({});
+  const [feedbackByQid, setFeedbackByQid] = React.useState<Record<string, string>>({});
   const [openCommentId, setOpenCommentId] = React.useState<string | null>(null);
   const [commentSavedId, setCommentSavedId] = React.useState<string | null>(null);
   const [overallFeedback, setOverallFeedback] = React.useState("");
   const [overallSaved, setOverallSaved] = React.useState(false);
+  const [gradesInitialized, setGradesInitialized] = React.useState(false);
+  const [reviewOpenAt, setReviewOpenAt] = React.useState<string | null>(null);
+  const [isEditing, setIsEditing] = React.useState(false);
+  const snapshotRef = React.useRef<{
+    localGrades: Record<string, LocalGrade>;
+    feedbackByQid: Record<string, string>;
+    overallFeedback: string;
+  } | null>(null);
+  const editedFeedbackQids = React.useRef<Set<string>>(new Set());
+  const rehydratedFeedbackQids = React.useRef<Set<string>>(new Set());
 
   const infoTimerRef = React.useRef<number | null>(null);
 
@@ -185,11 +196,20 @@ export default function GradingDetailPage() {
         }
 
         const data = (await gradingRes.json()) as GradingResponse;
-        const qList = Array.isArray(data?.questions)
+        
+        const qListRaw = Array.isArray(data?.questions)
           ? data.questions
           : Array.isArray(data?.items)
           ? data.items
           : [];
+        const qList = qListRaw.map((q: any) => {
+          const normalizedQuestion = {
+            ...q,
+            teacherFeedback: q?.teacherFeedback ?? "",
+            feedback: q?.feedback ?? q?.teacherFeedback ?? "",
+          };
+          return normalizedQuestion;
+        });
 
         let review: ReviewResponse | null = null;
         if (reviewRes.ok) {
@@ -221,33 +241,71 @@ export default function GradingDetailPage() {
         setAttempt(data.attempt ?? null);
         setQuestions(qList);
         setReviewData(review);
-        setOverallFeedback(
-          String(
-            data?.overallFeedback ??
-              data?.grading?.overallFeedback ??
-              data?.attempt?.overallFeedback ??
-              ""
-          )
-        );
-        setOverallSaved(false);
+        const derivedOpenAt =
+          (review as any)?.exam?.openAt ??
+          (data as any)?.exam?.openAt ??
+          (data as any)?.reviewAvailableAt ??
+          null;
+        setReviewOpenAt(derivedOpenAt ? String(derivedOpenAt) : null);
+        if (!gradesInitialized) {
+          setOverallFeedback(
+            String(
+              data?.overallFeedback ??
+                data?.grading?.overallFeedback ??
+                data?.attempt?.overallFeedback ??
+                ""
+            )
+          );
+          setOverallSaved(false);
+        }
 
         const incoming =
           data?.perQuestion ?? data?.grading?.perQuestion ?? [];
         const nextGrades: Record<string, LocalGrade> = {};
+        const nextFeedback: Record<string, string> = {};
         const reviewQuestions = Array.isArray(review?.questions)
           ? review.questions
           : [];
-        reviewQuestions.forEach((q) => {
-          const found = incoming.find((g) => g.questionId === q.id);
-          nextGrades[q.id] = {
-            score:
-              typeof found?.score === "number" && !isNaN(found.score)
-                ? String(found.score)
-                : "",
-            feedback: found?.feedback ? String(found.feedback) : "",
-          };
-        });
-        setLocalGrades(nextGrades);
+        if (!gradesInitialized) {
+          reviewQuestions.forEach((q) => {
+            const qid = getQid(q);
+            const found = incoming.find((g) => g.questionId === qid);
+            const fallbackScore =
+              typeof (q as any).teacherScore === "number"
+                ? (q as any).teacherScore
+                : typeof (q as any).score === "number"
+                ? (q as any).score
+                : null;
+            const fallbackFeedback =
+              (q as any).feedback ??
+              (q as any).teacherFeedback ??
+              null;
+
+            nextGrades[qid] = {
+              score:
+                typeof found?.score === "number" && !isNaN(found.score)
+                  ? String(found.score)
+                  : typeof fallbackScore === "number" && !isNaN(fallbackScore)
+                  ? String(fallbackScore)
+                  : "",
+              feedback: "",
+            };
+
+            const fbValue =
+              found?.feedback != null && String(found.feedback)
+                ? String(found.feedback)
+                : fallbackFeedback != null && String(fallbackFeedback)
+                ? String(fallbackFeedback)
+                : "";
+            if (fbValue) {
+              rehydratedFeedbackQids.current.add(qid);
+              nextFeedback[qid] = fbValue;
+            }
+          });
+          setLocalGrades(nextGrades);
+          setFeedbackByQid(nextFeedback);
+          setGradesInitialized(true);
+        }
       } catch (e) {
         logDevError("GRADING_LOAD_ERROR", e);
         if (!cancelled) setError("Hubo un error. Reintenta.");
@@ -261,7 +319,7 @@ export default function GradingDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [code, attemptId, reloadKey]);
+  }, [code, attemptId, reloadKey, gradesInitialized]);
 
   const maxScore = React.useMemo(() => {
     const reviewQuestions = Array.isArray(reviewData?.questions)
@@ -273,12 +331,37 @@ export default function GradingDetailPage() {
     }, 0);
   }, [reviewData]);
 
+  function getQid(q: { id?: any; questionId?: any }) {
+    return String(q.questionId ?? q.id ?? "");
+  }
+
+  function getEffectiveFb(qid: string, serverFb?: string | null) {
+    const local = feedbackByQid[qid];
+    const edited = editedFeedbackQids.current.has(qid);
+    if (!edited && (local == null || String(local).trim() === "")) {
+      return String(serverFb ?? "");
+    }
+    return String(local ?? serverFb ?? "");
+  }
+
+  const serverFeedbackByQid = React.useMemo(() => {
+    const map = new Map<string, string>();
+    const sourceQuestions = Array.isArray(questions) ? questions : [];
+    sourceQuestions.forEach((q) => {
+      const qid = getQid(q);
+      const fb = String((q as any).feedback ?? (q as any).teacherFeedback ?? "");
+      map.set(qid, fb);
+    });
+    return map;
+  }, [questions]);
+
   const totalScore = React.useMemo(() => {
     const reviewQuestions = Array.isArray(reviewData?.questions)
       ? reviewData.questions
       : [];
     return reviewQuestions.reduce((acc, q) => {
-      const raw = localGrades[q.id]?.score;
+      const qid = getQid(q);
+      const raw = localGrades[qid]?.score;
       const val = Number(raw);
       if (raw === "" || Number.isNaN(val)) return acc;
       return acc + val;
@@ -290,7 +373,10 @@ export default function GradingDetailPage() {
       ? reviewData.questions
       : [];
     return reviewQuestions.some((q) => {
-      const raw = localGrades[q.id]?.score;
+      const maxPoints = typeof q.points === "number" ? q.points : 0;
+      if (maxPoints <= 0) return false;
+      const qid = getQid(q);
+      const raw = localGrades[qid]?.score;
       if (raw === "" || raw == null) return true;
       return Number.isNaN(Number(raw));
     });
@@ -298,9 +384,43 @@ export default function GradingDetailPage() {
 
   const hasOverMax = totalScore > maxScore;
   const isFinalized = React.useMemo(() => {
-    const status = String(attempt?.status || "").toLowerCase();
+    const status = String(attempt?.status || "")
+      .trim()
+      .toLowerCase();
     return status === "graded" || status === "corrected";
   }, [attempt?.status]);
+  const canEditBeforeReview = React.useMemo(() => {
+    if (!reviewOpenAt) return true;
+    const time = new Date(reviewOpenAt).getTime();
+    if (Number.isNaN(time)) return true;
+    return Date.now() < time;
+  }, [reviewOpenAt]);
+  const readOnly = isFinalized && (!canEditBeforeReview || !isEditing);
+  const canSaveDraft = !readOnly;
+  const canFinalize = !readOnly && !hasMissingScores;
+  const [mounted, setMounted] = React.useState(false);
+  const [tokenPresent, setTokenPresent] = React.useState(false);
+  const missingCount = React.useMemo(() => {
+    const reviewQuestions = Array.isArray(reviewData?.questions)
+      ? reviewData.questions
+      : [];
+    let count = 0;
+    reviewQuestions.forEach((q) => {
+      const maxPoints = typeof q.points === "number" ? q.points : 0;
+      if (maxPoints <= 0) return;
+      const qid = getQid(q);
+      const raw = localGrades[qid]?.score;
+      if (raw === "" || raw == null || Number.isNaN(Number(raw))) count += 1;
+    });
+    return count;
+  }, [localGrades, reviewData]);
+
+  React.useEffect(() => {
+    setMounted(true);
+    if (process.env.NODE_ENV !== "production") {
+      setTokenPresent(Boolean(getAuthToken()));
+    }
+  }, []);
 
   function parseJSONSafe(value: any) {
     if (value == null) return null;
@@ -506,17 +626,20 @@ export default function GradingDetailPage() {
       const reviewQuestions = Array.isArray(reviewData?.questions)
         ? reviewData.questions
         : [];
-      const perQuestion = reviewQuestions
-        .map((q) => {
-          const raw = localGrades[q.id]?.score;
-          const scoreVal = raw === "" ? null : Number(raw);
-          return {
-            questionId: q.id,
-            score: Number.isNaN(scoreVal as number) ? null : scoreVal,
-            feedback: localGrades[q.id]?.feedback ?? "",
-          };
-        })
-        .filter((item) => finalize || item.score !== null);
+      const perQuestion = reviewQuestions.map((q) => {
+        const qid = getQid(q);
+        const raw = localGrades[qid]?.score;
+        const scoreVal = raw === "" ? null : Number(raw);
+        const feedbackValue = feedbackByQid[qid] ?? "";
+        const includeFeedback =
+          editedFeedbackQids.current.has(qid) ||
+          rehydratedFeedbackQids.current.has(qid);
+        return {
+          questionId: qid,
+          score: Number.isNaN(scoreVal as number) ? null : scoreVal,
+          ...(includeFeedback ? { feedback: feedbackValue } : {}),
+        };
+      });
 
       const res = await fetch(
         `${API}/exams/${code}/attempts/${attemptId}/grading`,
@@ -539,6 +662,21 @@ export default function GradingDetailPage() {
           handleUnauthorized("Sesion expirada. Inicia sesion nuevamente.");
         } else if (res.status === 403) {
           handleForbidden("No tenes permisos para corregir este intento.");
+        } else if (res.status === 409) {
+          let body: any = null;
+          try {
+            body = await res.json();
+          } catch {
+            body = null;
+          }
+          if (body?.error === "REVIEW_ALREADY_OPEN") {
+            setError("La revisión ya está habilitada. No se puede editar.");
+            setIsEditing(false);
+            setGradesInitialized(false);
+            setReloadKey((k) => k + 1);
+            return;
+          }
+          setError("Hubo un error. Reintenta.");
         } else {
           setError("Hubo un error. Reintenta.");
         }
@@ -659,6 +797,57 @@ export default function GradingDetailPage() {
           </div>
         )}
 
+        {isFinalized && (
+          <div className="mb-6 p-4 rounded-xl bg-white/70 border border-white/60 text-sm flex items-center justify-between gap-4">
+            {canEditBeforeReview ? (
+              <div>
+                <div className="font-semibold text-gray-800">
+                  Corrección publicada
+                </div>
+                <div className="text-gray-600">
+                  Podés editar hasta{" "}
+                  {reviewOpenAt ? formatDateTime(reviewOpenAt) : "que se habilite la revisión"}.
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="font-semibold text-gray-800">
+                  Revisión habilitada
+                </div>
+                <div className="text-gray-600">
+                  Corrección bloqueada.
+                </div>
+              </div>
+            )}
+            {canEditBeforeReview && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (isEditing) {
+                    if (snapshotRef.current) {
+                      setLocalGrades(snapshotRef.current.localGrades);
+                      setFeedbackByQid(snapshotRef.current.feedbackByQid);
+                      setOverallFeedback(snapshotRef.current.overallFeedback);
+                    }
+                    editedFeedbackQids.current = new Set();
+                    setIsEditing(false);
+                    return;
+                  }
+                  snapshotRef.current = {
+                    localGrades: JSON.parse(JSON.stringify(localGrades)),
+                    feedbackByQid: JSON.parse(JSON.stringify(feedbackByQid)),
+                    overallFeedback,
+                  };
+                  setIsEditing(true);
+                }}
+                className="btn-aurora px-3 py-1.5 rounded-lg text-xs font-bold"
+              >
+                {isEditing ? "Cancelar edición" : "Editar corrección"}
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 glass-panel p-6 rounded-3xl">
             <h2 className="text-lg font-bold text-gray-800 mb-4">
@@ -677,6 +866,10 @@ export default function GradingDetailPage() {
             ) : (
               <div className="space-y-4">
                 {(reviewData?.questions ?? []).map((q, idx) => {
+                  const qid = getQid(q);
+                  const serverFb = serverFeedbackByQid.get(qid) ?? "";
+                  const effectiveFb = getEffectiveFb(qid, serverFb);
+                  const hasComment = effectiveFb.trim().length > 0;
                   const fib = getFibData(q);
                   const isFib = !!fib;
                   const options = Array.isArray(q.choices) ? q.choices : [];
@@ -722,7 +915,7 @@ export default function GradingDetailPage() {
 
                   return (
                     <div
-                      key={q.id}
+                      key={qid}
                       className="border border-white/60 bg-white/60 rounded-2xl p-5 shadow-sm space-y-4"
                     >
                       <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -754,7 +947,7 @@ export default function GradingDetailPage() {
                                 const matches =
                                   !empty && norm(value) === norm(correct);
                                 return (
-                                  <React.Fragment key={`${q.id}-fib-${i}`}>
+                                  <React.Fragment key={`${qid}-fib-${i}`}>
                                     {part && <span>{part}</span>}
                                     {i < (fib.blanks || fib.parts.length - 1) && (
                                       <span
@@ -791,7 +984,7 @@ export default function GradingDetailPage() {
                                   isStudentOption && !isCorrect && studentIndex != null;
                                 return (
                                   <li
-                                    key={`${q.id}-opt-${choiceIndex}`}
+                                    key={`${qid}-opt-${choiceIndex}`}
                                     className={`flex items-start gap-2 rounded-lg border px-2 py-1 ${
                                       isCorrectOption
                                         ? "border-emerald-300 bg-emerald-50/60 text-emerald-700 font-semibold"
@@ -852,15 +1045,15 @@ export default function GradingDetailPage() {
                                 min={0}
                                 max={q.points ?? 0}
                                 placeholder="0"
-                                value={localGrades[q.id]?.score ?? ""}
-                                disabled={isFinalized}
+                                value={localGrades[qid]?.score ?? ""}
+                                disabled={readOnly}
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   setLocalGrades((prev) => ({
                                     ...prev,
-                                    [q.id]: {
+                                    [qid]: {
                                       score: val,
-                                      feedback: prev[q.id]?.feedback ?? "",
+                                      feedback: prev[qid]?.feedback ?? "",
                                     },
                                   }));
                                 }}
@@ -875,44 +1068,56 @@ export default function GradingDetailPage() {
                             <button
                               type="button"
                               onClick={() =>
-                                setOpenCommentId((prev) =>
-                                  prev === q.id ? null : q.id
-                                )
+                                setOpenCommentId((prev) => {
+                                  const next = prev === qid ? null : qid;
+                                  if (
+                                    next &&
+                                    (feedbackByQid[qid] === undefined ||
+                                      (!editedFeedbackQids.current.has(qid) &&
+                                        String(feedbackByQid[qid] ?? "").trim() === "")) &&
+                                    serverFb.trim().length > 0
+                                  ) {
+                                    setFeedbackByQid((prevMap) => ({
+                                      ...prevMap,
+                                      [qid]: serverFb,
+                                    }));
+                                  }
+                                  return next;
+                                })
                               }
-                              disabled={isFinalized}
+                              disabled={readOnly}
                               className="btn-aurora px-3 py-2 rounded-xl text-xs font-bold relative flex items-center gap-2"
                               title="Comentario"
                             >
                               <span>{"\uD83D\uDCAC"}</span>
                               <span>Comentario</span>
-                              {localGrades[q.id]?.feedback ? (
+                              {hasComment ? (
                                 <span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">
                                   {"\u2713"}
                                 </span>
                               ) : null}
                             </button>
-                            {openCommentId === q.id && (
+                            {openCommentId === qid && (
                               <div className="pointer-events-none absolute left-0 top-full mt-2 z-20">
                                 <div className="pointer-events-auto bg-white/95 border border-white/60 shadow-lg rounded-xl p-3 w-64">
                                   <div className="text-xs font-bold text-gray-600 mb-2">
                                     Comentario
                                   </div>
                                   <textarea
-                                    value={localGrades[q.id]?.feedback ?? ""}
+                                    value={getEffectiveFb(qid, serverFb)}
                                     onChange={(e) => {
                                       const val = e.target.value;
-                                      setLocalGrades((prev) => ({
+                                      editedFeedbackQids.current.add(qid);
+                                      setFeedbackByQid((prev) => ({
                                         ...prev,
-                                        [q.id]: {
-                                          score: prev[q.id]?.score ?? "",
-                                          feedback: val,
-                                        },
+                                        [qid]: val,
                                       }));
                                     }}
+                                    disabled={readOnly}
                                     rows={3}
                                     className="input-aurora w-full p-2 rounded-xl text-xs"
                                   />
-                                  {commentSavedId === q.id && (
+                                  {commentSavedId === qid && (
                                     <div className="mt-2 text-xs text-emerald-600 font-semibold">
                                       {"Guardado \u2713"}
                                     </div>
@@ -920,7 +1125,7 @@ export default function GradingDetailPage() {
                                   <div className="mt-2 flex justify-end gap-2">
                                     <button
                                       type="button"
-                                      onClick={() => setCommentSavedId(q.id)}
+                                      onClick={() => setCommentSavedId(qid)}
                                       className="btn-aurora-primary px-3 py-1.5 rounded-lg text-xs font-bold"
                                     >
                                       Guardar
@@ -965,7 +1170,7 @@ export default function GradingDetailPage() {
                   setOverallFeedback(e.target.value);
                   setOverallSaved(false);
                 }}
-                disabled={isFinalized}
+                disabled={readOnly}
                 rows={4}
                 placeholder="Escribí un comentario general para el alumno..."
                 className="input-aurora w-full p-3 rounded-xl text-xs"
@@ -979,16 +1184,16 @@ export default function GradingDetailPage() {
                 <div className="flex gap-2 ml-auto">
                   <button
                     type="button"
-                    onClick={() => setOverallSaved(true)}
-                    disabled={isFinalized}
+                    onClick={() => saveGrading(false)}
+                    disabled={readOnly || saving}
                     className="btn-aurora-primary px-3 py-1.5 rounded-lg text-xs font-bold"
                   >
-                    Guardar
+                    {saving ? "Guardando..." : "Guardar"}
                   </button>
                   <button
                     type="button"
                     onClick={() => setOverallSaved(false)}
-                    disabled={isFinalized}
+                    disabled={readOnly}
                     className="btn-aurora px-3 py-1.5 rounded-lg text-xs font-bold"
                   >
                     Cerrar
@@ -1004,16 +1209,20 @@ export default function GradingDetailPage() {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => saveGrading(false)}
-                disabled={saving || isFinalized}
+                onClick={() => {
+                  saveGrading(false);
+                }}
+                disabled={saving || !canSaveDraft}
                 className="btn-aurora px-4 py-2 rounded-lg text-xs font-bold"
               >
                 {saving ? "Guardando..." : "Guardar borrador"}
               </button>
               <button
                 type="button"
-                onClick={() => saveGrading(true)}
-                disabled={saving || hasMissingScores || isFinalized}
+                onClick={() => {
+                  saveGrading(true);
+                }}
+                disabled={saving || !canFinalize}
                 className="btn-aurora-primary px-4 py-2 rounded-lg text-xs font-bold"
               >
                 {saving ? "Guardando..." : "Finalizar y publicar"}

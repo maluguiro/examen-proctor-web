@@ -47,6 +47,7 @@ export default function GradingInboxPage() {
     };
   }, [info]);
 
+
   React.useEffect(() => {
     if (!code) return;
     if (searchParams?.get("updated") !== "1") return;

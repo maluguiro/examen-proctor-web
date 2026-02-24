@@ -25,6 +25,13 @@ type SubmitResponse = {
   maxScore: number | null;
 };
 
+type StoredAttempt = {
+  attemptId: string;
+  studentName?: string;
+  status?: "in_progress" | "submitted";
+  answersDraft?: Record<string, any>;
+};
+
 // Normaliza el kind que viene del backend al que usamos en el front
 function mapKind(raw: string): QKind {
   const k = String(raw || "").toUpperCase();
@@ -125,11 +132,25 @@ export default function StudentPage({ params }: { params: { code: string } }) {
   );
   const [score, setScore] = React.useState<number | null>(null);
   const [maxScore, setMaxScore] = React.useState<number | null>(null);
+  const [attemptStatus, setAttemptStatus] = React.useState<{
+    totalScore: number | null;
+    maxScore: number | null;
+    canReview: boolean;
+    reviewBlockedReason?: string | null;
+    reviewAvailableAt?: string | null;
+  } | null>(null);
   const [blockedStart, setBlockedStart] = React.useState<{
     reason: "EXAM_NOT_OPEN" | "EXAM_CLOSED";
     startsAt?: string | null;
     endsAt?: string | null;
   } | null>(null);
+
+  const attemptStorageKey = React.useMemo(
+    () => `examproctor_attempt_${code}`,
+    [code]
+  );
+  const resumeRef = React.useRef(false);
+  const answersSaveTimer = React.useRef<number | null>(null);
 
   function logDevError(label: string, detail?: any) {
     if (process.env.NODE_ENV !== "production") {
@@ -145,6 +166,59 @@ export default function StudentPage({ params }: { params: { code: string } }) {
   const retryLoad = React.useCallback(() => {
     setReloadKey((k) => k + 1);
   }, []);
+
+  const readStoredAttempt = React.useCallback((): StoredAttempt | null => {
+    if (!attemptStorageKey) return null;
+    try {
+      const raw = localStorage.getItem(attemptStorageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+      if (!parsed.attemptId) return null;
+      return parsed as StoredAttempt;
+    } catch {
+      return null;
+    }
+  }, [attemptStorageKey]);
+
+  const writeStoredAttempt = React.useCallback(
+    (next: StoredAttempt) => {
+      if (!attemptStorageKey) return;
+      try {
+        localStorage.setItem(attemptStorageKey, JSON.stringify(next));
+      } catch {
+        return;
+      }
+    },
+    [attemptStorageKey]
+  );
+
+  const clearStoredAttempt = React.useCallback(() => {
+    if (!attemptStorageKey) return;
+    try {
+      localStorage.removeItem(attemptStorageKey);
+    } catch {
+      return;
+    }
+  }, [attemptStorageKey]);
+
+  const updateStoredAttempt = React.useCallback(
+    (patch: Partial<StoredAttempt>) => {
+      const prev = readStoredAttempt();
+      const nextAttemptId = patch.attemptId ?? prev?.attemptId ?? attemptId;
+      if (!nextAttemptId) return;
+
+      const next: StoredAttempt = {
+        attemptId: nextAttemptId,
+        studentName: patch.studentName ?? prev?.studentName ?? studentName,
+        status: patch.status ?? prev?.status ?? "in_progress",
+        answersDraft: patch.answersDraft ?? prev?.answersDraft ?? {},
+      };
+
+      writeStoredAttempt(next);
+    },
+    [attemptId, readStoredAttempt, studentName, writeStoredAttempt]
+  );
 
   const handleReturnToExam = React.useCallback(() => {
     const target = document.documentElement;
@@ -185,6 +259,31 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     return () => document.body.classList.remove("student-shell");
   }, []);
 
+  React.useEffect(() => {
+    if (!code || attemptId) return;
+    if (typeof window === "undefined") return;
+
+    const stored = readStoredAttempt();
+    if (!stored) return;
+
+    if (stored.studentName && !studentName) {
+      setStudentName(stored.studentName);
+    }
+
+    if (stored.status === "submitted") {
+      setAttemptId(stored.attemptId);
+      setStep("submitted");
+      return;
+    }
+
+    resumeRef.current = true;
+    setAttemptId(stored.attemptId);
+    setStep("exam");
+    if (stored.answersDraft && typeof stored.answersDraft === "object") {
+      setAnswers(stored.answersDraft);
+    }
+  }, [attemptId, code, readStoredAttempt, studentName]);
+
   const canViewReview = React.useMemo(() => {
     const hasScore =
       gradingMode === "auto" || (gradingMode === "manual" && score !== null);
@@ -198,6 +297,72 @@ export default function StudentPage({ params }: { params: { code: string } }) {
       setStep("submitted");
     }
   }, [step, canViewReview]);
+
+  React.useEffect(() => {
+    if (step !== "submitted" || !attemptId) return;
+    let cancelled = false;
+    let pollCount = 0;
+    let pollTimer: number | null = null;
+
+    const run = async () => {
+      try {
+        const r = await fetch(`${API}/attempts/${attemptId}`);
+        if (!r.ok) return;
+        const data = await r.json();
+        if (cancelled) return;
+
+        const totals = data?.totals ?? data ?? {};
+        const totalScore =
+          data?.totalScore ?? data?.score ?? totals?.totalScore ?? totals?.score ?? null;
+        const maxScore = data?.maxScore ?? totals?.maxScore ?? null;
+        const canReviewFlag = Boolean(
+          data?.canReview ?? data?.review?.canReview ?? data?.reviewAllowed
+        );
+        const reviewBlockedReason =
+          data?.reviewBlockedReason ??
+          data?.review?.blockedReason ??
+          data?.reviewBlockedReason ??
+          null;
+        const reviewAvailableAt =
+          data?.reviewAvailableAt ?? data?.review?.availableAt ?? null;
+
+        setAttemptStatus({
+          totalScore,
+          maxScore,
+          canReview: canReviewFlag,
+          reviewBlockedReason,
+          reviewAvailableAt,
+        });
+
+        if (typeof data?.gradingMode === "string") {
+          setGradingMode(data.gradingMode);
+        }
+        if (totalScore !== null && totalScore !== undefined) {
+          setScore(totalScore);
+        }
+        if (maxScore !== null && maxScore !== undefined) {
+          setMaxScore(maxScore);
+        }
+
+        if (canReviewFlag || (maxScore && totalScore !== null)) {
+          return;
+        }
+      } catch (e) {
+        logDevError("ATTEMPT_STATUS_ERROR", e);
+      }
+
+      if (pollCount < 12) {
+        pollCount += 1;
+        pollTimer = window.setTimeout(run, 10000);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+      if (pollTimer) window.clearTimeout(pollTimer);
+    };
+  }, [attemptId, step]);
 
   function formatReviewDate(openAt?: string | null) {
     if (!openAt) return "Próximamente";
@@ -358,6 +523,53 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     };
   }, [attemptId, refreshSummary]);
 
+  React.useEffect(() => {
+    if (!attemptId || !resumeRef.current) return;
+    let cancelled = false;
+
+    const validate = async () => {
+      try {
+        const r = await fetch(`${API}/attempts/${attemptId}/summary`);
+        if (!r.ok && (r.status === 403 || r.status === 404)) {
+          if (cancelled) return;
+          clearStoredAttempt();
+          setAttemptId(null);
+          setAnswers({});
+          setStep("name");
+          setErr("No se pudo reanudar el intento.");
+          return;
+        }
+      } catch (e) {
+        logDevError("RESUME_VALIDATE_ERROR", e);
+      } finally {
+        resumeRef.current = false;
+      }
+    };
+
+    validate();
+    return () => {
+      cancelled = true;
+    };
+  }, [attemptId, clearStoredAttempt]);
+
+  React.useEffect(() => {
+    if (!attemptId || step !== "exam") return;
+
+    if (answersSaveTimer.current) {
+      window.clearTimeout(answersSaveTimer.current);
+    }
+
+    answersSaveTimer.current = window.setTimeout(() => {
+      updateStoredAttempt({ answersDraft: answers });
+    }, 300);
+
+    return () => {
+      if (answersSaveTimer.current) {
+        window.clearTimeout(answersSaveTimer.current);
+      }
+    };
+  }, [answers, attemptId, step, updateStoredAttempt]);
+
   const startAttempt = React.useCallback(async () => {
     if (!studentName.trim()) {
       setErr("Ingresá tu nombre antes de comenzar.");
@@ -412,12 +624,18 @@ export default function StudentPage({ params }: { params: { code: string } }) {
       setBlockedStart(null);
       setAttemptId(at.id);
       setStep("exam");
+      updateStoredAttempt({
+        attemptId: at.id,
+        studentName: studentName.trim(),
+        status: "in_progress",
+        answersDraft: {},
+      });
       await refreshSummary();
     } catch (e: any) {
       logDevError("START_ATTEMPT_ERROR", e);
       setFriendlyError(e);
     }
-  }, [code, studentName, refreshSummary]);
+  }, [code, studentName, refreshSummary, updateStoredAttempt]);
 
   const handleRetry = React.useCallback(() => {
     if (step === "name") {
@@ -473,13 +691,14 @@ export default function StudentPage({ params }: { params: { code: string } }) {
         setScore(data.score ?? null);
         setMaxScore(data.maxScore ?? null);
         setStep("submitted");
+        updateStoredAttempt({ status: "submitted", answersDraft: {} });
       } catch (e: any) {
         logDevError("SUBMIT_ATTEMPT_ERROR", e);
         setFriendlyError(e);
         setStep("exam");
       }
     },
-    [attemptId, answers, questions]
+    [attemptId, answers, questions, updateStoredAttempt]
   );
 
   const handleOpenReview = React.useCallback(() => {
@@ -933,19 +1152,43 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                 Tus respuestas han sido registradas exitosamente.
               </p>
 
-              {canViewReview ? (
+              {(() => {
+                const reviewAvailableAt =
+                  attemptStatus?.reviewAvailableAt ?? exam?.openAt ?? null;
+                const canReviewFlag =
+                  attemptStatus?.canReview ?? canViewReview ?? false;
+                const totalScore = attemptStatus?.totalScore ?? score;
+                const totalMax = attemptStatus?.maxScore ?? maxScore;
+                const hasGrade =
+                  typeof totalScore === "number" &&
+                  typeof totalMax === "number" &&
+                  totalMax > 0;
+                const percent = hasGrade
+                  ? Math.round((totalScore / totalMax) * 100)
+                  : null;
+
+                const reviewReason =
+                  attemptStatus?.reviewBlockedReason ??
+                  (!hasGrade ? "NOT_GRADED" : "NOT_OPEN_YET");
+
+                return canReviewFlag ? (
                 <>
-                  {gradingMode === "auto" ? (
+                  {hasGrade ? (
                     <div className="bg-white/40 p-6 rounded-2xl mb-6">
                       <div className="text-sm uppercase tracking-wider opacity-60">
                         Tu Calificación
                       </div>
                       <div className="text-5xl font-bold mt-2 text-gray-800">
-                        {score}{" "}
+                        {totalScore}{" "}
                         <span className="text-2xl text-gray-500">
-                          / {maxScore}
+                          / {totalMax}
                         </span>
                       </div>
+                      {percent !== null && (
+                        <div className="text-sm mt-2 opacity-70">
+                          {percent}% del puntaje total
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="bg-white/40 p-6 rounded-2xl mb-6">
@@ -969,14 +1212,58 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                     Ver revisión detallada (PDF)
                   </button>
                 </>
-              ) : (
+                ) : (
                 <div className="bg-white/40 p-6 rounded-2xl mb-6 border border-white/50">
-                  <p className="text-sm opacity-80 mb-1">Revisión programada</p>
-                  <p className="font-semibold text-lg">
-                    La revisión detallada estará disponible el: <br />
-                    {formatReviewDate(exam?.openAt)}
-                  </p>
+                  {!hasGrade ? (
+                    <>
+                      <p className="text-sm opacity-80 mb-1">
+                        Pendiente de corrección
+                      </p>
+                      <p className="font-semibold text-lg">
+                        El docente revisará tu examen pronto.
+                      </p>
+                    </>
+                  ) : reviewReason === "NOT_OPEN_YET" ? (
+                    <>
+                      <p className="text-sm opacity-80 mb-1">
+                        Revisión programada
+                      </p>
+                      <p className="font-semibold text-lg">
+                        La revisión detallada estará disponible el: <br />
+                        {formatReviewDate(reviewAvailableAt)}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm opacity-80 mb-1">
+                        Revisión no disponible
+                      </p>
+                      <p className="font-semibold text-lg">
+                        Aún no está corregido.
+                      </p>
+                    </>
+                  )}
                 </div>
+                );
+              })()}
+              {(attemptStatus?.canReview ?? canViewReview) ? null : (
+                <button
+                  type="button"
+                  disabled
+                  className="
+    w-full md:w-auto
+    px-6 py-3
+    rounded-full
+    text-sm font-bold
+    shadow-md
+    bg-white/40
+    text-gray-500
+    border border-white/60
+    cursor-not-allowed
+  "
+                >
+                  Ver revisión detallada (PDF)
+                </button>
               )}
             </div>
           )}
