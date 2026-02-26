@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { API, clearAuthToken, getAuthToken } from "@/lib/api";
@@ -92,6 +93,12 @@ export default function GradingDetailPage() {
   const [gradesInitialized, setGradesInitialized] = React.useState(false);
   const [reviewOpenAt, setReviewOpenAt] = React.useState<string | null>(null);
   const [isEditing, setIsEditing] = React.useState(false);
+  const [commentPopover, setCommentPopover] = React.useState<{
+    qid: string;
+    anchorRect: DOMRect;
+  } | null>(null);
+  const [popoverPos, setPopoverPos] = React.useState<{ top: number; left: number } | null>(null);
+  const popoverRef = React.useRef<HTMLDivElement | null>(null);
   const snapshotRef = React.useRef<{
     localGrades: Record<string, LocalGrade>;
     feedbackByQid: Record<string, string>;
@@ -422,6 +429,50 @@ export default function GradingDetailPage() {
     }
   }, []);
 
+  React.useLayoutEffect(() => {
+    if (!commentPopover || !popoverRef.current) return;
+    const margin = 12;
+    const gap = 8;
+    const rect = popoverRef.current.getBoundingClientRect();
+    const anchor = commentPopover.anchorRect;
+
+    let left = anchor.right + gap;
+    if (left + rect.width > window.innerWidth - margin) {
+      left = anchor.left - rect.width - gap;
+    }
+    let top = anchor.bottom + gap;
+    if (top + rect.height > window.innerHeight - margin) {
+      top = anchor.top - rect.height - gap;
+    }
+    left = Math.max(margin, Math.min(left, window.innerWidth - rect.width - margin));
+    top = Math.max(margin, Math.min(top, window.innerHeight - rect.height - margin));
+    setPopoverPos({ top, left });
+  }, [commentPopover]);
+
+  React.useEffect(() => {
+    if (!commentPopover) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (popoverRef.current && popoverRef.current.contains(target)) return;
+      if (target.closest('[data-comment-anchor="true"]')) return;
+      setCommentPopover(null);
+      setOpenCommentId(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setCommentPopover(null);
+        setOpenCommentId(null);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [commentPopover]);
+
   function parseJSONSafe(value: any) {
     if (value == null) return null;
     if (Array.isArray(value) || typeof value === "object") return value;
@@ -462,6 +513,16 @@ export default function GradingDetailPage() {
   function formatIndexAnswers(items: string[]) {
     if (!items.length) return "\u2014";
     return items.map((val, idx) => `${idx + 1}:${val || "\u2014"}`).join(" \u00B7 ");
+  }
+
+  function isEmptyAnswer(value: any) {
+    if (value == null) return true;
+    if (Array.isArray(value)) {
+      if (value.length === 0) return true;
+      return value.every((v) => String(v ?? "").trim() === "");
+    }
+    if (typeof value === "string") return value.trim() === "";
+    return false;
   }
 
   function getFibData(q: ReviewQuestion): FibData | null {
@@ -699,6 +760,10 @@ export default function GradingDetailPage() {
     }
   }
 
+  const activeQid = commentPopover?.qid ?? null;
+  const activeServerFb = activeQid ? serverFeedbackByQid.get(activeQid) ?? "" : "";
+  const activeEffectiveFb = activeQid ? getEffectiveFb(activeQid, activeServerFb) : "";
+
   return (
     <div className="min-h-screen p-6 md:p-10">
       <div className="max-w-5xl mx-auto">
@@ -895,13 +960,28 @@ export default function GradingDetailPage() {
                         (val, i) => norm(val) === norm(fib.correctAnswers[i] || "")
                       );
                       autoStatus = allMatch ? "correct" : "incorrect";
+                    } else {
+                      autoStatus = "incorrect";
                     }
-                  } else if (isMCQ && correctIndex != null && studentIndex != null) {
-                    autoStatus = isCorrect ? "correct" : "incorrect";
+                  } else if (isMCQ) {
+                    if (correctIndex != null && studentIndex != null) {
+                      autoStatus = isCorrect ? "correct" : "incorrect";
+                    } else {
+                      autoStatus = "incorrect";
+                    }
+                  } else if (isEmptyAnswer(q.given)) {
+                    autoStatus = "incorrect";
                   }
 
+                  const studentEmpty = isFib
+                    ? fib?.studentAnswers.every((v) => String(v ?? "").trim() === "")
+                    : isMCQ
+                    ? studentIndex == null
+                    : isEmptyAnswer(q.given);
                   const studentText =
-                    isMCQ && studentIndex != null
+                    studentEmpty
+                      ? "Sin respuesta"
+                      : isMCQ && studentIndex != null
                       ? `${optionLetters[studentIndex]}. ${options[studentIndex]}`
                       : isFib && fib
                       ? formatIndexAnswers(fib.studentAnswers)
@@ -1067,25 +1147,37 @@ export default function GradingDetailPage() {
                           <div className="flex-1 flex items-end justify-start relative">
                             <button
                               type="button"
-                              onClick={() =>
+                              onClick={(e) => {
+                                e.preventDefault();
+                                const el = e.currentTarget as HTMLElement | null;
                                 setOpenCommentId((prev) => {
                                   const next = prev === qid ? null : qid;
-                                  if (
-                                    next &&
-                                    (feedbackByQid[qid] === undefined ||
-                                      (!editedFeedbackQids.current.has(qid) &&
-                                        String(feedbackByQid[qid] ?? "").trim() === "")) &&
-                                    serverFb.trim().length > 0
-                                  ) {
-                                    setFeedbackByQid((prevMap) => ({
-                                      ...prevMap,
-                                      [qid]: serverFb,
-                                    }));
+                                  if (!next) {
+                                    setCommentPopover(null);
+                                    return null;
                                   }
+                                  if (
+                                    feedbackByQid[qid] === undefined ||
+                                    (!editedFeedbackQids.current.has(qid) &&
+                                      String(feedbackByQid[qid] ?? "").trim() === "")
+                                  ) {
+                                    if (serverFb.trim().length > 0) {
+                                      setFeedbackByQid((prevMap) => ({
+                                        ...prevMap,
+                                        [qid]: serverFb,
+                                      }));
+                                    }
+                                  }
+                                  if (!el) return prev ?? next;
+                                  setCommentPopover({
+                                    qid,
+                                    anchorRect: el.getBoundingClientRect(),
+                                  });
                                   return next;
-                                })
-                              }
+                                });
+                              }}
                               disabled={readOnly}
+                              data-comment-anchor="true"
                               className="btn-aurora px-3 py-2 rounded-xl text-xs font-bold relative flex items-center gap-2"
                               title="Comentario"
                             >
@@ -1097,50 +1189,6 @@ export default function GradingDetailPage() {
                                 </span>
                               ) : null}
                             </button>
-                            {openCommentId === qid && (
-                              <div className="pointer-events-none absolute left-0 top-full mt-2 z-20">
-                                <div className="pointer-events-auto bg-white/95 border border-white/60 shadow-lg rounded-xl p-3 w-64">
-                                  <div className="text-xs font-bold text-gray-600 mb-2">
-                                    Comentario
-                                  </div>
-                                  <textarea
-                                    value={getEffectiveFb(qid, serverFb)}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      editedFeedbackQids.current.add(qid);
-                                      setFeedbackByQid((prev) => ({
-                                        ...prev,
-                                        [qid]: val,
-                                      }));
-                                    }}
-                                    disabled={readOnly}
-                                    rows={3}
-                                    className="input-aurora w-full p-2 rounded-xl text-xs"
-                                  />
-                                  {commentSavedId === qid && (
-                                    <div className="mt-2 text-xs text-emerald-600 font-semibold">
-                                      {"Guardado \u2713"}
-                                    </div>
-                                  )}
-                                  <div className="mt-2 flex justify-end gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => setCommentSavedId(qid)}
-                                      className="btn-aurora-primary px-3 py-1.5 rounded-lg text-xs font-bold"
-                                    >
-                                      Guardar
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setOpenCommentId(null)}
-                                      className="btn-aurora px-3 py-1.5 rounded-lg text-xs font-bold"
-                                    >
-                                      Cerrar
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -1231,6 +1279,67 @@ export default function GradingDetailPage() {
           </div>
         </div>
       </div>
+      {mounted && commentPopover &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            className="fixed z-[9999] w-[340px] rounded-2xl bg-white shadow-xl border border-black/5 p-4"
+            style={{
+              top: popoverPos?.top ?? commentPopover.anchorRect.bottom + 8,
+              left: popoverPos?.left ?? commentPopover.anchorRect.right + 8,
+            }}
+          >
+            <div className="mb-2">
+              <h3 className="text-sm font-bold text-gray-800">Comentario</h3>
+              <p className="text-xs text-gray-500">
+                Dejá una devolución para el alumno.
+              </p>
+            </div>
+            <textarea
+              value={activeEffectiveFb}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (!activeQid) return;
+                editedFeedbackQids.current.add(activeQid);
+                setFeedbackByQid((prev) => ({
+                  ...prev,
+                  [activeQid]: val,
+                }));
+              }}
+              disabled={readOnly}
+              rows={4}
+              placeholder="Escribí un comentario…"
+              className="w-full rounded-xl border border-gray-200 p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+            {activeQid && commentSavedId === activeQid && (
+              <div className="mt-2 text-xs text-emerald-600 font-semibold">
+                {"Guardado \u2713"}
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setCommentPopover(null);
+                  setOpenCommentId(null);
+                }}
+                className="btn-aurora px-3 py-1.5 rounded-lg text-xs font-bold"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeQid) setCommentSavedId(activeQid);
+                }}
+                className="btn-aurora-primary px-3 py-1.5 rounded-lg text-xs font-bold"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

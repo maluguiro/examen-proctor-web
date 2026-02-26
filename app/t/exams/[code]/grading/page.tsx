@@ -11,6 +11,7 @@ type AttemptRow = {
   submittedAt?: string | null;
   status?: string | null;
   score?: number | null;
+  reviewOpenAt?: string | null;
 };
 
 export default function GradingInboxPage() {
@@ -56,10 +57,51 @@ export default function GradingInboxPage() {
     router.replace(`/t/exams/${code}/grading`);
   }, [code, router, searchParams]);
 
-  function mapStatus(status?: string | null) {
+  function isFinalStatus(status?: string | null) {
     const raw = String(status || "").toLowerCase();
-    if (raw === "graded" || raw === "corrected") return "Corregido";
-    return "Pendiente";
+    return raw === "graded" || raw === "corrected";
+  }
+
+  function mapStatus(status?: string | null) {
+    return isFinalStatus(status) ? "Corregido" : "Pendiente";
+  }
+
+  function formatDateTime(raw?: string | null) {
+    if (!raw) return "";
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString("es-AR");
+  }
+
+  function getEditLabel(
+    status?: string | null,
+    reviewOpenAt?: string | null
+  ) {
+    const isFinal = isFinalStatus(status);
+    if (!isFinal) return { text: "A corregir", tone: "neutral" as const };
+    if (!reviewOpenAt) {
+      return {
+        text: "Editable hasta habilitar revisión",
+        tone: "editable" as const,
+      };
+    }
+    const t = new Date(reviewOpenAt).getTime();
+    if (Number.isNaN(t)) {
+      return {
+        text: "Editable hasta habilitar revisión",
+        tone: "editable" as const,
+      };
+    }
+    if (Date.now() < t) {
+      return {
+        text: `Editable hasta ${formatDateTime(reviewOpenAt)}`,
+        tone: "editable" as const,
+      };
+    }
+    return {
+      text: "Bloqueado (revisión habilitada)",
+      tone: "blocked" as const,
+    };
   }
 
   React.useEffect(() => {
@@ -192,6 +234,27 @@ export default function GradingInboxPage() {
                       </td>
                         <td className="py-3 px-2 text-gray-500">
                           {mapStatus(row.status)}
+                          {(() => {
+                            const isFinal = isFinalStatus(row.status);
+                            const label = isFinal
+                              ? getEditLabel(row.status, row.reviewOpenAt ?? null)
+                              : row.score !== null && row.score !== undefined
+                              ? { text: "Borrador guardado", tone: "draft" as const }
+                              : { text: "A corregir", tone: "neutral" as const };
+                            const toneClass =
+                              label.tone === "editable"
+                                ? "text-emerald-600"
+                                : label.tone === "blocked"
+                                ? "text-rose-600"
+                                : label.tone === "draft"
+                                ? "text-sky-600"
+                                : "text-slate-500";
+                            return (
+                              <div className={`text-[11px] mt-1 ${toneClass}`}>
+                                {label.text}
+                              </div>
+                            );
+                          })()}
                         </td>
                       <td className="py-3 px-2 text-gray-500">
                         {row.score != null ? row.score : "-"}
@@ -201,9 +264,7 @@ export default function GradingInboxPage() {
                             href={`/t/exams/${code}/grading/${row.id}`}
                             className="btn-aurora px-3 py-1.5 rounded-lg text-xs font-bold"
                           >
-                            {mapStatus(row.status) === "Corregido"
-                              ? "Ver"
-                              : "Corregir"}
+                            {isFinalStatus(row.status) ? "Ver" : "Corregir"}
                           </Link>
                         </td>
                     </tr>
