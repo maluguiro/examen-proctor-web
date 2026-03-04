@@ -22,6 +22,7 @@ export default function GradingInboxPage() {
 
   const [loading, setLoading] = React.useState(true);
   const [attempts, setAttempts] = React.useState<AttemptRow[]>([]);
+  const [examOpenAt, setExamOpenAt] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [info, setInfo] = React.useState<string | null>(null);
   const [reloadKey, setReloadKey] = React.useState(0);
@@ -47,6 +48,13 @@ export default function GradingInboxPage() {
       }
     };
   }, [info]);
+
+  const reviewIsOpen = React.useMemo(() => {
+    if (!examOpenAt) return false;
+    const t = new Date(examOpenAt).getTime();
+    if (Number.isNaN(t)) return false;
+    return Date.now() >= t;
+  }, [examOpenAt]);
 
 
   React.useEffect(() => {
@@ -141,6 +149,9 @@ export default function GradingInboxPage() {
           : Array.isArray(data)
           ? data
           : [];
+        const openAt =
+          data?.examOpenAt ?? data?.exam?.openAt ?? data?.reviewOpenAt ?? null;
+        setExamOpenAt(openAt ?? null);
         if (process.env.NODE_ENV !== "production" && items.length === 0) {
           console.warn("Bandeja attempts empty; response shape:", data);
         }
@@ -195,6 +206,12 @@ export default function GradingInboxPage() {
             {info}
           </div>
         )}
+        {reviewIsOpen && (
+          <div className="mb-6 p-4 rounded-xl bg-amber-50 text-amber-800 border border-amber-100 text-sm font-semibold">
+            Revisión habilitada para alumnos. Las correcciones quedan
+            bloqueadas.
+          </div>
+        )}
 
         <div className="glass-panel p-4 md:p-6 rounded-3xl">
           <div className="overflow-x-auto">
@@ -236,8 +253,10 @@ export default function GradingInboxPage() {
                           {mapStatus(row.status)}
                           {(() => {
                             const isFinal = isFinalStatus(row.status);
+                            const effectiveOpenAt =
+                              examOpenAt ?? row.reviewOpenAt ?? null;
                             const label = isFinal
-                              ? getEditLabel(row.status, row.reviewOpenAt ?? null)
+                              ? getEditLabel(row.status, effectiveOpenAt)
                               : row.score !== null && row.score !== undefined
                               ? { text: "Borrador guardado", tone: "draft" as const }
                               : { text: "A corregir", tone: "neutral" as const };

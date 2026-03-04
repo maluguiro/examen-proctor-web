@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { API } from "@/lib/api";
 import ExamChat from "@/components/ExamChat";
 import FloatingChatShell from "@/components/FloatingChatShell";
@@ -31,6 +32,7 @@ type StoredAttempt = {
   status?: "in_progress" | "submitted";
   answersDraft?: Record<string, any>;
 };
+
 
 // Normaliza el kind que viene del backend al que usamos en el front
 function mapKind(raw: string): QKind {
@@ -139,6 +141,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     reviewBlockedReason?: string | null;
     reviewAvailableAt?: string | null;
   } | null>(null);
+  const router = useRouter();
   const [blockedStart, setBlockedStart] = React.useState<{
     reason: "EXAM_NOT_OPEN" | "EXAM_CLOSED";
     startsAt?: string | null;
@@ -292,6 +295,8 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     return hasScore && isTimeReached;
   }, [gradingMode, score, exam?.openAt]);
 
+  const canReviewFlag = attemptStatus?.canReview ?? canViewReview ?? false;
+
   React.useEffect(() => {
     if (step === "review" && !canViewReview) {
       setStep("submitted");
@@ -306,45 +311,60 @@ export default function StudentPage({ params }: { params: { code: string } }) {
 
     const run = async () => {
       try {
-        const r = await fetch(`${API}/attempts/${attemptId}`);
-        if (!r.ok) return;
-        const data = await r.json();
+        const url = `${API}/attempts/${attemptId}/review`;
+        const res = await fetchJsonOrNull(url);
         if (cancelled) return;
 
-        const totals = data?.totals ?? data ?? {};
-        const totalScore =
-          data?.totalScore ?? data?.score ?? totals?.totalScore ?? totals?.score ?? null;
-        const maxScore = data?.maxScore ?? totals?.maxScore ?? null;
-        const canReviewFlag = Boolean(
-          data?.canReview ?? data?.review?.canReview ?? data?.reviewAllowed
-        );
-        const reviewBlockedReason =
-          data?.reviewBlockedReason ??
-          data?.review?.blockedReason ??
-          data?.reviewBlockedReason ??
-          null;
-        const reviewAvailableAt =
-          data?.reviewAvailableAt ?? data?.review?.availableAt ?? null;
+        if (!res.ok) {
+          if (res.nonJson) {
+            setAttemptStatus({
+              totalScore: null,
+              maxScore: null,
+              canReview: false,
+              reviewBlockedReason: "ERROR",
+              reviewAvailableAt: null,
+            });
+          } else if (res.status === 403) {
+            const reason =
+              res.data?.reason ?? res.data?.reviewBlockedReason ?? "NOT_GRADED";
+            const reviewAvailableAt =
+              res.data?.reviewAvailableAt ?? res.data?.review?.availableAt ?? null;
+            setAttemptStatus({
+              totalScore: null,
+              maxScore: null,
+              canReview: false,
+              reviewBlockedReason: reason,
+              reviewAvailableAt,
+            });
+          } else {
+            setAttemptStatus({
+              totalScore: null,
+              maxScore: null,
+              canReview: false,
+              reviewBlockedReason: "ERROR",
+              reviewAvailableAt: null,
+            });
+          }
+        } else {
+          const data = res.data ?? {};
+          const totals = data?.totals ?? data ?? {};
+          const totalScore =
+            data?.totalScore ?? totals?.totalScore ?? data?.score ?? totals?.score ?? null;
+          const maxScore = data?.maxScore ?? totals?.maxScore ?? null;
+          setAttemptStatus({
+            totalScore,
+            maxScore,
+            canReview: true,
+            reviewBlockedReason: null,
+            reviewAvailableAt: null,
+          });
 
-        setAttemptStatus({
-          totalScore,
-          maxScore,
-          canReview: canReviewFlag,
-          reviewBlockedReason,
-          reviewAvailableAt,
-        });
-
-        if (typeof data?.gradingMode === "string") {
-          setGradingMode(data.gradingMode);
-        }
-        if (totalScore !== null && totalScore !== undefined) {
-          setScore(totalScore);
-        }
-        if (maxScore !== null && maxScore !== undefined) {
-          setMaxScore(maxScore);
-        }
-
-        if (canReviewFlag || (maxScore && totalScore !== null)) {
+          if (totalScore !== null && totalScore !== undefined) {
+            setScore(totalScore);
+          }
+          if (maxScore !== null && maxScore !== undefined) {
+            setMaxScore(maxScore);
+          }
           return;
         }
       } catch (e) {
@@ -363,6 +383,32 @@ export default function StudentPage({ params }: { params: { code: string } }) {
       if (pollTimer) window.clearTimeout(pollTimer);
     };
   }, [attemptId, step]);
+
+  function logDevFetchIssue(status: number, url: string, contentType: string) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[review gate] non-json response", {
+        status,
+        url,
+        contentType,
+      });
+    }
+  }
+
+  async function fetchJsonOrNull(url: string) {
+    const res = await fetch(url, { cache: "no-store" });
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      logDevFetchIssue(res.status, url, contentType);
+      return {
+        ok: false,
+        nonJson: true as const,
+        status: res.status,
+        data: null,
+      };
+    }
+    const data = await res.json().catch(() => null);
+    return { ok: res.ok, nonJson: false as const, status: res.status, data };
+  }
 
   function formatReviewDate(openAt?: string | null) {
     if (!openAt) return "Próximamente";
@@ -745,6 +791,11 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     },
     [attemptId, refreshSummary, submitAttempt]
   );
+
+  const handleOpenReviewPage = React.useCallback(() => {
+    if (!canReviewFlag || !attemptId) return;
+    router.push(`/s/${code}/review?attemptId=${encodeURIComponent(attemptId)}`);
+  }, [attemptId, canReviewFlag, code, router]);
 
   React.useEffect(() => {
     if (!attemptId || step !== "exam") return;
@@ -1155,8 +1206,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
               {(() => {
                 const reviewAvailableAt =
                   attemptStatus?.reviewAvailableAt ?? exam?.openAt ?? null;
-                const canReviewFlag =
-                  attemptStatus?.canReview ?? canViewReview ?? false;
                 const totalScore = attemptStatus?.totalScore ?? score;
                 const totalMax = attemptStatus?.maxScore ?? maxScore;
                 const hasGrade =
@@ -1171,9 +1220,19 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                   attemptStatus?.reviewBlockedReason ??
                   (!hasGrade ? "NOT_GRADED" : "NOT_OPEN_YET");
 
+                const statusMessage = canReviewFlag
+                  ? "Tu examen ya fue corregido. Podés ver tu nota y comentarios."
+                  : reviewReason === "NOT_OPEN_YET"
+                  ? `Tu examen fue corregido. La revisión estará disponible el ${formatReviewDate(
+                      reviewAvailableAt
+                    )}.`
+                  : reviewReason === "NOT_GRADED"
+                  ? "El docente corregirá tu examen pronto."
+                  : "No se pudo validar la revisión. Intentá de nuevo.";
+
                 return canReviewFlag ? (
                 <>
-                  {hasGrade ? (
+                  {hasGrade && (
                     <div className="bg-white/40 p-6 rounded-2xl mb-6">
                       <div className="text-sm uppercase tracking-wider opacity-60">
                         Tu Calificación
@@ -1190,81 +1249,34 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                         </div>
                       )}
                     </div>
-                  ) : (
-                    <div className="bg-white/40 p-6 rounded-2xl mb-6">
-                      <p>El docente revisará tu examen pronto.</p>
-                    </div>
                   )}
 
-                  <button
-                    onClick={handleOpenReview}
-                    className="
-    w-full md:w-auto
-    px-6 py-3
-    rounded-full
-    text-sm font-bold
-    shadow-md hover:shadow-lg transition-all
-    bg-gradient-to-r from-lime-300 via-amber-300 to-orange-300
-    text-[#1f2933]
-    border border-white/60
-  "
-                  >
-                    Ver revisión detallada (PDF)
-                  </button>
+                  <div className="text-sm text-gray-700 mb-4">
+                    {statusMessage}
+                  </div>
+                  <div className="flex flex-col items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleOpenReviewPage}
+                      className="btn-aurora-primary px-5 py-2 rounded-full text-xs font-bold"
+                    >
+                      Ver revisión
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenReview}
+                      className="text-xs font-semibold text-gray-700 underline underline-offset-4"
+                    >
+                      Descargar PDF
+                    </button>
+                  </div>
                 </>
                 ) : (
                 <div className="bg-white/40 p-6 rounded-2xl mb-6 border border-white/50">
-                  {!hasGrade ? (
-                    <>
-                      <p className="text-sm opacity-80 mb-1">
-                        Pendiente de corrección
-                      </p>
-                      <p className="font-semibold text-lg">
-                        El docente revisará tu examen pronto.
-                      </p>
-                    </>
-                  ) : reviewReason === "NOT_OPEN_YET" ? (
-                    <>
-                      <p className="text-sm opacity-80 mb-1">
-                        Revisión programada
-                      </p>
-                      <p className="font-semibold text-lg">
-                        La revisión detallada estará disponible el: <br />
-                        {formatReviewDate(reviewAvailableAt)}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm opacity-80 mb-1">
-                        Revisión no disponible
-                      </p>
-                      <p className="font-semibold text-lg">
-                        Aún no está corregido.
-                      </p>
-                    </>
-                  )}
+                  <p className="font-semibold text-lg">{statusMessage}</p>
                 </div>
                 );
               })()}
-              {(attemptStatus?.canReview ?? canViewReview) ? null : (
-                <button
-                  type="button"
-                  disabled
-                  className="
-    w-full md:w-auto
-    px-6 py-3
-    rounded-full
-    text-sm font-bold
-    shadow-md
-    bg-white/40
-    text-gray-500
-    border border-white/60
-    cursor-not-allowed
-  "
-                >
-                  Ver revisión detallada (PDF)
-                </button>
-              )}
             </div>
           )}
         </div>
