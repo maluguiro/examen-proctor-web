@@ -750,7 +750,7 @@ export default function StudentPage({ params }: { params: { code: string } }) {
   const handleOpenReview = React.useCallback(() => {
     if (!attemptId) return;
     const url = `${API}/attempts/${attemptId}/review.print`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.location.href = url;
   }, [attemptId]);
 
   const reportViolation = React.useCallback(
@@ -791,11 +791,6 @@ export default function StudentPage({ params }: { params: { code: string } }) {
     },
     [attemptId, refreshSummary, submitAttempt]
   );
-
-  const handleOpenReviewPage = React.useCallback(() => {
-    if (!canReviewFlag || !attemptId) return;
-    router.push(`/s/${code}/review?attemptId=${encodeURIComponent(attemptId)}`);
-  }, [attemptId, canReviewFlag, code, router]);
 
   React.useEffect(() => {
     if (!attemptId || step !== "exam") return;
@@ -1223,11 +1218,11 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                 const statusMessage = canReviewFlag
                   ? "Tu examen ya fue corregido. Podés ver tu nota y comentarios."
                   : reviewReason === "NOT_OPEN_YET"
-                  ? `Tu examen fue corregido. La revisión estará disponible el ${formatReviewDate(
+                  ? `La revisión estará habilitada el ${formatReviewDate(
                       reviewAvailableAt
                     )}.`
                   : reviewReason === "NOT_GRADED"
-                  ? "El docente corregirá tu examen pronto."
+                  ? "El docente revisará tu examen pronto."
                   : "No se pudo validar la revisión. Intentá de nuevo.";
 
                 return canReviewFlag ? (
@@ -1257,17 +1252,10 @@ export default function StudentPage({ params }: { params: { code: string } }) {
                   <div className="flex flex-col items-center gap-3">
                     <button
                       type="button"
-                      onClick={handleOpenReviewPage}
+                      onClick={handleOpenReview}
                       className="btn-aurora-primary px-5 py-2 rounded-full text-xs font-bold"
                     >
-                      Ver revisión
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleOpenReview}
-                      className="text-xs font-semibold text-gray-700 underline underline-offset-4"
-                    >
-                      Descargar PDF
+                      Ver revisión (PDF)
                     </button>
                   </div>
                 </>
